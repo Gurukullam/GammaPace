@@ -1,0 +1,38 @@
+{
+  "name": "ielts-stripe-backend",
+  "version": "1.0.0",
+  "description": "Vercel serverless backend for IELTS Stripe payment processing",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required'",
+    "start": "vercel dev",
+    "deploy": "vercel deploy --prod",
+    "logs": "vercel logs --follow"
+  },
+  "keywords": [
+    "stripe",
+    "payment",
+    "ielts",
+    "vercel",
+    "serverless",
+    "nodejs"
+  ],
+  "author": "IELTS Practice App",
+  "license": "ISC",
+  "dependencies": {
+    "stripe": "^14.21.0",
+    "micro": "^10.0.1"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/VercelDeploymentSetup.git"
+  },
+  "homepage": "https://www.gammapace.com"
+} 
