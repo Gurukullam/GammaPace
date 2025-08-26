@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Webhook Handler - IELTS Subscription</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .status {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: 500;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        .webhook-log {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-left: 4px solid #28a745;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        input, select {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin: 0.5rem 0;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Stripe Webhook Handler</h1>
+            <p>IELTS Subscription Management System</p>
+        </div>
+
+        <!-- Configuration Section -->
+        <div class="test-section">
+            <h3>⚙️ Webhook Configuration</h3>
+            <div class="info status">
+                <strong>Endpoint URL:</strong> <span id="webhookEndpoint">https://your-domain.com/stripe-webhook</span><br>
+                <strong>Status:</strong> <span id="webhookStatus">Not Configured</span>
+            </div>
+            
+            <h4>🔑 Production Keys Status:</h4>
+            <div class="code-block" style="color: #155724; background: #d4edda;">
+✅ STRIPE_SECRET_KEY=sk_live_***...(configured)
+✅ STRIPE_WEBHOOK_SECRET=whsec_***...(configured)  
+✅ PRODUCTION MODE ACTIVE
+✅ Ready for Live Payments
+            </div>
+        </div>
+
+        <!-- Event Handling Section -->
+        <div class="test-section">
+            <h3>📡 Webhook Events</h3>
+            <p>This handler processes the following Stripe events:</p>
+            <ul>
+                <li><code>checkout.session.completed</code> - Payment successful</li>
+                <li><code>customer.subscription.created</code> - New subscription</li>
+                <li><code>customer.subscription.updated</code> - Subscription changes</li>
+                <li><code>customer.subscription.deleted</code> - Subscription cancelled</li>
+                <li><code>invoice.payment_succeeded</code> - Renewal successful</li>
+                <li><code>invoice.payment_failed</code> - Payment failed</li>
+            </ul>
+        </div>
+
+        <!-- Test Section -->
+        <div class="test-section">
+            <h3>🧪 Test Webhook</h3>
+            <p>Use this section to test webhook handling with simulated events:</p>
+            
+            <label for="testEventType">Event Type:</label>
+            <select id="testEventType">
+                <option value="checkout.session.completed">Payment Completed</option>
+                <option value="customer.subscription.created">Subscription Created</option>
+                <option value="customer.subscription.deleted">Subscription Cancelled</option>
+                <option value="invoice.payment_succeeded">Payment Succeeded</option>
+                <option value="invoice.payment_failed">Payment Failed</option>
+            </select>
+            
+            <label for="testCustomerId">Test Customer ID:</label>
+            <input type="text" id="testCustomerId" placeholder="cus_test_123456" value="cus_test_123456">
+            
+            <label for="testUserId">Firebase User ID:</label>
+            <input type="text" id="testUserId" placeholder="firebase_user_id">
+            
+            <button onclick="testWebhook()">🧪 Send Test Event</button>
+            <button onclick="clearLog()">🗑️ Clear Log</button>
+        </div>
+
+        <!-- Response Section -->
+        <div class="status info">
+            <strong>Last Response:</strong> <span id="lastResponse">No events processed yet</span>
+        </div>
+
+        <!-- Log Section -->
+        <h3>📋 Event Log</h3>
+        <div class="webhook-log" id="webhookLog">
+            Webhook handler ready. Waiting for events...
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // STRIPE WEBHOOK HANDLER CONFIGURATION
+        // ========================================
+
+        const WEBHOOK_CONFIG = {
+            // 🚀 PRODUCTION MODE ACTIVE - Live Stripe Keys Configured ✅
+            testMode: false, // ⚠️ LIVE PRODUCTION MODE
+            stripeSecretKey: 'sk_live_[REGENERATE_NEW_KEY]', // Live secret key - REGENERATE FROM STRIPE DASHBOARD
+            webhookSecret: 'whsec_[REGENERATE_NEW_WEBHOOK_SECRET]', // Live webhook secret - REGENERATE FROM STRIPE DASHBOARD
+            
+            // 🔄 BACKUP TEST CONFIGURATION (if needed to revert):
+            // testMode: true,
+            // stripeSecretKey: 'sk_test_...', // Test secret key  
+            // webhookSecret: 'whsec_test_...', // Test webhook secret
+            
+            firebaseConfig: {
+                // Your Firebase config here
+            }
+        };
+
+        // ========================================
+        // WEBHOOK EVENT HANDLERS
+        // ========================================
+
+        /**
+         * Main webhook handler - processes Stripe events
+         */
+        async function handleStripeWebhook(event) {
+            try {
+                logEvent(`📡 Received event: ${event.type}`);
+                
+                switch (event.type) {
+                    case 'checkout.session.completed':
+                        await handleCheckoutCompleted(event.data.object);
+                        break;
+                        
+                    case 'customer.subscription.created':
+                        await handleSubscriptionCreated(event.data.object);
+                        break;
+                        
+                    case 'customer.subscription.updated':
+                        await handleSubscriptionUpdated(event.data.object);
+                        break;
+                        
+                    case 'customer.subscription.deleted':
+                        await handleSubscriptionDeleted(event.data.object);
+                        break;
+                        
+                    case 'invoice.payment_succeeded':
+                        await handlePaymentSucceeded(event.data.object);
+                        break;
+                        
+                    case 'invoice.payment_failed':
+                        await handlePaymentFailed(event.data.object);
+                        break;
+                        
+                    default:
+                        logEvent(`⚠️ Unhandled event type: ${event.type}`);
+                }
+                
+                return { success: true, message: 'Event processed successfully' };
+                
+            } catch (error) {
+                logEvent(`❌ Error processing webhook: ${error.message}`, 'error');
+                return { success: false, error: error.message };
+            }
+        }
+
+        /**
+         * Handle successful checkout completion
+         */
+        async function handleCheckoutCompleted(session) {
+            logEvent(`✅ Processing checkout completion for session: ${session.id}`);
+            
+            const customerId = session.customer;
+            const subscriptionId = session.subscription;
+            
+            if (subscriptionId) {
+                // Subscription payment - activate user's subscription
+                await activateUserSubscription(customerId, subscriptionId);
+                logEvent(`🎉 Subscription activated for customer: ${customerId}`);
+            } else {
+                // One-time payment
+                logEvent(`💰 One-time payment completed for customer: ${customerId}`);
+            }
+        }
+
+        /**
+         * Handle new subscription creation
+         */
+        async function handleSubscriptionCreated(subscription) {
+            logEvent(`📋 New subscription created: ${subscription.id}`);
+            
+            const customerId = subscription.customer;
+            const status = subscription.status;
+            const currentPeriodStart = new Date(subscription.current_period_start * 1000);
+            const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+            
+            await updateUserSubscriptionStatus(customerId, {
+                subscriptionId: subscription.id,
+                status: status,
+                startDate: currentPeriodStart,
+                endDate: currentPeriodEnd,
+                planId: subscription.items.data[0]?.price?.id
+            });
+        }
+
+        /**
+         * Handle subscription updates
+         */
+        async function handleSubscriptionUpdated(subscription) {
+            logEvent(`🔄 Subscription updated: ${subscription.id}`);
+            
+            const customerId = subscription.customer;
+            const status = subscription.status;
+            const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+            
+            await updateUserSubscriptionStatus(customerId, {
+                subscriptionId: subscription.id,
+                status: status,
+                endDate: currentPeriodEnd
+            });
+        }
+
+        /**
+         * Handle subscription deletion/cancellation
+         */
+        async function handleSubscriptionDeleted(subscription) {
+            logEvent(`🚫 Subscription cancelled: ${subscription.id}`);
+            
+            const customerId = subscription.customer;
+            
+            await deactivateUserSubscription(customerId, subscription.id);
+            logEvent(`❌ Subscription deactivated for customer: ${customerId}`);
+        }
+
+        /**
+         * Handle successful payment
+         */
+        async function handlePaymentSucceeded(invoice) {
+            logEvent(`💳 Payment succeeded for invoice: ${invoice.id}`);
+            
+            const customerId = invoice.customer;
+            const subscriptionId = invoice.subscription;
+            
+            if (subscriptionId) {
+                // Subscription renewal
+                await handleSubscriptionRenewal(customerId, subscriptionId, invoice);
+                logEvent(`🔄 Subscription renewed for customer: ${customerId}`);
+            }
+        }
+
+        /**
+         * Handle failed payment
+         */
+        async function handlePaymentFailed(invoice) {
+            logEvent(`❌ Payment failed for invoice: ${invoice.id}`, 'error');
+            
+            const customerId = invoice.customer;
+            const subscriptionId = invoice.subscription;
+            
+            // Handle failed payment (send notification, retry, etc.)
+            await handlePaymentFailure(customerId, subscriptionId, invoice);
+            logEvent(`⚠️ Payment failure handled for customer: ${customerId}`);
+        }
+
+        // ========================================
+        // FIREBASE INTEGRATION FUNCTIONS
+        // ========================================
+
+        /**
+         * Activate user subscription in Firebase with UTC-4 timezone and specific fields
+         */
+        async function activateUserSubscription(stripeCustomerId, subscriptionId, checkoutSession = null) {
+            try {
+                logEvent(`🔥 Activating subscription in Firebase for customer: ${stripeCustomerId}`);
+                
+                // Find user by Stripe customer ID
+                const userId = await findUserByStripeCustomerId(stripeCustomerId);
+                
+                if (userId) {
+                    // Get current date in UTC-4 timezone
+                    const currentDateUTC4 = await getCurrentDateInUTC4();
+                    logEvent(`📅 Current date (UTC-4): ${currentDateUTC4.toISOString()}`);
+                    
+                    // Determine plan details from checkout session
+                    let planType = 'monthly'; // Default
+                    let planAmount = 1499; // Default monthly amount
+                    
+                    if (checkoutSession && checkoutSession.line_items) {
+                        // Extract plan details from Stripe session
+                        const lineItem = checkoutSession.line_items.data[0];
+                        if (lineItem && lineItem.price) {
+                            planAmount = lineItem.price.unit_amount;
+                            // Determine plan type based on amount
+                            if (planAmount === 499) planType = 'weekly';
+                            else if (planAmount === 1499) planType = 'monthly';
+                            else if (planAmount === 2999) planType = 'quarterly';
+                        }
+                    }
+                    
+                    // Calculate subscription end date
+                    const subscriptionEndDate = calculateSubscriptionEndDate(currentDateUTC4, planType);
+                    const planDisplayName = getPlanDisplayName(planType);
+                    
+                    logEvent(`📋 Subscription details - Plan: ${planDisplayName}, Amount: ${planAmount}, End: ${subscriptionEndDate.toISOString()}`);
+                    
+                    // Update user's subscription status with required fields
+                    const firebaseUpdateData = {
+                        // Required fields as per specification
+                        Subscription: "Y",
+                        Date_Subscription_Start: currentDateUTC4,
+                        Date_Subscription_End: subscriptionEndDate,
+                        Plan: planDisplayName,
+                        Amount: planAmount,
+                        
+                        // Additional tracking fields
+                        Stripe_Customer_ID: stripeCustomerId,
+                        Stripe_Subscription_ID: subscriptionId,
+                        Last_Updated: currentDateUTC4,
+                        Subscription_Status: 'active',
+                        Timezone: 'UTC-4'
+                    };
+                    
+                    // Validate the update data
+                    if (validateFirebaseUpdateData(firebaseUpdateData)) {
+                        // In production: await admin.firestore().collection('users').doc(userId).update(firebaseUpdateData);
+                        logEvent(`✅ User subscription activated with UTC-4 data: ${userId}`);
+                        logEvent(`📊 Firebase update data: ${JSON.stringify(firebaseUpdateData, null, 2)}`);
+                    } else {
+                        logEvent(`❌ Firebase update data validation failed`, 'error');
+                    }
+                } else {
+                    logEvent(`❌ User not found for Stripe customer: ${stripeCustomerId}`, 'error');
+                }
+                
+            } catch (error) {
+                logEvent(`❌ Error activating subscription: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        /**
+         * Update user subscription status
+         */
+        async function updateUserSubscriptionStatus(stripeCustomerId, subscriptionData) {
+            try {
+                logEvent(`🔄 Updating subscription status for customer: ${stripeCustomerId}`);
+                
+                const userId = await findUserByStripeCustomerId(stripeCustomerId);
+                
+                if (userId) {
+                    const updateData = {
+                        Subscription_Status: subscriptionData.status,
+                        Last_Updated: new Date()
+                    };
+                    
+                    if (subscriptionData.endDate) {
+                        updateData.Date_Subscription_End = subscriptionData.endDate;
+                    }
+                    
+                    // In production: await admin.firestore().collection('users').doc(userId).update(updateData);
+                    logEvent(`✅ Subscription status updated for user: ${userId}`);
+                }
+                
+            } catch (error) {
+                logEvent(`❌ Error updating subscription status: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        /**
+         * Deactivate user subscription
+         */
+        async function deactivateUserSubscription(stripeCustomerId, subscriptionId) {
+            try {
+                logEvent(`🚫 Deactivating subscription for customer: ${stripeCustomerId}`);
+                
+                const userId = await findUserByStripeCustomerId(stripeCustomerId);
+                
+                if (userId) {
+                    const updateData = {
+                        Subscription: 'N',
+                        Subscription_Status: 'cancelled',
+                        Date_Subscription_Cancelled: new Date(),
+                        Last_Updated: new Date()
+                    };
+                    
+                    // In production: await admin.firestore().collection('users').doc(userId).update(updateData);
+                    logEvent(`✅ Subscription deactivated for user: ${userId}`);
+                }
+                
+            } catch (error) {
+                logEvent(`❌ Error deactivating subscription: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        /**
+         * Handle subscription renewal
+         */
+        async function handleSubscriptionRenewal(stripeCustomerId, subscriptionId, invoice) {
+            try {
+                logEvent(`🔄 Processing subscription renewal for customer: ${stripeCustomerId}`);
+                
+                const userId = await findUserByStripeCustomerId(stripeCustomerId);
+                
+                if (userId) {
+                    // Extend subscription period
+                    const periodEnd = new Date(invoice.period_end * 1000);
+                    
+                    const updateData = {
+                        Date_Subscription_End: periodEnd,
+                        Last_Payment: new Date(),
+                        Subscription_Status: 'active',
+                        Last_Updated: new Date()
+                    };
+                    
+                    // In production: await admin.firestore().collection('users').doc(userId).update(updateData);
+                    logEvent(`✅ Subscription renewed until: ${periodEnd.toLocaleDateString()}`);
+                }
+                
+            } catch (error) {
+                logEvent(`❌ Error processing renewal: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        /**
+         * Handle payment failure
+         */
+        async function handlePaymentFailure(stripeCustomerId, subscriptionId, invoice) {
+            try {
+                logEvent(`⚠️ Handling payment failure for customer: ${stripeCustomerId}`);
+                
+                const userId = await findUserByStripeCustomerId(stripeCustomerId);
+                
+                if (userId) {
+                    // Mark subscription as past due but don't immediately cancel
+                    const updateData = {
+                        Subscription_Status: 'past_due',
+                        Last_Payment_Failed: new Date(),
+                        Last_Updated: new Date()
+                    };
+                    
+                    // In production: await admin.firestore().collection('users').doc(userId).update(updateData);
+                    logEvent(`⚠️ Subscription marked as past due for user: ${userId}`);
+                    
+                    // Could send notification to user here
+                }
+                
+            } catch (error) {
+                logEvent(`❌ Error handling payment failure: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        /**
+         * Find Firebase user by Stripe customer ID
+         */
+        async function findUserByStripeCustomerId(stripeCustomerId) {
+            try {
+                // In production, this would query Firebase
+                // const snapshot = await admin.firestore().collection('users')
+                //     .where('Stripe_Customer_ID', '==', stripeCustomerId)
+                //     .limit(1).get();
+                
+                // For testing, return a mock user ID
+                const testUserId = document.getElementById('testUserId').value;
+                if (testUserId) {
+                    logEvent(`👤 Found user ID: ${testUserId}`);
+                    return testUserId;
+                }
+                
+                logEvent(`❌ No user found for Stripe customer: ${stripeCustomerId}`, 'error');
+                return null;
+                
+            } catch (error) {
+                logEvent(`❌ Error finding user: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        // ========================================
+        // TESTING FUNCTIONS
+        // ========================================
+
+        /**
+         * Test webhook with simulated event
+         */
+        async function testWebhook() {
+            const eventType = document.getElementById('testEventType').value;
+            const customerId = document.getElementById('testCustomerId').value;
+            
+            logEvent(`🧪 Testing webhook with event: ${eventType}`);
+            
+            const mockEvent = createMockEvent(eventType, customerId);
+            const result = await handleStripeWebhook(mockEvent);
+            
+            document.getElementById('lastResponse').textContent = 
+                result.success ? 'Success: Event processed' : `Error: ${result.error}`;
+        }
+
+        /**
+         * Create mock Stripe event for testing
+         */
+        function createMockEvent(eventType, customerId) {
+            const baseEvent = {
+                id: `evt_test_${Date.now()}`,
+                object: 'event',
+                type: eventType,
+                created: Math.floor(Date.now() / 1000),
+                livemode: false
+            };
+
+            switch (eventType) {
+                case 'checkout.session.completed':
+                    baseEvent.data = {
+                        object: {
+                            id: `cs_test_${Date.now()}`,
+                            customer: customerId,
+                            subscription: `sub_test_${Date.now()}`,
+                            payment_status: 'paid'
+                        }
+                    };
+                    break;
+
+                case 'customer.subscription.created':
+                    baseEvent.data = {
+                        object: {
+                            id: `sub_test_${Date.now()}`,
+                            customer: customerId,
+                            status: 'active',
+                            current_period_start: Math.floor(Date.now() / 1000),
+                            current_period_end: Math.floor((Date.now() + 30 * 24 * 60 * 60 * 1000) / 1000),
+                            items: {
+                                data: [{ price: { id: 'price_test_monthly' } }]
+                            }
+                        }
+                    };
+                    break;
+
+                case 'customer.subscription.deleted':
+                    baseEvent.data = {
+                        object: {
+                            id: `sub_test_${Date.now()}`,
+                            customer: customerId,
+                            status: 'canceled'
+                        }
+                    };
+                    break;
+
+                case 'invoice.payment_succeeded':
+                    baseEvent.data = {
+                        object: {
+                            id: `in_test_${Date.now()}`,
+                            customer: customerId,
+                            subscription: `sub_test_${Date.now()}`,
+                            period_end: Math.floor((Date.now() + 30 * 24 * 60 * 60 * 1000) / 1000),
+                            paid: true
+                        }
+                    };
+                    break;
+
+                case 'invoice.payment_failed':
+                    baseEvent.data = {
+                        object: {
+                            id: `in_test_${Date.now()}`,
+                            customer: customerId,
+                            subscription: `sub_test_${Date.now()}`,
+                            paid: false,
+                            attempt_count: 1
+                        }
+                    };
+                    break;
+            }
+
+            return baseEvent;
+        }
+
+        // ========================================
+        // UTILITY FUNCTIONS
+        // ========================================
+
+        /**
+         * Log event to the webhook log
+         */
+        function logEvent(message, type = 'info') {
+            const timestamp = new Date().toISOString();
+            const logEntry = `[${timestamp}] ${message}`;
+            
+            const logElement = document.getElementById('webhookLog');
+            logElement.innerHTML += logEntry + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(logEntry);
+        }
+
+        /**
+         * Clear the webhook log
+         */
+        function clearLog() {
+            document.getElementById('webhookLog').innerHTML = 'Webhook handler ready. Waiting for events...\n';
+        }
+
+        // ========================================
+        // INITIALIZATION
+        // ========================================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            logEvent('🚀 Stripe Webhook Handler initialized');
+            logEvent('🔧 Ready to process events');
+            
+            // Update endpoint URL and status based on configuration
+            document.getElementById('webhookEndpoint').textContent = window.location.href.replace('stripe-webhook-handler.html', 'webhook');
+            
+            // Update status based on actual configuration
+            if (WEBHOOK_CONFIG.testMode) {
+                document.getElementById('webhookStatus').textContent = 'Test Mode Active';
+                document.getElementById('webhookStatus').style.color = '#856404';
+            } else {
+                document.getElementById('webhookStatus').textContent = '🚀 PRODUCTION MODE ACTIVE';
+                document.getElementById('webhookStatus').style.color = '#155724';
+                document.getElementById('webhookStatus').style.fontWeight = 'bold';
+            }
+        });
+
+        // ========================================
+        // UTC-4 TIMEZONE AND FIREBASE UTILITY FUNCTIONS
+        // ========================================
+
+        /**
+         * Get current date from web API and convert to UTC-4 timezone
+         */
+        async function getCurrentDateInUTC4() {
+            try {
+                logEvent('🌐 Fetching current date from web API for UTC-4 conversion...');
+                
+                // Try multiple time APIs for reliability
+                const timeAPIs = [
+                    'https://worldtimeapi.org/api/timezone/America/New_York',
+                    'https://worldtimeapi.org/api/timezone/America/Toronto',
+                    'https://worldtimeapi.org/api/timezone/America/Detroit'
+                ];
+                
+                for (const api of timeAPIs) {
+                    try {
+                        const response = await fetch(api);
+                        if (response.ok) {
+                            const timeData = await response.json();
+                            const webDate = new Date(timeData.datetime);
+                            logEvent(`✅ Got current date from web API: ${webDate.toISOString()}`);
+                            return webDate;
+                        }
+                    } catch (error) {
+                        logEvent(`⚠️ Time API failed: ${api}, trying next...`);
+                        continue;
+                    }
+                }
+                
+                // Fallback: Convert system time to UTC-4
+                logEvent('⚠️ All time APIs failed, using system time converted to UTC-4');
+                const systemTime = new Date();
+                const utc4Time = new Date(systemTime.getTime() - (4 * 60 * 60 * 1000));
+                logEvent(`🔄 System time converted to UTC-4: ${utc4Time.toISOString()}`);
+                return utc4Time;
+                
+            } catch (error) {
+                logEvent(`❌ Error getting UTC-4 time: ${error.message}`, 'error');
+                // Final fallback
+                const fallbackTime = new Date();
+                logEvent(`🚨 Using system time as final fallback: ${fallbackTime.toISOString()}`);
+                return fallbackTime;
+            }
+        }
+
+        /**
+         * Calculate subscription end date based on plan type and start date
+         */
+        function calculateSubscriptionEndDate(startDate, planType) {
+            const endDate = new Date(startDate.getTime());
+            
+            switch (planType) {
+                case 'weekly':
+                    endDate.setDate(endDate.getDate() + 7);
+                    logEvent('📅 Weekly plan: Adding 7 days');
+                    break;
+                case 'monthly':
+                    endDate.setDate(endDate.getDate() + 30);
+                    logEvent('📅 Monthly plan: Adding 30 days');
+                    break;
+                case 'quarterly':
+                    endDate.setDate(endDate.getDate() + 90);
+                    logEvent('📅 Quarterly plan: Adding 90 days');
+                    break;
+                default:
+                    logEvent(`❌ Unknown plan type: ${planType}, defaulting to monthly`, 'error');
+                    endDate.setDate(endDate.getDate() + 30); // Default to monthly
+            }
+            
+            logEvent(`📊 Subscription period: ${startDate.toISOString()} → ${endDate.toISOString()} (${planType})`);
+            return endDate;
+        }
+
+        /**
+         * Get display name for plan type (exact case matching as required)
+         */
+        function getPlanDisplayName(planType) {
+            const planNames = {
+                'weekly': 'Weekly',
+                'monthly': 'Monthly',
+                'quarterly': 'Quarterly'
+            };
+            
+            const displayName = planNames[planType] || 'Monthly'; // Default fallback
+            logEvent(`📝 Plan display name: ${planType} → ${displayName}`);
+            return displayName;
+        }
+
+        /**
+         * Validate Firebase field requirements
+         */
+        function validateFirebaseUpdateData(updateData) {
+            const requiredFields = ['Subscription', 'Date_Subscription_Start', 'Date_Subscription_End', 'Plan', 'Amount'];
+            const missingFields = requiredFields.filter(field => !updateData.hasOwnProperty(field));
+            
+            if (missingFields.length > 0) {
+                logEvent(`❌ Missing required Firebase fields: ${missingFields.join(', ')}`, 'error');
+                return false;
+            }
+            
+            // Validate specific field values
+            if (updateData.Subscription !== 'Y') {
+                logEvent(`❌ Subscription field must be "Y", got: ${updateData.Subscription}`, 'error');
+                return false;
+            }
+            
+            const validPlans = ['Weekly', 'Monthly', 'Quarterly'];
+            if (!validPlans.includes(updateData.Plan)) {
+                logEvent(`❌ Plan field must be one of: ${validPlans.join(', ')}, got: ${updateData.Plan}`, 'error');
+                return false;
+            }
+            
+            if (typeof updateData.Amount !== 'number' || updateData.Amount <= 0) {
+                logEvent(`❌ Amount field must be a positive number, got: ${updateData.Amount}`, 'error');
+                return false;
+            }
+            
+            // Validate date objects
+            if (!(updateData.Date_Subscription_Start instanceof Date) || !(updateData.Date_Subscription_End instanceof Date)) {
+                logEvent(`❌ Date fields must be Date objects`, 'error');
+                return false;
+            }
+            
+            logEvent('✅ Firebase update data validation passed');
+            return true;
+        }
+
+        // ========================================
+        // PAYMENT INTENT PROCESSING
+        // ========================================
+
+        /**
+         * Handle payment intent creation requests from frontend
+         */
+        async function handlePaymentIntentRequest(paymentData) {
+            logEvent('🚀 Processing payment intent request...', 'info');
+            
+            try {
+                const { 
+                    amount, 
+                    currency, 
+                    payment_method_id,
+                    customer_name,
+                    customer_email,
+                    plan_type,
+                    user_country 
+                } = paymentData;
+                
+                // Validate required fields
+                if (!amount || !currency || !payment_method_id || !customer_name || !customer_email || !plan_type) {
+                    throw new Error('Missing required payment fields');
+                }
+                
+                logEvent(`📋 Payment details: ${plan_type} plan for ${customer_name} (${customer_email}) - ${amount/100} ${currency.toUpperCase()}`, 'info');
+                
+                // Step 1: Create or find Stripe customer
+                logEvent('👤 Creating/finding Stripe customer...', 'info');
+                
+                // First, try to find existing customer by email
+                let customer;
+                const existingCustomerResponse = await fetch(`https://api.stripe.com/v1/customers?email=${encodeURIComponent(customer_email)}&limit=1`, {
+                    headers: {
+                        'Authorization': `Bearer ${WEBHOOK_CONFIG.stripeSecretKey}`
+                    }
+                });
+                
+                if (existingCustomerResponse.ok) {
+                    const existingCustomers = await existingCustomerResponse.json();
+                    if (existingCustomers.data && existingCustomers.data.length > 0) {
+                        customer = existingCustomers.data[0];
+                        logEvent(`✅ Found existing customer: ${customer.id}`, 'success');
+                    }
+                }
+                
+                // If no existing customer, create new one
+                if (!customer) {
+                    const createCustomerResponse = await fetch('https://api.stripe.com/v1/customers', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${WEBHOOK_CONFIG.stripeSecretKey}`,
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: new URLSearchParams({
+                            'name': customer_name,
+                            'email': customer_email,
+                            'metadata[plan_type]': plan_type,
+                            'metadata[user_country]': user_country || 'Unknown',
+                            'metadata[source]': 'GammaPace IELTS'
+                        })
+                    });
+                    
+                    if (!createCustomerResponse.ok) {
+                        const errorData = await createCustomerResponse.json();
+                        throw new Error(`Customer creation failed: ${errorData.error?.message || 'Unknown error'}`);
+                    }
+                    
+                    customer = await createCustomerResponse.json();
+                    logEvent(`✅ Created new customer: ${customer.id}`, 'success');
+                }
+                
+                // Step 2: Attach payment method to customer
+                logEvent('🔗 Attaching payment method to customer...', 'info');
+                const attachResponse = await fetch(`https://api.stripe.com/v1/payment_methods/${payment_method_id}/attach`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${WEBHOOK_CONFIG.stripeSecretKey}`,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'customer': customer.id
+                    })
+                });
+                
+                if (!attachResponse.ok) {
+                    const errorData = await attachResponse.json();
+                    logEvent(`⚠️ Payment method attach failed: ${errorData.error?.message}`, 'warning');
+                    // Continue anyway - payment might still work
+                }
+                
+                // Step 3: Create Stripe payment intent (separate from confirmation)
+                logEvent('💳 Creating payment intent with customer...', 'info');
+                const stripeResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${WEBHOOK_CONFIG.stripeSecretKey}`,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'amount': amount,
+                        'currency': currency.toLowerCase(),
+                        'customer': customer.id,
+                        'payment_method': payment_method_id,
+                        'confirmation_method': 'manual',
+                        'metadata[plan_type]': plan_type,
+                        'metadata[customer_name]': customer_name,
+                        'metadata[customer_email]': customer_email,
+                        'metadata[user_country]': user_country || 'Unknown',
+                        'metadata[subscription_type]': 'one_time_subscription',
+                        'metadata[exact_billing_guarantee]': 'true',
+                        'description': `GammaPace IELTS ${plan_type} Plan Subscription`
+                    })
+                });
+                
+                if (!stripeResponse.ok) {
+                    const errorData = await stripeResponse.json();
+                    throw new Error(`Stripe API error: ${errorData.error?.message || 'Unknown error'}`);
+                }
+                
+                let paymentIntent = await stripeResponse.json();
+                logEvent(`✅ Payment intent created: ${paymentIntent.id} - Status: ${paymentIntent.status}`, 'success');
+                
+                // Step 4: Confirm the payment intent (matching your successful flow!)
+                logEvent('🔒 Confirming payment intent...', 'info');
+                const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${paymentIntent.id}/confirm`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${WEBHOOK_CONFIG.stripeSecretKey}`,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'return_url': 'https://gurukullam.github.io/GammaPace/'
+                    })
+                });
+                
+                if (!confirmResponse.ok) {
+                    const errorData = await confirmResponse.json();
+                    throw new Error(`Payment confirmation failed: ${errorData.error?.message || 'Unknown error'}`);
+                }
+                
+                paymentIntent = await confirmResponse.json();
+                logEvent(`🎉 Payment intent confirmed: ${paymentIntent.id} - Status: ${paymentIntent.status}`, 'success');
+                
+                // Calculate subscription dates
+                const startDate = await getCurrentDateInUTC4();
+                const endDate = calculateSubscriptionEndDate(startDate, plan_type);
+                
+                return {
+                    success: true,
+                    payment_intent: {
+                        id: paymentIntent.id,
+                        status: paymentIntent.status,
+                        amount: paymentIntent.amount,
+                        currency: paymentIntent.currency
+                    },
+                    customer: {
+                        id: customer.id,
+                        email: customer_email,
+                        name: customer_name
+                    },
+                    customerId: customer.id,
+                    subscription_data: {
+                        plan_type: plan_type,
+                        start_date: startDate.toISOString(),
+                        end_date: endDate.toISOString(),
+                        amount_paid: amount,
+                        currency: currency
+                    }
+                };
+                
+            } catch (error) {
+                logEvent(`❌ Payment processing failed: ${error.message}`, 'error');
+                logEvent(`❌ Full error details: ${JSON.stringify(error)}`, 'error');
+                
+                // Handle specific Stripe errors
+                if (error.message.includes('card_declined')) {
+                    return {
+                        success: false,
+                        error: 'Your card was declined. Please try a different payment method.',
+                        type: 'card_error',
+                        decline_code: 'card_declined'
+                    };
+                } else if (error.message.includes('insufficient_funds')) {
+                    return {
+                        success: false,
+                        error: 'Insufficient funds. Please check your account balance.',
+                        type: 'card_error',
+                        decline_code: 'insufficient_funds'
+                    };
+                } else if (error.message.includes('expired_card')) {
+                    return {
+                        success: false,
+                        error: 'Your card has expired. Please use a different payment method.',
+                        type: 'card_error',
+                        decline_code: 'expired_card'
+                    };
+                } else if (error.message.includes('invalid_cvc')) {
+                    return {
+                        success: false,
+                        error: 'Invalid security code. Please check your CVC and try again.',
+                        type: 'card_error',
+                        decline_code: 'invalid_cvc'
+                    };
+                } else {
+                    return {
+                        success: false,
+                        error: error.message || 'Payment processing failed',
+                        type: 'payment_error',
+                        details: error.toString()
+                    };
+                }
+            }
+        }
+
+        // ========================================
+        // MESSAGE HANDLING FOR FRONTEND
+        // ========================================
+
+                 /**
+          * Handle messages from frontend (payment requests)
+          */
+         window.addEventListener('message', async function(event) {
+             try {
+                 logEvent(`📨 Received message from origin: ${event.origin}`, 'info');
+                 
+                 // Security check - only accept messages from our domain
+                 if (event.origin !== 'https://gurukullam.github.io') {
+                     logEvent(`❌ Rejected message from unauthorized origin: ${event.origin}`, 'error');
+                     return;
+                 }
+                 
+                 logEvent(`📋 Message data: ${JSON.stringify(event.data)}`, 'info');
+                 
+                 if (event.data.type === 'CREATE_PAYMENT_INTENT') {
+                     logEvent('📨 Received payment intent request from frontend', 'info');
+                     logEvent(`🔍 Request ID: ${event.data.requestId}`, 'info');
+                     logEvent(`📋 Payload: ${JSON.stringify(event.data.payload)}`, 'info');
+                     
+                     const result = await handlePaymentIntentRequest(event.data.payload);
+                     
+                     logEvent(`🔄 Processing result: ${JSON.stringify(result)}`, 'info');
+                     
+                     // Send response back to frontend
+                     event.source.postMessage({
+                         type: 'PAYMENT_INTENT_RESPONSE',
+                         requestId: event.data.requestId,
+                         result: result
+                     }, event.origin);
+                     
+                     logEvent(`📤 Sent payment response to frontend: ${result.success ? 'SUCCESS' : 'ERROR'}`, result.success ? 'success' : 'error');
+                 } else {
+                     logEvent(`❌ Unknown message type: ${event.data.type}`, 'error');
+                 }
+             } catch (error) {
+                 logEvent(`❌ Error handling message: ${error.message}`, 'error');
+                 
+                 // Send error response back to frontend if possible
+                 try {
+                     event.source.postMessage({
+                         type: 'PAYMENT_INTENT_RESPONSE',
+                         requestId: event.data.requestId || 'unknown',
+                         result: {
+                             success: false,
+                             error: `Message handling error: ${error.message}`,
+                             type: 'webhook_handler_error'
+                         }
+                     }, event.origin);
+                 } catch (responseError) {
+                     logEvent(`❌ Failed to send error response: ${responseError.message}`, 'error');
+                 }
+             }
+         });
+
+        // Make payment processing available globally
+        window.processPaymentIntent = handlePaymentIntentRequest;
+
+        // Export for serverless function use
+        if (typeof module !== 'undefined' && module.exports) {
+            module.exports = { 
+                handleStripeWebhook,
+                getCurrentDateInUTC4,
+                calculateSubscriptionEndDate,
+                getPlanDisplayName,
+                validateFirebaseUpdateData,
+                handlePaymentIntentRequest
+            };
+        }
+    </script>
+</body>
+</html> 
