@@ -1,0 +1,32 @@
+{
+  "name": "gammapace-backend",
+  "version": "1.0.0",
+  "description": "GammaPace Backend API for Stripe integration and webhook processing",
+  "main": "api/health.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required for serverless functions'",
+    "deploy": "vercel --prod",
+    "test": "echo 'Tests not yet implemented'"
+  },
+  "dependencies": {
+    "stripe": "^14.9.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "stripe",
+    "payments",
+    "serverless",
+    "vercel",
+    "ielts",
+    "education"
+  ],
+  "author": "GammaPace",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/[USERNAME]/GammaPace.git"
+  }
+} 
