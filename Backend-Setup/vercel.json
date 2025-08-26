@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "name": "gammapace-backend",
+  "functions": {
+    "api/stripe/create-payment-intent.js": {
+      "maxDuration": 30
+    },
+    "api/stripe/webhook.js": {
+      "maxDuration": 30
+    },
+    "api/health.js": {
+      "maxDuration": 10
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://gurukullam.github.io"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ]
+} 
