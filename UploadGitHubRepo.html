@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Repository Sync Tool | GammaPace - ALPHAFIVE Production Frontend</title>
+    <title>🔒 GammaPace Production Upload | www.gammapace.com</title>
     
     <style>
         * {
@@ -383,8 +383,15 @@
 </head>
 <body>
     <div class="header">
-                        <h1>🔄 GitHub Repository Sync Tool - GammaPace</h1>
-                <p>Upload ALPHAFIVE Production Frontend to GitHub Repository: [USERNAME]/GammaPace</p>
+                                <h1>🔒 GammaPace Production Upload Tool</h1>
+        <p><strong>⚠️ PRODUCTION DEPLOYMENT ONLY:</strong> This tool uploads directly to GammaPace repository hosting <strong>www.gammapace.com</strong></p>
+        <div style="background: rgba(220, 53, 69, 0.1); border: 2px solid #dc3545; border-radius: 8px; padding: 1rem; margin-top: 1rem;">
+            <h4 style="color: #dc3545; margin-bottom: 0.5rem;">🚨 CRITICAL WARNING</h4>
+            <p style="color: #dc3545; margin: 0; font-weight: 500;">
+                This will deploy changes directly to your LIVE production website at www.gammapace.com. 
+                Changes will be visible to all users within 2-3 minutes. Use with caution!
+            </p>
+        </div>
     </div>
     
     <div class="main-container">
@@ -399,11 +406,11 @@
                 </button>
             </div>
             <div class="pane-content">
-                <div class="form-group">
-                    <label for="localPath">📂 Project Root Path:</label>
-                    <input type="text" id="localPath" value="C:\Ga\ALPHA\ALPHAFOUR" 
-                           placeholder="Enter your local project path">
-                </div>
+                                    <div class="form-group">
+                        <label for="localPath">📂 Project Root Path:</label>
+                        <input type="text" id="localPath" value="C:\Ga\ALPHA\ALPHAFIVE" 
+                               placeholder="Enter your ALPHAFIVE folder path">
+                    </div>
                 
                 <div class="action-buttons">
                     <button class="btn btn-primary" onclick="browseLocalFolder()">
@@ -418,15 +425,15 @@
                 <div id="fileDropZone" class="file-drop-zone" style="display: none; margin-top: 1rem; padding: 2rem; border: 2px dashed #8b4513; border-radius: 8px; text-align: center; background: rgba(139, 69, 19, 0.05);">
                     <div class="drop-zone-content">
                         <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: #8b4513; margin-bottom: 1rem;"></i>
-                        <h3 style="color: #8b4513; margin-bottom: 1rem;">Upload ALPHAFIVE Production Folder</h3>
-                        <p style="color: #666; margin-bottom: 1rem;">Click "Select Folder" and choose your local <strong>ALPHAFIVE</strong> folder (contains all your project files)</p>
+                        <h3 style="color: #8b4513; margin-bottom: 1rem;">Upload ALPHAFIVE Frontend</h3>
+                        <p style="color: #666; margin-bottom: 1rem;">Click "Select Folder" and choose your local <strong>ALPHAFIVE</strong> folder (contains all your website files)</p>
                         <div style="background: #e8f4fd; border: 1px solid #b3d9ff; border-radius: 6px; padding: 0.8rem; margin-bottom: 1rem; font-size: 0.9rem;">
                             <strong>📁 What to upload:</strong><br>
-                            • All .html files (index.html, IELTS modules, etc.)<br>
-                            • All .js files (Stripe integration, UI components)<br>
-                            • All .css files (styles and themes)<br>
-                            • Images, fonts, and other assets<br>
-                            <strong>🎯 Result:</strong> Complete ALPHAFIVE platform ready for www.gammapace.com!
+                            • Main index.html with updated backend URL<br>
+                            • All IELTS practice files<br>
+                            • Languages folder (French, English, Tamil)<br>
+                            • Updated Stripe integration files<br>
+                            <strong>🎯 Result:</strong> Complete frontend on www.gammapace.com with live payments!
                         </div>
                         <input type="file" id="fileInput" multiple webkitdirectory style="display: none;">
                         <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
@@ -502,7 +509,11 @@
                     <div class="form-group">
                         <label for="githubRepo">📦 Repository Name:</label>
                         <input type="text" id="githubRepo" value="GammaPace" 
-                                                               placeholder="GammaPace">
+                               placeholder="GammaPace" readonly 
+                               style="background-color: #f8f9fa; cursor: not-allowed; font-weight: bold; color: #28a745;">
+                        <small style="color: #28a745; font-weight: 500; display: block; margin-top: 0.3rem;">
+                            🔒 LOCKED: This tool is configured specifically for GammaPace (www.gammapace.com)
+                        </small>
                     </div>
                     
                     <div class="form-group">
@@ -528,7 +539,7 @@
                     <div class="form-group">
                         <label for="targetPath">🎯 Target Path in Repository:</label>
                         <input type="text" id="targetPath" value="" 
-                               placeholder="(leave empty for root - recommended for VercelDeploymentSetup)">
+                               placeholder="(leave empty for root - recommended for GammaPace frontend)">
                     </div>
                 </div>
                 
@@ -545,13 +556,13 @@
                 </div>
                 
                 <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 1rem; margin-top: 1rem;">
-                    <h4 style="color: #495057; margin-bottom: 0.8rem;">🚀 After Upload - Next Steps:</h4>
+                    <h4 style="color: #495057; margin-bottom: 0.8rem;">🚀 After Upload - What Happens:</h4>
                     <ol style="color: #6c757d; font-size: 0.9rem; margin: 0; padding-left: 1.2rem;">
-                        <li><strong>Enable GitHub Pages:</strong> Repository Settings → Pages → Deploy from main branch</li>
-                        <li><strong>Configure Custom Domain:</strong> Add "www.gammapace.com" in Pages settings</li>
-                        <li><strong>Update DNS Records:</strong> Point your domain to GitHub Pages</li>
-                        <li><strong>Verify SSL:</strong> GitHub will automatically provision HTTPS certificate</li>
-                        <li><strong>Test Production:</strong> Visit www.gammapace.com and test payment flow!</li>
+                        <li><strong>GitHub Pages Deploy:</strong> Files auto-deploy to www.gammapace.com (2-3 minutes)</li>
+                        <li><strong>Updated Backend URL:</strong> Frontend now connects to new Vercel backend</li>
+                        <li><strong>Updated Stripe Keys:</strong> Uses your new rotated publishable key</li>
+                        <li><strong>CORS Fixed:</strong> Payments work properly between frontend and backend</li>
+                        <li><strong>Test Live Payments:</strong> Verify everything works on www.gammapace.com!</li>
                     </ol>
                 </div>
                 
@@ -589,18 +600,24 @@
     </div>
     
     <!-- Sync Controls (Bottom Panel) -->
-    <div style="background: rgba(255,255,255,0.95); padding: 1rem; margin: 1rem; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+    <div style="background: rgba(255,255,255,0.95); padding: 1rem; margin: 1rem; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 3px solid #dc3545;">
+        <!-- PRODUCTION WARNING -->
+        <div style="background: linear-gradient(135deg, #dc3545, #c82333); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; text-align: center;">
+            <h3 style="margin: 0; font-size: 1.2rem;">🚨 LIVE PRODUCTION DEPLOYMENT</h3>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.95rem;">Changes will be visible on www.gammapace.com within 2-3 minutes</p>
+        </div>
+        
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div>
-                <h3 style="color: #0f4c75; margin-bottom: 0.5rem;">🚀 Sync Operations</h3>
+                <h3 style="color: #dc3545; margin-bottom: 0.5rem;">🔒 GammaPace Deployment</h3>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     <button class="btn btn-success" onclick="startSync()">
                         ⬆️ Upload Selected
                     </button>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <label style="display: flex; align-items: center; gap: 5px; font-size: 14px;">
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 14px; background: rgba(255, 193, 7, 0.1); padding: 0.5rem; border-radius: 4px; border: 1px solid #ffc107;">
                             <input type="checkbox" id="forceOverride" checked style="margin: 0;">
-                            <span>🔄 Force Override (Skip SHA checks)</span>
+                            <span><strong>🔄 Force Override (Overwrite ALL existing files)</strong></span>
                         </label>
                     </div>
                     <button class="btn btn-success" onclick="startUploadProcess()" 
@@ -686,6 +703,21 @@
                 console.error('❌ Missing repository name');
                 return;
             }
+            
+            // SECURITY CHECK: Enforce GammaPace repository only
+            if (repo !== 'GammaPace') {
+                const message = '🚨 SECURITY ERROR: This tool is locked to GammaPace repository only!';
+                showStatus(message, 'error');
+                console.error('❌ Invalid repository - must be GammaPace');
+                
+                // Reset to GammaPace and show warning
+                document.getElementById('githubRepo').value = 'GammaPace';
+                alert('🚨 SECURITY RESTRICTION\n\nThis tool only connects to GammaPace repository.\nThe repository field has been corrected.');
+                return;
+            }
+            
+            console.log(`🔒 Security check passed: Connecting to ${username}/GammaPace → www.gammapace.com`);
+            showStatus('🔒 Connecting to GammaPace repository (www.gammapace.com)...', 'info');
             
             // Validate token format
             if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
@@ -892,7 +924,7 @@
                 });
             }
             
-            async createRepository(description = 'VercelDeploymentSetup - IELTS Stripe Backend for Vercel Deployment') {
+            async createRepository(description = 'GammaPace - Production Frontend for www.gammapace.com with live payments') {
                 console.log('🏗️ Creating new repository...');
                 return this.request('/user/repos', {
                     method: 'POST',
@@ -984,7 +1016,10 @@
         
         // Initialize the application
         function initializeApp() {
-            console.log('🚀 GitHub Repository Sync Tool initialized');
+            console.log('🔒 GammaPace Production Upload Tool initialized');
+            
+            // SECURITY ENFORCEMENT: Lock to GammaPace repository
+            enforceGammaPaceSecurity();
             
             // Check browser compatibility
             console.log('🔧 Browser compatibility check:');
@@ -995,6 +1030,56 @@
             loadLocalStructure();
             setupEventListeners();
             initializeTokenManagement();
+        }
+        
+        // Security enforcement function
+        function enforceGammaPaceSecurity() {
+            console.log('🔒 Enforcing GammaPace security restrictions...');
+            
+            // Clear any existing config that might have VercelDeploymentSetup
+            const existingConfig = localStorage.getItem('githubSyncConfig');
+            if (existingConfig) {
+                try {
+                    const config = JSON.parse(existingConfig);
+                    if (config.githubRepo && config.githubRepo !== 'GammaPace') {
+                        console.log(`🧹 Clearing old repository config: ${config.githubRepo} → GammaPace`);
+                        delete config.githubRepo;  // Remove old repo setting
+                        localStorage.setItem('githubSyncConfig', JSON.stringify(config));
+                    }
+                } catch (error) {
+                    console.log('🧹 Clearing corrupted config');
+                    localStorage.removeItem('githubSyncConfig');
+                }
+            }
+            
+            // Ensure repository is always GammaPace
+            const repoField = document.getElementById('githubRepo');
+            if (repoField) {
+                repoField.value = 'GammaPace';
+                
+                // Add event listeners to prevent changes
+                repoField.addEventListener('input', function() {
+                    if (this.value !== 'GammaPace') {
+                        this.value = 'GammaPace';
+                        showStatus('🚨 Repository locked to GammaPace for security', 'error');
+                    }
+                });
+                
+                repoField.addEventListener('change', function() {
+                    if (this.value !== 'GammaPace') {
+                        this.value = 'GammaPace';
+                        alert('🚨 SECURITY LOCK\n\nRepository name cannot be changed.\nThis tool is locked to GammaPace only.');
+                        showStatus('🚨 Repository locked to GammaPace for security', 'error');
+                    }
+                });
+                
+                console.log('✅ Repository field locked to GammaPace');
+            }
+            
+            // Add title reminder
+            document.title = '🔒 GammaPace Production Upload - www.gammapace.com';
+            
+            console.log('✅ Security enforcement complete - locked to www.gammapace.com');
         }
         
         function setupEventListeners() {
@@ -1093,13 +1178,14 @@
         function saveConfiguration() {
             const config = {
                 githubUsername: document.getElementById('githubUsername').value,
-                githubRepo: document.getElementById('githubRepo').value,
+                // SECURITY: Never save repository name - always use GammaPace
+                // githubRepo: Always 'GammaPace' - not saved to prevent overrides
                 githubBranch: document.getElementById('githubBranch').value,
                 targetPath: document.getElementById('targetPath').value
             };
             
             localStorage.setItem('githubSyncConfig', JSON.stringify(config));
-            console.log('💾 Configuration saved');
+            console.log('💾 Configuration saved (repository locked to GammaPace, not saved)');
         }
         
         function loadConfiguration() {
@@ -1108,15 +1194,36 @@
                 try {
                     const config = JSON.parse(saved);
                     Object.keys(config).forEach(key => {
+                        // SECURITY: Never load repository name from localStorage - always keep as GammaPace
+                        if (key === 'githubRepo') {
+                            console.log('🔒 Skipping repository name from saved config - locked to GammaPace');
+                            return;
+                        }
+                        
                         const element = document.getElementById(key);
                         if (element && config[key]) {
                             element.value = config[key];
                         }
                     });
-                    console.log('📋 Configuration loaded');
+                    
+                    // Force repository to always be GammaPace regardless of saved config
+                    const repoField = document.getElementById('githubRepo');
+                    if (repoField) {
+                        repoField.value = 'GammaPace';
+                        console.log('🔒 Repository field enforced to GammaPace');
+                    }
+                    
+                    console.log('📋 Configuration loaded (repository locked to GammaPace)');
                 } catch (error) {
                     console.error('❌ Error loading configuration:', error);
                 }
+            }
+            
+            // Always ensure GammaPace repository even if no saved config
+            const repoField = document.getElementById('githubRepo');
+            if (repoField && repoField.value !== 'GammaPace') {
+                repoField.value = 'GammaPace';
+                console.log('🔒 Repository field corrected to GammaPace');
             }
         }
         
@@ -1812,10 +1919,9 @@
                 '.git/',
                 '.vscode/',
                 'Clean-up/',
-                'Backend-Setup/',
                 '.DS_Store',
                 'Thumbs.db',
-                // NOTE: .gitignore is NOT skipped for VercelDeploymentSetup (we need it!)
+                // NOTE: For GammaPace, we keep all frontend files including configs
                 // File types to skip
                 '.zip',
                 '.rar',
@@ -1831,10 +1937,11 @@
         function getFileType(fileName) {
             const ext = fileName.split('.').pop().toLowerCase();
             
-            // Handle special cases for VercelDeploymentSetup files
+            // Handle special cases for GammaPace files
             if (fileName === '.gitignore') return 'Git Config';
             if (fileName === 'env.example') return 'Environment Template';
             if (fileName.includes('vercel.json')) return 'Vercel Config';
+            if (fileName === 'CNAME') return 'GitHub Pages Domain';
             
             const types = {
                 'html': 'HTML',
@@ -2265,17 +2372,52 @@
         
         // Proceed with the actual upload
         async function proceedWithUpload(projectPath) {
+            // SECURITY CHECK: Ensure repository is GammaPace
+            if (!validateGammaPaceRepository()) {
+                return;
+            }
+            
             const forceOverride = document.getElementById('forceOverride').checked;
             const overrideText = forceOverride ? '\n🔄 FORCE OVERRIDE MODE: Will overwrite existing files without SHA checks' : '';
             
-            const confirmUpload = confirm(`🚀 Upload ALL ${loadedRealFiles.size} files and folders to GitHub?\n\nFrom: ${projectPath || 'Selected Folder'}\n\nThis will upload:\n- All HTML files with real content\n- All subfolders and their contents\n- Maintain exact folder structure${overrideText}\n\nAre you sure you want to proceed?`);
+            const confirmUpload = confirm(`🚨 PRODUCTION DEPLOYMENT TO www.gammapace.com\n\n🚀 Upload ALL ${loadedRealFiles.size} files to LIVE website?\n\nFrom: ${projectPath || 'Selected Folder'}\nTo: GammaPace repository (www.gammapace.com)\n\nThis will:\n- Update your LIVE production website\n- Be visible to all users in 2-3 minutes\n- All HTML files with real content\n- All subfolders and their contents${overrideText}\n\n⚠️ CONFIRM: Deploy to PRODUCTION?`);
             
             if (!confirmUpload) {
-                showStatus('Upload cancelled by user', 'info');
+                showStatus('Production deployment cancelled by user', 'info');
+                return;
+            }
+            
+            // Final security check before upload
+            const finalConfirm = confirm(`🔒 FINAL CONFIRMATION\n\nYou are about to deploy to:\n🌐 www.gammapace.com (LIVE PRODUCTION)\n\nThis will affect your live website immediately.\n\nClick OK to proceed with PRODUCTION deployment.`);
+            
+            if (!finalConfirm) {
+                showStatus('Production deployment cancelled - safety check', 'info');
                 return;
             }
             
             await uploadAllFiles();
+        }
+        
+        // Security validation function
+        function validateGammaPaceRepository() {
+            const repoName = document.getElementById('githubRepo').value.trim();
+            const username = document.getElementById('githubUsername').value.trim();
+            
+            if (repoName !== 'GammaPace') {
+                alert('🚨 SECURITY ERROR\n\nThis tool is locked to GammaPace repository only.\nRepository name has been reset to GammaPace.');
+                document.getElementById('githubRepo').value = 'GammaPace';
+                showStatus('🚨 Repository name corrected to GammaPace for security', 'error');
+                return false;
+            }
+            
+            if (!username) {
+                alert('🚨 USERNAME REQUIRED\n\nPlease enter your GitHub username to proceed with GammaPace deployment.');
+                showStatus('🚨 GitHub username required for GammaPace deployment', 'error');
+                return false;
+            }
+            
+            console.log(`✅ Security validation passed: ${username}/GammaPace → www.gammapace.com`);
+            return true;
         }
         
         // Upload All Files functionality - now called after files are loaded
@@ -2422,7 +2564,7 @@
                 
                 // Remove the root folder name if it exists in the path
                 const pathParts = targetPath.split('/');
-                                    if (pathParts[0] === 'VercelDeploymentSetup' || pathParts[0] === 'ALPHAFOUR' || pathParts[0] === 'ALPHAFIVE' || pathParts[0].includes('VercelDeploymentSetup') || pathParts[0].includes('ALPHAFOUR') || pathParts[0].includes('ALPHAFIVE')) {
+                                    if (pathParts[0] === 'ALPHAFOUR' || pathParts[0] === 'ALPHAFIVE' || pathParts[0].includes('ALPHAFOUR') || pathParts[0].includes('ALPHAFIVE')) {
                         pathParts.shift(); // Remove first part (the folder name)
                     targetPath = pathParts.join('/');
                 }
@@ -2477,9 +2619,9 @@
                     return fileData.content;
                 }
                 
-                // Match if paths are similar (remove common prefixes like ALPHAFOUR/, ALPHAFIVE/, or VercelDeploymentSetup/)
-                const normalizedFilePath = filePath.replace(/^(ALPHAFOUR|ALPHAFIVE|VercelDeploymentSetup)\//, '');
-                const normalizedLoadedPath = loadedPath.replace(/^(ALPHAFOUR|ALPHAFIVE|VercelDeploymentSetup)\//, '');
+                // Match if paths are similar (remove common prefixes like ALPHAFOUR/, ALPHAFIVE/)
+                const normalizedFilePath = filePath.replace(/^(ALPHAFOUR|ALPHAFIVE)\//, '');
+                const normalizedLoadedPath = loadedPath.replace(/^(ALPHAFOUR|ALPHAFIVE)\//, '');
                 
                 if (normalizedFilePath === normalizedLoadedPath) {
                     console.log(`✅ Found by normalized path match: ${loadedPath} for ${filePath}`);
@@ -2827,6 +2969,14 @@
         console.log('   testTokens()   - Test save/load functionality'); 
         console.log('   clearTokens()  - Clear all saved token data');
         console.log('');
+        
+        // Initialize the application when DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            // DOM already loaded
+            initializeApp();
+        }
     </script>
 </body>
 </html> 
