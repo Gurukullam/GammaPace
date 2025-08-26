@@ -9,8 +9,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export default async function handler(req, res) {
   console.log('🏢 Customer Portal API called:', req.method);
   
-  // Add CORS headers for www.gammapace.com
-  res.setHeader('Access-Control-Allow-Origin', 'https://www.gammapace.com');
+  // Add CORS headers for multiple origins (development & production)
+  const allowedOrigins = [
+    'https://www.gammapace.com',
+    'https://gurukullam.github.io',
+    'null' // For local file:// testing
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    // Allow requests with no origin (like from local files)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
