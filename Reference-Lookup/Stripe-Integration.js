@@ -11,7 +11,7 @@
 // STRIPE CONFIGURATION - LIVE PRODUCTION KEYS ACTIVE ✅
 const STRIPE_CONFIG = {
     // 🚀 PRODUCTION: Live publishable key configured
-    publishableKey: 'pk_live_51Rr5H03QiDHRr52effkP2HrTynAiO7NYD8VQfmbQiHTfpj3zvbw7q4p3uSeRWHHK0ehhHAoYqHyxXwIjmuyGVz3Q00BJL8lkM9',
+    publishableKey: 'pk_live_51Rr5H03QiDHRr52eipxAgsorLcfVZ0rLMiYvMwdM8J7k2MhlQKgFKwGSUFe3Qysrzkw3fx5S5F0EVt4GPfexynCG00kImb5Ca4',
     testMode: false, // ⚠️ PRODUCTION MODE ACTIVE
     currency: 'cad'
     
@@ -940,8 +940,9 @@ async function processRealStripePayment(paymentMethod, plan, customerName, custo
     // Call Vercel backend API - Much cleaner than complex postMessage approach!
     let paymentResponse = null;
     try {
-        // Live ALPHAFIVE Vercel backend API URL
-        const vercelApiUrl = 'https://vercel-deployment-setup-qvzzrm4ga.vercel.app/api/stripe/create-payment-intent';
+        // ✅ UPDATED: New Vercel backend URL after deployment
+        // OLD URL (deactivated after key rotation): https://vercel-deployment-setup-qvzzrm4ga.vercel.app
+        const vercelApiUrl = 'https://vercel-deployment-setup.vercel.app/api/stripe/create-payment-intent';
         
         console.log('🌐 Sending payment request to Vercel backend:', {
             url: vercelApiUrl,
@@ -1463,7 +1464,8 @@ async function openStripeCustomerPortal() {
         }
 
             // Live ALPHAFIVE Vercel backend API URL  
-    const vercelApiUrl = 'https://vercel-deployment-setup-qvzzrm4ga.vercel.app/api/stripe/customer-portal';
+            // ⚠️ PENDING: Update with new Vercel URL after deployment completes
+        const vercelApiUrl = 'https://vercel-deployment-setup.vercel.app/api/stripe/customer-portal';
 
         console.log('🌐 Calling Vercel backend for customer portal...', {
             customerId: customerId || 'Using email lookup',
