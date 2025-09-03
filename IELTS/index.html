@@ -1259,7 +1259,8 @@
                     </button>
                 </form>
                 <div class="modal-transition">
-                    <p>Don't have an account? <a href="#" onclick="switchToSignUp()">Sign up here</a></p>
+                    <p>Don't have an account? <a href="#" onclick="trackSignUpHereClick(); switchToSignUp()" style="font-size: 1.2rem; font-style: italic;">Sign up here</a></p>
+                    <p style="margin-top: 0.5rem; font-size: 0.8rem; color: #800000; font-style: italic;">Sign up for free practice materials!</p>
                 </div>
             </div>
         </div>
@@ -4129,6 +4130,42 @@
                 console.log('✅ Firebase form handlers initialized!');
             }, 2000); // Wait 2 seconds for Firebase to fully load
         });
+
+        // ============================================================================
+        // 🚀 FIRE AND FORGET TAG SYSTEM - User Experience First
+        // ============================================================================
+        // 
+        // ALL tag creation functions follow these principles:
+        // 1. NEVER block user interactions or page functionality
+        // 2. NO await/async - tags are created silently in background
+        // 3. ALL errors are silently caught and ignored
+        // 4. User experience is ALWAYS the priority
+        // 5. Tags are "fire and forget" - no waiting, no blocking
+        //
+        // ============================================================================
+
+        // Track "Sign up here" link clicks - FIRE AND FORGET (non-blocking)
+        function trackSignUpHereClick() {
+            // Fire and forget - never block user experience
+            if (typeof createTag === 'function') {
+                // Create tag silently in background - no await, no blocking
+                createTag({
+                    eventType: 'Sign up here -Click',
+                    pageName: '/IELTS',
+                    processName: 'signup_link_click',
+                    processStatus: 'completed',
+                    linkText: 'Sign up here',
+                    actionType: 'signup_navigation',
+                    clickTimestamp: Date.now(),
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform
+                    // Location will be auto-detected by createTag function
+                }).catch(() => {
+                    // Silently ignore any tag creation errors - user experience is priority
+                });
+            }
+            // Always continue with user action regardless of tag creation status
+        }
     </script>
 
     <!-- Firebase CDN Scripts -->
