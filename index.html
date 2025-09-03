@@ -652,5 +652,340 @@
             });
         });
     </script>
+
+    <!-- Firebase CDN Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <!-- Firebase Integration with Tags Collection -->
+    <script src="Reference-Lookup/IELTS-Firebase-Integration.js"></script>
+
+    <!-- Initialize Root Page Tagging -->
+    <script>
+        // ============================================================================
+        // 🚀 FIRE AND FORGET TAG SYSTEM - User Experience First
+        // ============================================================================
+        // 
+        // ALL tag creation functions follow these principles:
+        // 1. NEVER block user interactions or page functionality
+        // 2. NO await/async - tags are created silently in background
+        // 3. ALL errors are silently caught and ignored
+        // 4. User experience is ALWAYS the priority
+        // 5. Tags are "fire and forget" - no waiting, no blocking
+        //
+        // ============================================================================
+        
+        // Debug Firebase connection
+        console.log('🔍 Checking Firebase availability...');
+        console.log('Firebase object:', typeof firebase !== 'undefined' ? 'Available' : 'Not available');
+        
+        // Wait for Firebase to load and then initialize tagging
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 DOM Content Loaded - Starting Firebase initialization...');
+            
+            // Initialize tagging after a short delay to ensure Firebase is ready
+            setTimeout(() => {
+                // Fire and forget tag creation - never block page functionality
+                if (typeof firebase !== 'undefined' && typeof createTag === 'function') {
+                    // Create tag silently in background - no await, no blocking
+                    createTag({
+                        eventType: 'page_view',
+                        pageName: '/',
+                        processName: 'root_page_visit',
+                        processStatus: 'completed',
+                        pageTitle: 'Ga Foundation - Global Online Learning Platform',
+                        referrer: document.referrer || 'direct',
+                        userAgent: navigator.userAgent,
+                        platform: navigator.platform,
+                        language: navigator.language,
+                        screenResolution: `${screen.width}x${screen.height}`,
+                        viewportSize: `${window.innerWidth}x${window.innerHeight}`,
+                        timeOnPage: 0
+                    }).catch(() => {
+                        // Silently ignore any tag creation errors - page functionality is priority
+                    });
+                }
+                
+                // Always initialize tracking regardless of tag creation status
+                trackUserInteractions();
+                trackIELTSMenuInteractions();
+            }, 1000);
+        });
+
+        // Test Firebase connection manually
+        window.testFirebaseConnection = async function() {
+            console.log('🧪 Testing Firebase connection manually...');
+            
+            try {
+                if (typeof firebase === 'undefined') {
+                    console.error('❌ Firebase is not loaded');
+                    return false;
+                }
+                
+                if (typeof db === 'undefined') {
+                    console.error('❌ Firestore database is not available');
+                    return false;
+                }
+                
+                console.log('✅ Firebase and Firestore are available');
+                
+                // Try to create a test document
+                const testDoc = await db.collection('test').add({
+                    test: true,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    message: 'Firebase connection test successful'
+                });
+                
+                console.log('✅ Test document created successfully:', testDoc.id);
+                
+                // Clean up test document
+                await db.collection('test').doc(testDoc.id).delete();
+                console.log('✅ Test document cleaned up');
+                
+                return false;
+            } catch (error) {
+                console.error('❌ Firebase connection test failed:', error);
+                return false;
+            }
+        };
+
+        // Test Firebase configuration
+        window.testFirebaseConfig = function() {
+            console.log('🔧 Testing Firebase configuration...');
+            
+            try {
+                if (typeof firebase === 'undefined') {
+                    console.error('❌ Firebase is not loaded');
+                    return;
+                }
+                
+                // Check if Firebase is initialized
+                const apps = firebase.apps;
+                console.log('📱 Firebase apps:', apps);
+                
+                if (apps.length > 0) {
+                    const app = apps[0];
+                    console.log('✅ Firebase app initialized:', app.name);
+                    console.log('🔑 Project ID:', app.options.projectId);
+                    console.log('🌐 Auth Domain:', app.options.authDomain);
+                } else {
+                    console.error('❌ No Firebase apps initialized');
+                }
+                
+                // Check Firestore settings
+                if (typeof firebase.firestore !== 'undefined') {
+                    const settings = firebase.firestore().settings;
+                    console.log('⚙️ Firestore settings:', settings);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error checking Firebase config:', error);
+            }
+        };
+
+
+
+        // Track user interactions on the root page - FIRE AND FORGET (non-blocking)
+        function trackUserInteractions() {
+            // Track navigation clicks (EXCLUDING IELTS elements to avoid duplicate tags)
+            const navLinks = document.querySelectorAll('nav a, .cta-button');
+            navLinks.forEach(link => {
+                // Skip IELTS elements - they have their own specific tracking
+                const linkHref = link.getAttribute('href');
+                if (linkHref && linkHref.includes('IELTS/index.html')) {
+                    return; // Skip this element
+                }
+                
+                link.addEventListener('click', function(e) {
+                    // Fire and forget tag creation - never block user navigation
+                    if (typeof createTag === 'function') {
+                        createTag({
+                            eventType: 'user_action',
+                            pageName: '/',
+                            processName: 'navigation_click',
+                            processStatus: 'completed',
+                            linkText: this.textContent.trim(),
+                            linkHref: this.getAttribute('href'),
+                            actionType: 'navigation'
+                        }).catch(() => {
+                            // Silently ignore any tag creation errors - user experience is priority
+                        });
+                    }
+                });
+            });
+
+            // Track mobile menu interactions
+            const mobileMenuToggle = document.querySelector('.mobile-menu-toggle');
+            if (mobileMenuToggle) {
+                mobileMenuToggle.addEventListener('click', function() {
+                    // Fire and forget tag creation - never block user interaction
+                    if (typeof createTag === 'function') {
+                        createTag({
+                            eventType: 'user_action',
+                            pageName: '/',
+                            processName: 'mobile_menu_toggle',
+                            processStatus: 'completed',
+                            actionType: 'mobile_navigation'
+                        }).catch(() => {
+                            // Silently ignore any tag creation errors - user experience is priority
+                        });
+                    }
+                });
+            }
+
+            // Track scroll depth
+            let maxScrollDepth = 0;
+            window.addEventListener('scroll', function() {
+                const scrollPercent = Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100);
+                if (scrollPercent > maxScrollDepth) {
+                    maxScrollDepth = scrollPercent;
+                    
+                    // Track significant scroll milestones
+                    if (scrollPercent % 25 === 0) { // Track at 25%, 50%, 75%, 100%
+                        if (typeof createTag === 'function') {
+                            createTag({
+                                eventType: 'user_action',
+                                pageName: '/',
+                                processName: 'scroll_depth',
+                                processStatus: 'completed',
+                                scrollDepth: scrollPercent,
+                                actionType: 'scrolling'
+                            }).catch(() => {
+                                // Silently ignore any tag creation errors - user experience is priority
+                            });
+                        }
+                    }
+                }
+            });
+
+            // Track time on page
+            let startTime = Date.now();
+            window.addEventListener('beforeunload', function() {
+                const timeOnPage = Math.round((Date.now() - startTime) / 1000);
+                if (typeof createTag === 'function') {
+                    createTag({
+                        eventType: 'user_action',
+                        pageName: '/',
+                        processName: 'page_exit',
+                        processStatus: 'completed',
+                        timeOnPage: timeOnPage,
+                        maxScrollDepth: maxScrollDepth,
+                        actionType: 'page_exit'
+                    }).catch(() => {
+                        // Silently ignore any tag creation errors - user experience is priority
+                    });
+                }
+            });
+        }
+
+                // Track IELTS menu interactions specifically - FIRE AND FORGET (non-blocking)
+        function trackIELTSMenuInteractions() {
+            // Wait a bit for DOM to be fully ready
+            setTimeout(() => {
+                // Create a single function to handle IELTS navigation and create tag
+                const handleIELTSNavigation = (elementType, elementText) => {
+                    // Create tag first, then navigate
+                    if (typeof createTag === 'function') {
+                        // Create tag and wait for it to complete before navigating
+                        createTag({
+                            eventType: 'IELTS Home Menu Click',
+                            pageName: '/',
+                            processName: 'ielts_navigation',
+                            processStatus: 'completed',
+                            elementType: elementType,
+                            elementText: elementText,
+                            actionType: 'ielts_navigation',
+                            clickTimestamp: Date.now(),
+                            userAgent: navigator.userAgent,
+                            platform: navigator.platform
+                        }).then(() => {
+                            // Navigate after successful tag creation
+                            window.location.href = 'IELTS/index.html';
+                        }).catch(() => {
+                            // Navigate even if tag creation fails
+                            window.location.href = 'IELTS/index.html';
+                        });
+                    } else {
+                        // If createTag is not available, just navigate
+                        window.location.href = 'IELTS/index.html';
+                    }
+                };
+                
+                // Track IELTS navigation link click
+                const ieltsNavLink = document.querySelector('nav a[href="IELTS/index.html"]');
+                
+                if (ieltsNavLink) {
+                    // Remove any existing event listeners to avoid conflicts
+                    const newNavLink = ieltsNavLink.cloneNode(true);
+                    ieltsNavLink.parentNode.replaceChild(newNavLink, ieltsNavLink);
+                    
+                    newNavLink.addEventListener('click', function(e) {
+                        e.preventDefault(); // Prevent immediate navigation
+                        handleIELTSNavigation('Navigation Link', this.textContent.trim());
+                    });
+                }
+                
+                // Track IELTS CTA button click
+                const ieltsCTAButton = document.querySelector('.cta-button[href="IELTS/index.html"]');
+                
+                if (ieltsCTAButton) {
+                    // Remove any existing event listeners to avoid conflicts
+                    const newCTAButton = ieltsCTAButton.cloneNode(true);
+                    ieltsCTAButton.parentNode.replaceChild(newCTAButton, ieltsCTAButton);
+                    
+                    newCTAButton.addEventListener('click', function(e) {
+                        e.preventDefault(); // Prevent immediate navigation
+                        handleIELTSNavigation('CTA Button', this.textContent.trim());
+                    });
+                }
+            }, 500); // Wait 500ms for DOM to be fully ready
+        }
+
+        // Quick debug function to check IELTS tracking status
+        window.checkIELTSStatus = function() {
+            const ieltsNavLink = document.querySelector('nav a[href="IELTS/index.html"]');
+            const ieltsCTAButton = document.querySelector('.cta-button[href="IELTS/index.html"]');
+            console.log('IELTS Nav Link found:', !!ieltsNavLink);
+            console.log('IELTS CTA Button found:', !!ieltsCTAButton);
+            console.log('createTag function available:', typeof createTag === 'function');
+            console.log('trackIELTSMenuInteractions function:', typeof trackIELTSMenuInteractions === 'function');
+        };
+
+        // Test IELTS tag creation manually
+        window.testIELTSTag = function() {
+            if (typeof createTag === 'function') {
+                createTag({
+                    eventType: 'Manual Test - IELTS Tag',
+                    pageName: '/',
+                    processName: 'manual_test',
+                    processStatus: 'completed',
+                    testMessage: 'Testing IELTS tag creation'
+                }).then(result => {
+                    if (result && result.success) {
+                        console.log('✅ Manual IELTS tag created:', result.tagId);
+                    } else {
+                        console.log('⚠️ Manual IELTS tag failed:', result);
+                    }
+                }).catch(error => {
+                    console.log('❌ Manual IELTS tag error:', error.message);
+                });
+            } else {
+                console.log('❌ createTag function not available');
+            }
+        };
+
+        // Test IELTS click tracking
+        window.testIELTSClick = function() {
+            console.log('🧪 Testing IELTS click tracking...');
+            const ieltsNavLink = document.querySelector('nav a[href="IELTS/index.html"]');
+            if (ieltsNavLink) {
+                console.log('🖱️ Simulating click on IELTS Navigation Link...');
+                ieltsNavLink.click();
+            } else {
+                console.log('⚠️ IELTS Navigation Link not found for click simulation');
+            }
+        };
+    </script>
 </body>
 </html> 
