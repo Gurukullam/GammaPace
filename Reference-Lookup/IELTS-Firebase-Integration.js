@@ -18,6 +18,425 @@ const db = firebase.firestore();
 
 console.log('🔥 Firebase initialized for IELTS-Practice project!');
 
+// ============================================================================
+// 🏷️ TAGS COLLECTION - Event Tracking & Analytics
+// ============================================================================
+
+// Tags collection structure for tracking user events and interactions
+const TAGS_COLLECTION = 'Tags';
+
+// Tag event types for consistent tracking
+const TAG_EVENT_TYPES = {
+    PAGE_VIEW: 'page_view',
+    USER_ACTION: 'user_action',
+    FORM_SUBMISSION: 'form_submission',
+    NAVIGATION: 'navigation',
+    ERROR: 'error',
+    PERFORMANCE: 'performance',
+    SUBSCRIPTION: 'subscription',
+    PAYMENT: 'payment',
+    PRACTICE_SESSION: 'practice_session',
+    AUTHENTICATION: 'authentication'
+};
+
+// Create a new tag entry in the Tags collection
+async function createTag(tagData) {
+    try {
+        trackWrite();
+        
+        const tag = {
+            eventType: tagData.eventType || TAG_EVENT_TYPES.USER_ACTION,
+            tagID: tagData.tagID || generateUniqueTagId(),
+            pageName: tagData.pageName || window.location.pathname,
+            processStatus: tagData.processStatus || 'pending',
+            processName: tagData.processName || 'unknown',
+            dateTime: firebase.firestore.FieldValue.serverTimestamp(),
+            location: tagData.location || await getCurrentLocation(),
+            userId: auth.currentUser ? auth.currentUser.uid : 'guest',
+            userEmail: auth.currentUser ? auth.currentUser.email : 'guest',
+            sessionId: sessionStorage.getItem('sessionId') || 'no-session',
+            userAgent: navigator.userAgent,
+            timestamp: Date.now()
+        };
+
+        const docRef = await db.collection(TAGS_COLLECTION).add(tag);
+        console.log('🏷️ Tag created successfully:', docRef.id);
+        
+        return {
+            success: true,
+            tagId: docRef.id,
+            data: tag
+        };
+    } catch (error) {
+        console.error('❌ Error creating tag:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+// Generate unique tag ID
+function generateUniqueTagId() {
+    return 'TAG_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Update tag process status
+async function updateTagStatus(tagId, processStatus, processName = null) {
+    try {
+        trackWrite();
+        
+        const updateData = {
+            processStatus: processStatus,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        if (processName) {
+            updateData.processName = processName;
+        }
+        
+        await db.collection(TAGS_COLLECTION).doc(tagId).update(updateData);
+        console.log('🏷️ Tag status updated:', tagId, processStatus);
+        
+        return { success: true };
+    } catch (error) {
+        console.error('❌ Error updating tag status:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Get tags by user ID
+async function getUserTags(userId, limit = 50) {
+    try {
+        trackRead();
+        
+        const snapshot = await db.collection(TAGS_COLLECTION)
+            .where('userId', '==', userId)
+            .orderBy('dateTime', 'desc')
+            .limit(limit)
+            .get();
+        
+        const tags = [];
+        snapshot.forEach(doc => {
+            tags.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        console.log(`🏷️ Retrieved ${tags.length} tags for user:`, userId);
+        return { success: true, tags: tags };
+    } catch (error) {
+        console.error('❌ Error getting user tags:', error);
+        return { success: true, tags: [] };
+    }
+}
+
+// Get tags by event type
+async function getTagsByEventType(eventType, limit = 100) {
+    try {
+        trackRead();
+        
+        const snapshot = await db.collection(TAGS_COLLECTION)
+            .where('eventType', '==', eventType)
+            .orderBy('dateTime', 'desc')
+            .limit(limit)
+            .get();
+        
+        const tags = [];
+        snapshot.forEach(doc => {
+            tags.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        console.log(`🏷️ Retrieved ${tags.length} tags for event type:`, eventType);
+        return { success: true, tags: tags };
+    } catch (error) {
+        console.error('❌ Error getting tags by event type:', error);
+        return { success: true, tags: [] };
+    }
+}
+
+// Get tags by page name
+async function getTagsByPage(pageName, limit = 100) {
+    try {
+        trackRead();
+        
+        const snapshot = await db.collection(TAGS_COLLECTION)
+            .where('pageName', '==', pageName)
+            .orderBy('dateTime', 'desc')
+            .limit(limit)
+            .get();
+        
+        const tags = [];
+        snapshot.forEach(doc => {
+            tags.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        console.log(`🏷️ Retrieved ${tags.length} tags for page:`, pageName);
+        return { success: true, tags: tags };
+    } catch (error) {
+        console.error('❌ Error getting tags by page:', error);
+        return { success: true, tags: [] };
+    }
+}
+
+// Delete tag by ID
+async function deleteTag(tagId) {
+    try {
+        trackWrite();
+        
+        await db.collection(TAGS_COLLECTION).doc(tagId).delete();
+        console.log('🏷️ Tag deleted successfully:', tagId);
+        
+        return { success: true };
+    } catch (error) {
+        console.error('❌ Error deleting tag:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Batch create multiple tags
+async function createBatchTags(tagsArray) {
+    try {
+        trackWrite();
+        
+        const batch = db.batch();
+        const createdTags = [];
+        
+        for (const tagData of tagsArray) {
+            const tag = {
+                eventType: tagData.eventType || TAG_EVENT_TYPES.USER_ACTION,
+                tagID: tagData.tagID || generateUniqueTagId(),
+                pageName: tagData.pageName || window.location.pathname,
+                processStatus: tagData.processStatus || 'pending',
+                processName: tagData.processName || 'unknown',
+                dateTime: firebase.firestore.FieldValue.serverTimestamp(),
+                location: tagData.location || await getCurrentLocation(),
+                userId: auth.currentUser ? auth.currentUser.uid : 'guest',
+                userEmail: auth.currentUser ? auth.currentUser.email : 'guest',
+                sessionId: sessionStorage.getItem('sessionId') || 'no-session',
+                userAgent: navigator.userAgent,
+                timestamp: Date.now()
+            };
+            
+            const docRef = db.collection(TAGS_COLLECTION).doc();
+            batch.set(docRef, tag);
+            createdTags.push({ id: docRef.id, data: tag });
+        }
+        
+        await batch.commit();
+        console.log(`🏷️ Batch created ${createdTags.length} tags successfully`);
+        
+        return { success: true, tags: createdTags };
+    } catch (error) {
+        console.error('❌ Error creating batch tags:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ============================================================================
+// 🚀 TAGS USAGE EXAMPLES & UTILITY FUNCTIONS
+// ============================================================================
+
+// Example: Track page view
+async function trackPageView(pageName = null) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.PAGE_VIEW,
+        pageName: pageName || window.location.pathname,
+        processName: 'page_view_tracking',
+        processStatus: 'completed'
+    });
+}
+
+// Example: Track user action
+async function trackUserAction(actionName, actionDetails = {}) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.USER_ACTION,
+        processName: actionName,
+        processStatus: 'completed',
+        ...actionDetails
+    });
+}
+
+// Example: Track form submission
+async function trackFormSubmission(formName, success = true) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.FORM_SUBMISSION,
+        processName: formName,
+        processStatus: success ? 'completed' : 'failed'
+    });
+}
+
+// Example: Track navigation
+async function trackNavigation(fromPage, toPage) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.NAVIGATION,
+        processName: 'page_navigation',
+        processStatus: 'completed',
+        fromPage: fromPage,
+        toPage: toPage
+    });
+}
+
+// Example: Track error
+async function trackError(errorMessage, errorType = 'general') {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.ERROR,
+        processName: errorType,
+        processStatus: 'error',
+        errorMessage: errorMessage
+    });
+}
+
+// Example: Track subscription event
+async function trackSubscriptionEvent(eventType, subscriptionDetails = {}) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.SUBSCRIPTION,
+        processName: eventType,
+        processStatus: 'completed',
+        ...subscriptionDetails
+    });
+}
+
+// Example: Track practice session
+async function trackPracticeSession(skill, duration, questionsAnswered) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.PRACTICE_SESSION,
+        processName: 'practice_session',
+        processStatus: 'completed',
+        skill: skill,
+        duration: duration,
+        questionsAnswered: questionsAnswered
+    });
+}
+
+// Auto-track page views on navigation
+function enableAutoPageTracking() {
+    let currentPage = window.location.pathname;
+    
+    // Track initial page view
+    trackPageView(currentPage);
+    
+    // Track page changes (for SPA navigation)
+    const observer = new MutationObserver(() => {
+        if (window.location.pathname !== currentPage) {
+            currentPage = window.location.pathname;
+            trackPageView(currentPage);
+        }
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// ============================================================================
+// 🎯 IELTS PLATFORM SPECIFIC TAGGING INTEGRATION
+// ============================================================================
+
+// Track IELTS skill selection
+async function trackIELTSSkillSelection(skill, module) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.USER_ACTION,
+        processName: 'ielts_skill_selection',
+        processStatus: 'completed',
+        skill: skill,
+        module: module,
+        pageName: window.location.pathname
+    });
+}
+
+// Track practice session start
+async function trackPracticeStart(skill, module, practiceType) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.PRACTICE_SESSION,
+        processName: 'practice_session_start',
+        processStatus: 'started',
+        skill: skill,
+        module: module,
+        practiceType: practiceType,
+        pageName: window.location.pathname
+    });
+}
+
+// Track practice session completion
+async function trackPracticeCompletion(skill, module, practiceType, score, duration) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.PRACTICE_SESSION,
+        processName: 'practice_session_complete',
+        processStatus: 'completed',
+        skill: skill,
+        module: module,
+        practiceType: practiceType,
+        score: score,
+        duration: duration,
+        pageName: window.location.pathname
+    });
+}
+
+// Track subscription modal interactions
+async function trackSubscriptionInteraction(action, planType = null) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.SUBSCRIPTION,
+        processName: `subscription_${action}`,
+        processStatus: 'completed',
+        planType: planType,
+        pageName: window.location.pathname
+    });
+}
+
+// Track authentication events
+async function trackAuthEvent(eventType, success = true, errorMessage = null) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.AUTHENTICATION,
+        processName: `auth_${eventType}`,
+        processStatus: success ? 'completed' : 'failed',
+        errorMessage: errorMessage,
+        pageName: window.location.pathname
+    });
+}
+
+// Track navigation between IELTS sections
+async function trackIELTSNavigation(fromSection, toSection) {
+    return await createTag({
+        eventType: TAG_EVENT_TYPES.NAVIGATION,
+        processName: 'ielts_section_navigation',
+        processStatus: 'completed',
+        fromSection: fromSection,
+        toSection: toSection,
+        pageName: window.location.pathname
+    });
+}
+
+// Initialize automatic tagging for IELTS platform
+function initializeIELTSTagging() {
+    console.log('🏷️ Initializing IELTS platform tagging...');
+    
+    // Enable auto page tracking
+    enableAutoPageTracking();
+    
+    // Track initial page load
+    trackPageView();
+    
+    // Track user agent and platform info
+    createTag({
+        eventType: TAG_EVENT_TYPES.PERFORMANCE,
+        processName: 'platform_info',
+        processStatus: 'completed',
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        cookieEnabled: navigator.cookieEnabled,
+        onLine: navigator.onLine
+    });
+    
+    console.log('✅ IELTS platform tagging initialized successfully');
+}
+
 // Usage tracking for free tier monitoring
 let readCount = 0;
 let writeCount = 0;
