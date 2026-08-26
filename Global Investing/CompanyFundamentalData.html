@@ -1,0 +1,3571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NASDAQ Analysis AI — Company Fundamental Data</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+<style>
+  .fas { font-family: "Font Awesome 6 Free"; font-weight: 900; font-style: normal; text-rendering: auto; -webkit-font-smoothing: antialiased; }
+  .fa-bars:before { content: "\f0c9"; }
+  .fa-times:before { content: "\f00d"; }
+  .fa-home:before { content: "\f015"; }
+
+  :root {
+    --bg: linear-gradient(135deg, #d4af37 0%, #b8860b 50%, #cd853f 100%);
+    --bg-card: rgba(255, 255, 255, 0.95);
+    --bg-elevated: #f8f5f0;
+    --border: #e0d5c5;
+    --border-hover: #d4af37;
+    --text: #3c2d1f;
+    --text-muted: #8b7355;
+    --text-dim: #a09080;
+    --accent: #8b4513;
+    --accent-glow: rgba(139, 69, 19, 0.15);
+    --accent-secondary: #d4af37;
+    --success: #2d7a3e;
+    --warning: #b8860b;
+    --error: #a03030;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+    overflow-x: hidden;
+    touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    color: #3c2d1f;
+    padding: 0;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    width: 100%;
+    min-height: 80px;
+  }
+
+  .navbar {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    gap: 0.5rem;
+  }
+
+  .nav-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 45px;
+  }
+
+  .nav-bottom-row {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    padding-top: 0.3rem;
+  }
+
+  .logo {
+    text-decoration: none;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .master-guruvammal-logo {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    box-sizing: border-box !important;
+    font-family: 'Century Gothic', sans-serif !important;
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.5px !important;
+    line-height: 1 !important;
+    color: #5d3a0a !important;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3) !important;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(139, 69, 19, 0.25) 50%, rgba(205, 133, 63, 0.2) 100%) !important;
+    backdrop-filter: blur(10px) !important;
+    border-radius: 4px !important;
+    padding: 8px !important;
+    box-shadow: 0 4px 12px rgba(139, 69, 19, 0.2), 0 0 20px rgba(212, 175, 55, 0.1) !important;
+    z-index: 10000 !important;
+    transition: all 0.3s ease !important;
+  }
+
+  .master-guruvammal-logo .musical-corner {
+    position: absolute !important;
+    top: 2px !important;
+    right: 3px !important;
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    background-color: transparent !important;
+    border: 0.8px solid #5d3a0a !important;
+    color: #5d3a0a !important;
+    font-family: 'Century Gothic', sans-serif !important;
+    font-size: 4.5px !important;
+    font-weight: 900 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3) !important;
+    box-shadow: none !important;
+  }
+
+  .master-guruvammal-logo:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 30px rgba(139, 69, 19, 0.4), 0 0 50px rgba(212, 175, 55, 0.3);
+  }
+
+  .mobile-menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #8b4513;
+    cursor: pointer;
+    padding: 0.5rem;
+  }
+
+  .nav-menu {
+    display: flex;
+    list-style: none;
+    align-items: center;
+    gap: 1.2rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .nav-menu li { position: relative; }
+
+  .nav-menu a, .nav-menu span {
+    color: #3c2d1f;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .nav-menu a:hover {
+    color: #8b4513;
+    background: rgba(139, 69, 19, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 120px 24px 24px;
+    position: relative;
+  }
+
+  .hero {
+    padding: 40px 0 60px;
+    text-align: center;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #8b4513 0%, #d4af37 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    font-size: 1.15rem;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto 40px;
+  }
+
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 60px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    transition: var(--transition);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  }
+
+  .stat-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(139, 69, 19, 0.15);
+  }
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .stat-meta {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    padding: 32px;
+    margin-bottom: 24px;
+    transition: var(--transition);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  }
+
+  .card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 8px 30px rgba(139, 69, 19, 0.12);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-title .icon {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent-secondary), #b8860b);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(139, 69, 19, 0.2);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 30px rgba(139, 69, 19, 0.3);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+
+  .btn-secondary:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-sm {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+  }
+
+  .btn-danger {
+    background: var(--error);
+    color: #fff;
+  }
+
+  .btn-danger:hover {
+    background: #802020;
+    transform: translateY(-1px);
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .input-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .input-group input, .input-group select, .input-group textarea {
+    background: #fff;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+    transition: var(--transition);
+    font-family: inherit;
+  }
+
+  .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .input-group textarea {
+    resize: vertical;
+    min-height: 120px;
+    line-height: 1.5;
+    text-transform: uppercase;
+  }
+
+  .api-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .api-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+    cursor: pointer;
+  }
+
+  .api-item:hover {
+    border-color: var(--accent);
+    background: rgba(139, 69, 19, 0.03);
+  }
+
+  .api-item.selected {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  .api-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .api-method {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(139, 69, 19, 0.1);
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .api-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .api-desc {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .api-status {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-weight: 600;
+  }
+
+  .status-active {
+    background: rgba(45, 122, 62, 0.1);
+    color: var(--success);
+  }
+
+  .status-pending {
+    background: rgba(184, 134, 11, 0.1);
+    color: var(--warning);
+  }
+
+  .exchange-selector, .quote-count-selector {
+    display: flex;
+    gap: 10px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .exchange-chip, .quote-count-chip {
+    padding: 8px 16px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: 600;
+    user-select: none;
+  }
+
+  .exchange-chip:hover, .quote-count-chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .exchange-chip.selected, .quote-count-chip.selected {
+    background: linear-gradient(135deg, var(--accent-secondary), #b8860b);
+    color: #fff;
+    border-color: var(--accent-secondary);
+  }
+
+  .progress-container {
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    display: none;
+  }
+
+  .progress-container.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e0d5c5;
+    border-radius: 100px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+    border-radius: 100px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+
+  .progress-text {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .data-table-container {
+    overflow-x: auto;
+    margin-top: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    max-height: 400px;
+    overflow-y: auto;
+    background: #fff;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  th {
+    background: var(--accent);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #fff;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+  }
+
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  tr:hover td {
+    background: rgba(139, 69, 19, 0.03);
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  .log-container {
+    background: #2a1f14;
+    border: 1px solid #5d3a0a;
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    max-height: 320px;
+    overflow-y: auto;
+    margin-top: 16px;
+    color: #d4af37;
+    transition: var(--transition);
+    scroll-margin-top: 100px;
+  }
+  .log-container.active-log {
+    border-color: #d4af37;
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+  }
+
+  .log-entry {
+    margin-bottom: 4px;
+    padding: 2px 0;
+  }
+
+  .log-time {
+    color: #8b7355;
+    margin-right: 8px;
+  }
+
+  .log-success { color: #7cb342; }
+  .log-error { color: #e57373; }
+  .log-info { color: #d4af37; }
+  .log-warn { color: #ffb74d; }
+
+  .settings-panel {
+    display: none;
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  }
+
+  .settings-panel.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .toggle-row:last-child {
+    border-bottom: none;
+  }
+
+  .toggle-switch {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    background: var(--bg-elevated);
+    border-radius: 100px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: var(--transition);
+  }
+
+  .toggle-switch.active {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: var(--transition);
+  }
+
+  .toggle-switch.active::after {
+    left: 25px;
+  }
+
+  .alert {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    display: none;
+  }
+
+  .alert.active {
+    display: block;
+  }
+
+  .alert-info {
+    background: rgba(139, 69, 19, 0.08);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    color: var(--accent);
+  }
+
+  .alert-warn {
+    background: rgba(184, 134, 11, 0.08);
+    border: 1px solid rgba(184, 134, 11, 0.2);
+    color: var(--warning);
+  }
+
+  .load-date-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    background: rgba(139, 69, 19, 0.1);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .section-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .estimate-text {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: rgba(139, 69, 19, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .btn-download {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+  .btn-download:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-download:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(255,255,255,0.3); }
+  ::-webkit-scrollbar-thumb { background: #c4a265; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #8b4513; }
+
+  .toggle-switch.locked {
+    background: #d0c8bc;
+    border-color: #c0b8ac;
+    cursor: not-allowed;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .toggle-switch.locked::after {
+    background: #a09080;
+  }
+  #adminModal {
+    backdrop-filter: blur(4px);
+  }
+
+  .gamma-status {
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 10px;
+    min-height: 18px;
+    color: var(--text-muted);
+  }
+  .gamma-status.success { color: var(--success); }
+  .gamma-status.error { color: var(--error); }
+  .gamma-status.info { color: var(--text-muted); }
+
+  @media (max-width: 768px) {
+    .mobile-menu-toggle { display: block; }
+    .nav-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      flex-direction: column;
+      padding: 1rem;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+      border-radius: 0 0 8px 8px;
+    }
+    .nav-menu.active { display: flex; }
+    .nav-menu li { width: 100%; }
+    .nav-menu a, .nav-menu span { width: 100%; justify-content: flex-start; padding: 0.8rem; }
+    .hero { padding: 20px 0 40px; }
+    .card { padding: 20px; }
+    .api-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .exchange-selector, .quote-count-selector { justify-content: center; }
+    .container { padding: 100px 16px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <nav class="navbar">
+    <div class="nav-top-row">
+      <a href="index.html" class="logo">
+        <div class="master-guruvammal-logo">
+          Ga<span class="musical-corner">P</span>
+        </div>
+      </a>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-secondary btn-sm" onclick="toggleSettings()">⚙️ Settings</button>
+        <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle mobile menu" aria-expanded="false">
+          <i class="fas fa-bars" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div class="nav-bottom-row">
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+      </ul>
+    </div>
+  </nav>
+</header>
+
+<div class="container">
+
+  <!-- Stats bar hidden per user request -->
+
+  <div class="settings-panel" id="settingsPanel">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">⚙️</span> Configuration</div>
+      <button class="btn btn-sm" id="adminLockBtn" onclick="toggleAdminLock()" title="Admin Lock" style="background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px 8px;color:var(--accent);">🔒</button>
+    </div>
+    <div class="settings-grid">
+      <div class="input-group">
+        <label>Backend key</label>
+        <input type="text" id="backendUrl" placeholder="https://nasdaq-historical-api.vercel.app" value="https://nasdaq-historical-api.vercel.app">
+      </div>
+      <div class="input-group">
+        <label>Bridge</label>
+        <input type="text" id="sbUrl" placeholder="https://your-project.supabase.co" value="https://ppdmhmrmmwnbvnfilcdh.supabase.co">
+      </div>
+      <div class="input-group">
+        <label>Security Key</label>
+        <input type="password" id="sbKey" placeholder="sb_publishable_...">
+      </div>
+    </div>
+    <div class="alert alert-info active" style="margin-top:12px;">
+      Email GammaPace@outlook.com to request your security keys—no payment required.
+    </div>
+  </div>
+
+
+  <!-- Admin Password Modal -->
+  <div id="adminModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-card); padding:28px; border-radius:var(--radius); max-width:340px; width:90%; box-shadow:0 10px 40px rgba(0,0,0,0.2); border:1px solid var(--border);">
+      <h3 style="margin-bottom:16px; font-size:1.1rem; color:var(--text);">🔐 Admin Access</h3>
+      <div class="input-group" style="margin-bottom:0;">
+        <label>Password</label>
+        <input type="password" id="adminPassword" placeholder="Enter password" style="width:100%;" onkeydown="if(event.key==='Enter')checkAdminPassword()">
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+        <button class="btn btn-secondary btn-sm" onclick="closeAdminModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="checkAdminPassword()">Unlock</button>
+      </div>
+    </div>
+  </div>
+  <!-- GammaPace DB Reset Confirmation Modal -->
+  <div id="gammaResetModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-card); padding:28px; border-radius:var(--radius); max-width:380px; width:90%; box-shadow:0 10px 40px rgba(0,0,0,0.2); border:1px solid var(--border);">
+      <h3 style="margin-bottom:16px; font-size:1.1rem; color:var(--error);">⚠️ Confirm DB Reset</h3>
+      <p id="gammaResetMessage" style="font-size:0.9rem; color:var(--text); line-height:1.5;"></p>
+      <p style="font-size:0.8rem; color:var(--text-muted);">This action cannot be undone.</p>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+        <button class="btn btn-secondary btn-sm" onclick="closeGammaResetModal()">Cancel</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmGammaReset()">OK — Proceed</button>
+      </div>
+    </div>
+  </div>
+  <!-- Getting Started Instructions -->
+  <div class="card" id="instructionsCard">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">👋</span> Getting Started</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="background:linear-gradient(135deg, var(--accent-secondary), #b8860b);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0;">1</div>
+        <div>
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px;">Configure Your Keys</div>
+          <div style="font-size:0.9rem;color:var(--text-muted);">Click the <strong>⚙️ Settings</strong> button in the header, then enter your <strong>Backend key</strong>, <strong>Bridge</strong>, and <strong>Security Key</strong> in the Configuration panel.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="background:linear-gradient(135deg, var(--accent-secondary), #b8860b);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0;">2</div>
+        <div>
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px;">Download Data</div>
+          <div style="font-size:0.9rem;color:var(--text-muted);">Click the <strong>⬇️ CSV</strong> button next to any data source below to fetch fresh data and download it as a CSV file.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin-only Load Database controls -->
+  <div id="adminPanel" style="display:none;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🗄️</span> Load Database</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="load-date-badge" id="loadDateBadge">📅 Load Date: —</span>
+          <button class="btn btn-primary" id="loadBtn" onclick="startLoading()">▶️ Load Data</button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="toggle-switch locked" id="autoReloadToggle" onclick="toggleAutoReload()" title="Auto-reload every 2s"></div>
+            <span style="font-size:0.8rem;color:var(--text-muted);font-weight:500;">Loop</span>
+          </div>
+          <button class="btn btn-danger" id="cancelBtn" onclick="cancelLoading()" style="display:none;">⏹ Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin-only GammaPace Recommends controls -->
+  <div id="gammaPacePanel" style="display:none;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">⚡</span> GammaPace IntraDay</div>
+      </div>
+      <div class="input-group">
+        <label>Ticker Symbols (comma-separated)</label>
+        <textarea id="intradaySymbols" rows="5" placeholder="AAPL, MSFT, NVDA, GOOGL, AMZN"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="gammaIntradayRefresh()">🔄 Active</button>
+        <button class="btn btn-primary btn-sm" onclick="gammaIntradayLoad()">💾 Add</button>
+        <button class="btn btn-primary btn-sm" onclick="gammaIntradayEngine()">⚙️ Gamma_engine</button>
+        <button class="btn btn-danger btn-sm" onclick="gammaIntradayReset()">🗑️ DB Reset</button>
+      </div>
+      <div id="intradayStatus" class="gamma-status"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📈</span> GammaPace LongTerm</div>
+      </div>
+      <div class="input-group">
+        <label>Ticker Symbols (comma-separated)</label>
+        <textarea id="longTermSymbols" rows="5" placeholder="AAPL, MSFT, NVDA, GOOGL, AMZN"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="gammaLongTermRefresh()">🔄 Active</button>
+        <button class="btn btn-primary btn-sm" onclick="gammaLongTermLoad()">💾 Add</button>
+        <button class="btn btn-primary btn-sm" onclick="gammaLongTermEngine()">⚙️ Gamma_engine_hist</button>
+        <button class="btn btn-danger btn-sm" onclick="gammaLongTermReset()">🗑️ DB Reset</button>
+      </div>
+      <div id="longTermStatus" class="gamma-status"></div>
+    </div>
+  </div>
+
+  <!-- Public Data Sources -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">📡</span> Available Data Sources</div>
+    </div>
+    <div class="api-list" id="apiList"></div>
+
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text">
+        <span id="progressStatus">Initializing...</span>
+        <span id="progressPercent">0%</span>
+      </div>
+    </div>
+
+    <div class="log-container" id="logContainer">
+      <div class="log-entry"><span class="log-time">--:--:--</span> Ready. Configure your Backend key, Bridge, and Security Key in Settings to begin.</div>
+    </div>
+  </div>
+
+  <div class="card" id="previewCard" style="display:none;">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">👁️</span> Data Preview</div>
+      <button class="btn btn-secondary btn-sm" onclick="clearPreview()">Clear</button>
+    </div>
+    <div class="data-table-container" id="previewTable"></div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// NASDAQ Analysis AI — Company Fundamental Data
+// Full record fetch + load_date (US Eastern Time) + ALL quotes
+// ============================================================
+
+const NASDAQ_ENDPOINTS = [
+  { id: 'news', name: 'Company News', path: '/api/news/topic/articlebysymbol?q={symbol}|STOCKS&offset=0&limit=10&fallback=true', description: 'Latest news articles with headlines, summaries, authors, and publish dates', table: 'nasdaq_news', status: 'active' },
+  { id: 'symbol_dividends', name: 'Symbol Dividends', path: '/api/quote/{symbol}/dividends?assetclass=stocks', description: 'Dividend history for a symbol with ex-dates, amounts, and payment dates', table: 'nasdaq_symbol_dividends', status: 'active' },
+  { id: 'dividends', name: 'Dividend Calendar', path: '/api/calendar/dividends', description: 'Dividend events with ex-dates and payment dates', table: 'nasdaq_dividends', status: 'active' },
+  { id: 'earnings', name: 'Earnings Forecast', path: '/api/analyst/{symbol}/earnings-forecast', description: 'Quarterly and yearly EPS consensus, high/low forecasts, estimate counts, and revisions', table: 'earnings_quarterly_forecast', status: 'active' },
+  { id: 'earnings_surprise', name: 'Earnings Surprise', path: '/api/company/{symbol}/earnings-surprise', description: 'Historical EPS actuals vs consensus forecasts with surprise percentages', table: 'earnings_surprise', status: 'active' },
+  { id: 'financials', name: 'Yearly Financials', path: '/api/company/{symbol}/financials?frequency=1', description: 'Income Statement, Balance Sheet, Cash Flow, and Financial Ratios (annual)', table: 'yearly_income_statement', status: 'active' },
+  { id: 'quarterly_financials', name: 'Quarterly Financials', path: '/api/company/{symbol}/financials?frequency=2', description: 'Quarterly Income Statement, Balance Sheet, Cash Flow, and Financial Ratios', table: 'quarterly_income_statement', status: 'active' },
+  { id: 'insider_trades', name: 'Insider Trades', path: '/api/company/{symbol}/insider-trades', description: 'Insider trading activity with names, relations, transaction types, and share amounts', table: 'nasdaq_insider_trades', status: 'active' },
+  { id: 'institutional_holdings', name: 'Institutional Holdings', path: '/api/company/{symbol}/institutional-holdings', description: 'Institutional ownership details, holder positions, and share changes', table: 'nasdaq_institutional_holdings', status: 'active' },
+  { id: 'ipos', name: 'IPO Calendar', path: '/api/ipo/calendar', description: 'Upcoming IPOs with pricing and dates', table: 'nasdaq_ipos', status: 'active' }
+];
+
+let selectedAPIs = new Set(['symbol_dividends']);
+let supabaseClient = null;
+let isLoading = false;
+let cancelRequested = false;
+let selectedExchange = 'nasdaq';
+let quoteCount = 'ALL';
+let financialMode = 'single';  // 'all' or 'single'
+let quarterlyMode = 'single';  // 'all' or 'single'
+let earningsMode = 'single';  // 'all' or 'single'
+let earningsSurpriseMode = 'single';  // 'all' or 'single'
+let newsMode = 'single';  // 'all' or 'single'
+let institutionalMode = 'single';  // 'all' or 'single'
+let symbolDividendsMode = 'single';  // 'all' or 'single'
+let insiderTradesMode = 'single';  // 'all' or 'single'
+let autoReloadEnabled = false;
+let autoReloadTimeout = null;
+let screenerSymbolsCache = null; // Cache NASDAQ symbol list for the session
+let isAdminUnlocked = false;
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function getUSLoadDate() {
+  const now = new Date();
+  const usStr = now.toLocaleDateString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const [m, d, y] = usStr.split('/');
+  return `${y}-${m}-${d}`;
+}
+
+function getUSLoadDateDisplay() {
+  return new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function getUSLoadTimestamp() {
+  // US NASDAQ wall-clock ISO 8601 timestamp with ms + offset. Metadata only — never part of a UNIQUE key.
+  const now = new Date();
+  const usStr = now.toLocaleString('en-US', { timeZone: 'America/New_York', hour12: false });
+  const [datePart, timePart] = usStr.split(', ');
+  const [m, d, y] = datePart.split('/');
+  let [hh, mm, ss] = timePart.split(':');
+  if (hh === '24') hh = '00';
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  const date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  const time = `${hh}:${mm}:${ss}.${ms}`;
+  const tzName = now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' }).split(' ').pop();
+  const offset = tzName === 'EDT' ? '-04:00' : '-05:00';
+  return `${date}T${time}${offset}`;
+}
+
+function log(msg, type = 'info') {
+  const container = document.getElementById('logContainer');
+  const time = new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: 'America/New_York' });
+  const cls = type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : type === 'warn' ? 'log-warn' : 'log-info';
+  container.innerHTML += `<div class="log-entry"><span class="log-time">${time}</span><span class="${cls}">${msg}</span></div>`;
+  container.scrollTop = container.scrollHeight;
+  if (container.classList.contains('active-log')) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPercent').textContent = Math.round(pct) + '%';
+  if (label) document.getElementById('progressStatus').textContent = label;
+}
+
+function toggleSettings() { document.getElementById('settingsPanel').classList.toggle('active'); }
+function scrollToLog() {
+  const logContainer = document.getElementById('logContainer');
+  logContainer.classList.add('active-log');
+  logContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => logContainer.classList.remove('active-log'), 3000);
+}
+
+function focusLog() {
+  const logContainer = document.getElementById('logContainer');
+  logContainer.classList.add('active-log');
+  logContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+const MODE_LABELS = { all: 'ALL NASDAQ', single: 'Single Symbol', gamma_intraday: 'Gamma IntraDay', gamma_longterm: 'Gamma LongTerm' };
+
+function selectFinancialMode(el) {
+  financialMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Financials mode: ${MODE_LABELS[financialMode] || financialMode}`, 'info');
+}
+
+function selectQuarterlyMode(el) {
+  quarterlyMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Quarterly Financials mode: ${MODE_LABELS[quarterlyMode] || quarterlyMode}`, 'info');
+}
+
+function selectEarningsMode(el) {
+  earningsMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Earnings Forecast mode: ${MODE_LABELS[earningsMode] || earningsMode}`, 'info');
+}
+
+function selectEarningsSurpriseMode(el) {
+  earningsSurpriseMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Earnings Surprise mode: ${MODE_LABELS[earningsSurpriseMode] || earningsSurpriseMode}`, 'info');
+}
+
+function selectNewsMode(el) {
+  newsMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Company News mode: ${MODE_LABELS[newsMode] || newsMode}`, 'info');
+}
+
+function selectInstitutionalMode(el) {
+  institutionalMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Institutional Holdings mode: ${MODE_LABELS[institutionalMode] || institutionalMode}`, 'info');
+}
+
+function selectSymbolDividendsMode(el) {
+  symbolDividendsMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Symbol Dividends mode: ${MODE_LABELS[symbolDividendsMode] || symbolDividendsMode}`, 'info');
+}
+
+function selectInsiderTradesMode(el) {
+  insiderTradesMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Insider Trades mode: ${MODE_LABELS[insiderTradesMode] || insiderTradesMode}`, 'info');
+}
+
+function toggleAdminLock() {
+  if (isAdminUnlocked) {
+    isAdminUnlocked = false;
+    autoReloadEnabled = false;
+    if (autoReloadTimeout) { clearTimeout(autoReloadTimeout); autoReloadTimeout = null; }
+    const toggle = document.getElementById('autoReloadToggle');
+    if (toggle) { toggle.classList.remove('active'); toggle.classList.add('locked'); }
+    const lockBtn = document.getElementById('adminLockBtn');
+    if (lockBtn) { lockBtn.textContent = '🔒'; lockBtn.title = 'Admin Lock'; }
+    const adminPanel = document.getElementById('adminPanel');
+    if (adminPanel) adminPanel.style.display = 'none';
+    const gammaPacePanel = document.getElementById('gammaPacePanel');
+    if (gammaPacePanel) gammaPacePanel.style.display = 'none';
+    log('Admin lock engaged. Loop toggle disabled.', 'info');
+  } else {
+    document.getElementById('adminModal').style.display = 'flex';
+    document.getElementById('adminPassword').value = '';
+    setTimeout(() => document.getElementById('adminPassword').focus(), 100);
+  }
+}
+
+function closeAdminModal() {
+  document.getElementById('adminModal').style.display = 'none';
+}
+
+function checkAdminPassword() {
+  const input = document.getElementById('adminPassword');
+  if (input.value === '191') {
+    isAdminUnlocked = true;
+    const toggle = document.getElementById('autoReloadToggle');
+    if (toggle) toggle.classList.remove('locked');
+    const lockBtn = document.getElementById('adminLockBtn');
+    if (lockBtn) { lockBtn.textContent = '🔓'; lockBtn.title = 'Admin Unlock'; }
+    const adminPanel = document.getElementById('adminPanel');
+    if (adminPanel) adminPanel.style.display = 'block';
+    const gammaPacePanel = document.getElementById('gammaPacePanel');
+    if (gammaPacePanel) gammaPacePanel.style.display = 'block';
+    closeAdminModal();
+    log('Admin unlocked. Loop toggle is now enabled.', 'success');
+  } else {
+    log('Incorrect password. Access denied.', 'error');
+    input.value = '';
+    input.style.borderColor = 'var(--error)';
+    setTimeout(() => input.style.borderColor = '', 1000);
+  }
+}
+
+function cancelLoading() {
+  cancelRequested = true;
+  if (autoReloadTimeout) {
+    clearTimeout(autoReloadTimeout);
+    autoReloadTimeout = null;
+  }
+  autoReloadEnabled = false;
+  const toggle = document.getElementById('autoReloadToggle');
+  if (toggle) toggle.classList.remove('active');
+  log('Cancel requested. Auto-reload stopped.', 'warn');
+  document.getElementById('cancelBtn').style.display = 'none';
+}
+function toggleAutoReload() {
+  if (!isAdminUnlocked) {
+    log('Loop toggle is locked. Unlock in Settings to enable.', 'warn');
+    return;
+  }
+  const toggle = document.getElementById('autoReloadToggle');
+  autoReloadEnabled = !autoReloadEnabled;
+  toggle.classList.toggle('active');
+  if (autoReloadEnabled) {
+    log('Auto-reload enabled. After each load completes, will wait 2s and reload.', 'info');
+  } else {
+    if (autoReloadTimeout) {
+      clearTimeout(autoReloadTimeout);
+      autoReloadTimeout = null;
+    }
+    log('Auto-reload disabled.', 'info');
+  }
+}
+
+function discoverAPIs() {
+  const list = document.getElementById('apiList');
+  list.innerHTML = '';
+  NASDAQ_ENDPOINTS.forEach(api => {
+    const item = document.createElement('div');
+    item.className = `api-item ${selectedAPIs.has(api.id) ? 'selected' : ''}`;
+    item.onclick = () => toggleAPI(api.id, item);
+
+    // Add days input for dividend calendar
+    const daysInputHtml = api.id === 'dividends' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px;" onclick="event.stopPropagation()">
+        <label for="dividend-days" style="color: #8b7355; font-size: 0.8rem;">Range:</label>
+        <input 
+          type="number" 
+          id="dividend-days" 
+          value="7" 
+          min="1" 
+          max="90"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 48px; font-size: 0.85rem; text-align: center; outline: none;"
+          onfocus="this.style.borderColor='#8b4513'"
+          onblur="this.style.borderColor='#ddd'"
+        >
+        <span style="color: #8b7355; font-size: 0.8rem;">days</span>
+      </span>
+    ` : '';
+
+    // Add symbol input + mode toggle for yearly financials
+    const financialInputHtml = api.id === 'financials' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="fin-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${financialMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="fin-mode-chip ${financialMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectFinancialMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${financialMode === 'all' ? '#d4af37' : '#fff'};color:${financialMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="fin-mode-chip ${financialMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectFinancialMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${financialMode === 'single' ? '#d4af37' : '#fff'};color:${financialMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="fin-mode-chip ${financialMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectFinancialMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${financialMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${financialMode === 'gamma_intraday' ? '#fff' : '#8b4513'};;">Gamma IntraDay</span>
+          <span class="fin-mode-chip ${financialMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectFinancialMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${financialMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${financialMode === 'gamma_longterm' ? '#fff' : '#8b4513'};;">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const quarterlyInputHtml = api.id === 'quarterly_financials' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="qfin-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${quarterlyMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="qfin-mode-chip ${quarterlyMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectQuarterlyMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${quarterlyMode === 'all' ? '#d4af37' : '#fff'};color:${quarterlyMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="qfin-mode-chip ${quarterlyMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectQuarterlyMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${quarterlyMode === 'single' ? '#d4af37' : '#fff'};color:${quarterlyMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="qfin-mode-chip ${quarterlyMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectQuarterlyMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${quarterlyMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${quarterlyMode === 'gamma_intraday' ? '#fff' : '#8b4513'};;">Gamma IntraDay</span>
+          <span class="qfin-mode-chip ${quarterlyMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectQuarterlyMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${quarterlyMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${quarterlyMode === 'gamma_longterm' ? '#fff' : '#8b4513'};;">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const institutionalInputHtml = api.id === 'institutional_holdings' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="institutional-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${institutionalMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="institutional-mode-chip ${institutionalMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectInstitutionalMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${institutionalMode === 'all' ? '#d4af37' : '#fff'};color:${institutionalMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="institutional-mode-chip ${institutionalMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectInstitutionalMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${institutionalMode === 'single' ? '#d4af37' : '#fff'};color:${institutionalMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="institutional-mode-chip ${institutionalMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectInstitutionalMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${institutionalMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${institutionalMode === 'gamma_intraday' ? '#fff' : '#8b4513'};;">Gamma IntraDay</span>
+          <span class="institutional-mode-chip ${institutionalMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectInstitutionalMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${institutionalMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${institutionalMode === 'gamma_longterm' ? '#fff' : '#8b4513'};;">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const earningsInputHtml = api.id === 'earnings' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="earnings-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${earningsMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="earnings-mode-chip ${earningsMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectEarningsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${earningsMode === 'all' ? '#d4af37' : '#fff'};color:${earningsMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="earnings-mode-chip ${earningsMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectEarningsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${earningsMode === 'single' ? '#d4af37' : '#fff'};color:${earningsMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="earnings-mode-chip ${earningsMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectEarningsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${earningsMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${earningsMode === 'gamma_intraday' ? '#fff' : '#8b4513'};;">Gamma IntraDay</span>
+          <span class="earnings-mode-chip ${earningsMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectEarningsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${earningsMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${earningsMode === 'gamma_longterm' ? '#fff' : '#8b4513'};;">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const earningsSurpriseInputHtml = api.id === 'earnings_surprise' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="earnings-surprise-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${earningsSurpriseMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="earnings-surprise-mode-chip ${earningsSurpriseMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectEarningsSurpriseMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${earningsSurpriseMode === 'all' ? '#d4af37' : '#fff'};color:${earningsSurpriseMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="earnings-surprise-mode-chip ${earningsSurpriseMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectEarningsSurpriseMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${earningsSurpriseMode === 'single' ? '#d4af37' : '#fff'};color:${earningsSurpriseMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="earnings-surprise-mode-chip ${earningsSurpriseMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectEarningsSurpriseMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${earningsSurpriseMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${earningsSurpriseMode === 'gamma_intraday' ? '#fff' : '#8b4513'};;">Gamma IntraDay</span>
+          <span class="earnings-surprise-mode-chip ${earningsSurpriseMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectEarningsSurpriseMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${earningsSurpriseMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${earningsSurpriseMode === 'gamma_longterm' ? '#fff' : '#8b4513'};;">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const newsInputHtml = api.id === 'news' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="news-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${newsMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="news-mode-chip ${newsMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectNewsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${newsMode === 'all' ? '#d4af37' : '#fff'};color:${newsMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="news-mode-chip ${newsMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectNewsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${newsMode === 'single' ? '#d4af37' : '#fff'};color:${newsMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="news-mode-chip ${newsMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectNewsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${newsMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${newsMode === 'gamma_intraday' ? '#fff' : '#8b4513'};;">Gamma IntraDay</span>
+          <span class="news-mode-chip ${newsMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectNewsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${newsMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${newsMode === 'gamma_longterm' ? '#fff' : '#8b4513'};;">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const symbolDividendsInputHtml = api.id === 'symbol_dividends' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="symbol-dividends-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${symbolDividendsMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="symbol-dividends-mode-chip ${symbolDividendsMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectSymbolDividendsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${symbolDividendsMode === 'all' ? '#d4af37' : '#fff'};color:${symbolDividendsMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="symbol-dividends-mode-chip ${symbolDividendsMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectSymbolDividendsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${symbolDividendsMode === 'single' ? '#d4af37' : '#fff'};color:${symbolDividendsMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="symbol-dividends-mode-chip ${symbolDividendsMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectSymbolDividendsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${symbolDividendsMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${symbolDividendsMode === 'gamma_intraday' ? '#fff' : '#8b4513'};;">Gamma IntraDay</span>
+          <span class="symbol-dividends-mode-chip ${symbolDividendsMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectSymbolDividendsMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${symbolDividendsMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${symbolDividendsMode === 'gamma_longterm' ? '#fff' : '#8b4513'};;">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const insiderTradesInputHtml = api.id === 'insider_trades' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="insider-trades-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${insiderTradesMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="insider-trades-mode-chip ${insiderTradesMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectInsiderTradesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${insiderTradesMode === 'all' ? '#d4af37' : '#fff'};color:${insiderTradesMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="insider-trades-mode-chip ${insiderTradesMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectInsiderTradesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${insiderTradesMode === 'single' ? '#d4af37' : '#fff'};color:${insiderTradesMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="insider-trades-mode-chip ${insiderTradesMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectInsiderTradesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${insiderTradesMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${insiderTradesMode === 'gamma_intraday' ? '#fff' : '#8b4513'};;">Gamma IntraDay</span>
+          <span class="insider-trades-mode-chip ${insiderTradesMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectInsiderTradesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${insiderTradesMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${insiderTradesMode === 'gamma_longterm' ? '#fff' : '#8b4513'};;">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+
+    item.innerHTML = `
+      <div class="api-info">
+        <span class="api-method">GET</span>
+        <div>
+          <div class="api-name">${api.name}${daysInputHtml}${financialInputHtml}${quarterlyInputHtml}${institutionalInputHtml}${earningsInputHtml}${earningsSurpriseInputHtml}${newsInputHtml}${symbolDividendsInputHtml}${insiderTradesInputHtml}</div>
+          <div class="api-desc">${api.description}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+      <span class="api-status ${api.status === 'active' ? 'status-active' : 'status-pending'}">${api.status}</span>
+      <button class="btn-download" onclick="event.stopPropagation(); downloadAPI('${api.id}')" title="Download as CSV">⬇️ CSV</button>
+    </div>
+    `;
+    list.appendChild(item);
+  });
+
+  log('API discovery complete. 10 endpoints found.', 'success');
+}
+
+function toggleAPI(id, element) {
+  if (selectedAPIs.has(id)) { selectedAPIs.delete(id); element.classList.remove('selected'); }
+  else { selectedAPIs.add(id); element.classList.add('selected'); }
+}
+
+function getBackendUrl() { return document.getElementById('backendUrl').value.trim().replace(/\/$/, ''); }
+
+function initSupabase() {
+  const url = document.getElementById('sbUrl').value.trim();
+  const key = document.getElementById('sbKey').value.trim();
+  if (!url || !key) { log('Please configure Supabase URL and Anon Key in Settings', 'error'); document.getElementById('settingsPanel').classList.add('active'); return false; }
+  try { supabaseClient = supabase.createClient(url, key); log('Supabase client initialized', 'success'); return true; }
+  catch (e) { log('Failed to initialize Supabase: ' + e.message, 'error'); return false; }
+}
+
+// ============================================================
+// Vercel Backend Proxy
+// ============================================================
+
+async function fetchNasdaq(path, timeoutMs = 20000) {
+  const backend = getBackendUrl();
+  if (!backend) throw new Error('Backend URL not configured. Open Settings and paste your Vercel URL.');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${backend}/api/nasdaq-proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || `HTTP ${res.status}`); }
+    return res.json();
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error(`Request timeout after ${timeoutMs}ms for ${path}`);
+    throw e;
+  }
+}
+
+async function getScreenerSymbols() {
+  if (screenerSymbolsCache) return screenerSymbolsCache;
+  log('Fetching NASDAQ symbol list...');
+  const data = await fetchNasdaq('/api/screener/stocks?tableonly=true&limit=500000&exchange=nasdaq');
+  const rows = data?.data?.table?.rows || [];
+  screenerSymbolsCache = rows.map(r => r.symbol).filter(s => s);
+  log(`${screenerSymbolsCache.length} NASDAQ symbols cached for session`, 'success');
+  return screenerSymbolsCache;
+}
+
+// GammaPace watchlist symbol source — reads the public gammapace_* tables.
+// Auto-initializes Supabase from Settings when null; DISTINCT-safe symbol list.
+async function getGammaPaceSymbols(table) {
+  if (!supabaseClient) {
+    const url = document.getElementById('sbUrl')?.value.trim();
+    const key = document.getElementById('sbKey')?.value.trim();
+    if (!(url && key && initSupabase())) {
+      log('Supabase not initialized. Configure Bridge and Security Key in Settings.', 'error');
+      document.getElementById('settingsPanel').classList.add('active');
+      return [];
+    }
+  }
+  const { data, error } = await supabaseClient.from(table).select('symbol').order('symbol');
+  if (error) {
+    log(`Failed to fetch symbols from ${table}: ${error.message}`, 'error');
+    return [];
+  }
+  const symbols = [...new Set((data || []).map(r => r.symbol).filter(s => s))];
+  log(`${symbols.length} symbols loaded from ${table}`, 'success');
+  return symbols;
+}
+
+// Active mode for an endpoint id — used by CSV download flow for watchlist scoping.
+function getActiveModeForAPI(apiId) {
+  switch (apiId) {
+    case 'news': return newsMode;
+    case 'symbol_dividends': return symbolDividendsMode;
+    case 'financials': return financialMode;
+    case 'quarterly_financials': return quarterlyMode;
+    case 'earnings': return earningsMode;
+    case 'earnings_surprise': return earningsSurpriseMode;
+    case 'institutional_holdings': return institutionalMode;
+    case 'insider_trades': return insiderTradesMode;
+    default: return null;
+  }
+}
+
+// Generic parallel fetch worker for ALL-mode endpoints
+// fetchFn: async (symbol) => data   — should throw on failure
+// options: { concurrency, delayMs, label, onBatch, onProgress }
+async function parallelFetchAll(symbols, fetchFn, options = {}) {
+  const { concurrency = 4, delayMs = 150, label = 'Fetch', onBatch, onProgress, logEvery = 20 } = options;
+  const results = [];
+  let successCount = 0;
+  let failCount = 0;
+  const total = symbols.length;
+
+  for (let i = 0; i < total; i += concurrency) {
+    if (cancelRequested) {
+      log(`${label}: Cancelled by user at ${i}/${total}`, 'warn');
+      break;
+    }
+
+    const batch = symbols.slice(i, i + concurrency);
+    const batchResults = await Promise.allSettled(batch.map(sym => fetchFn(sym)));
+
+    batchResults.forEach((res, idx) => {
+      const symbol = batch[idx];
+      if (res.status === 'fulfilled') {
+        results.push({ symbol, data: res.value, success: true });
+        successCount++;
+      } else {
+        results.push({ symbol, error: res.reason, success: false });
+        failCount++;
+        if (failCount <= 5 || i === total - 1) {
+          log(`${label} [${symbol}]: ${res.reason?.message || res.reason}`, 'warn');
+        }
+      }
+    });
+
+    if (onBatch) onBatch(batchResults, batch, i);
+
+    const processed = Math.min(i + concurrency, total);
+    if (onProgress) onProgress(processed, total, successCount, failCount);
+    if ((processed) % logEvery === 0 || processed === total) {
+      const pct = Math.round((processed / total) * 100);
+      setProgress(pct, `${label} ${processed}/${total} · ${successCount} ok · ${failCount} fail`);
+      log(`${label}: ${processed}/${total} symbols · ${successCount} ok · ${failCount} fail`);
+    }
+
+    if (i + concurrency < total && !cancelRequested) {
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+
+  log(`${label}: ${successCount} succeeded · ${failCount} failed · ${results.length} total`);
+  return { results, successCount, failCount };
+}
+
+// ============================================================
+// Data Loading Orchestrator
+// ============================================================
+
+async function startLoading() {
+  if (isLoading) return;
+  if (selectedAPIs.size === 0) { log('No APIs selected. Please select at least one API.', 'error'); return; }
+  const backend = getBackendUrl();
+  if (!backend) { log('Backend URL missing. Open Settings and paste your Vercel deployment URL.', 'error'); document.getElementById('settingsPanel').classList.add('active'); return; }
+  scrollToLog();
+
+  isLoading = true;
+  cancelRequested = false;
+  const btn = document.getElementById('loadBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading...';
+  cancelBtn.style.display = 'inline-flex';
+
+  const progress = document.getElementById('progressContainer');
+  const fill = document.getElementById('progressFill');
+  const status = document.getElementById('progressStatus');
+  const percent = document.getElementById('progressPercent');
+  progress.classList.add('active');
+  const loadDateBadge = document.getElementById('loadDateBadge');
+  if (loadDateBadge) loadDateBadge.textContent = `📅 Load Date: ${getUSLoadDateDisplay()}`;
+
+  const hasSupabase = initSupabase();
+  if (!hasSupabase) { btn.disabled = false; btn.textContent = '▶️ Load Data'; cancelBtn.style.display = 'none'; isLoading = false; return; }
+
+  const apis = Array.from(selectedAPIs);
+  const total = apis.length;
+  let completed = 0;
+
+  for (const apiId of apis) {
+    const api = NASDAQ_ENDPOINTS.find(a => a.id === apiId);
+    if (!api) continue;
+    status.textContent = `Loading ${api.name}...`;
+    const loadingMode = getActiveModeForAPI(api.id);
+    if (loadingMode === 'gamma_intraday' || loadingMode === 'gamma_longterm') {
+      log(`Starting: ${api.name} · filter: ${MODE_LABELS[loadingMode]} (symbols from ${loadingMode === 'gamma_intraday' ? 'gammapace_intraday' : 'gammapace_longterm'})`);
+    } else {
+      log(`Starting: ${api.name}`);
+    }
+
+    try {
+      let data;
+      if (api.id === 'ipos') data = await loadIPOs();
+      else if (api.id === 'dividends') data = await loadDividends();
+      else if (api.id === 'financials') data = await loadFinancials();
+      else if (api.id === 'quarterly_financials') data = await loadQuarterlyFinancials();
+      else if (api.id === 'institutional_holdings') data = await loadInstitutionalHoldings();
+      else if (api.id === 'earnings') data = await loadEarnings();
+      else if (api.id === 'earnings_surprise') data = await loadEarningsSurprise();
+      else if (api.id === 'news') data = await loadNews();
+      else if (api.id === 'symbol_dividends') data = await loadSymbolDividends();
+      else if (api.id === 'insider_trades') data = await loadInsiderTrades();
+
+      if (api.id === 'financials' && data && data.income_statement) {
+        const totalRows = data.income_statement.length + data.balance_sheet.length + data.cash_flow.length + data.financial_ratios.length;
+        if (totalRows > 0) {
+          log(`${api.name}: ${totalRows} total records fetched`, 'success');
+          showPreview('Income Statement', data.income_statement.slice(0, 10));
+          // Insert all 4 yearly tables in parallel (independent upserts)
+          await Promise.all([
+            insertToSupabase('yearly_income_statement', data.income_statement),
+            insertToSupabase('yearly_balance_sheet', data.balance_sheet),
+            insertToSupabase('yearly_cash_flow', data.cash_flow),
+            insertToSupabase('yearly_financial_ratios', data.financial_ratios)
+          ]);
+        } else {
+          log(`${api.name}: No data returned`, 'warn');
+        }
+      } else if (api.id === 'quarterly_financials' && data && data.income_statement) {
+        const totalRows = data.income_statement.length + data.balance_sheet.length + data.cash_flow.length + data.financial_ratios.length;
+        if (totalRows > 0) {
+          log(`${api.name}: ${totalRows} total records fetched`, 'success');
+          showPreview('Quarterly Income Statement', data.income_statement.slice(0, 10));
+          // Insert all 4 quarterly tables in parallel (independent upserts)
+          await Promise.all([
+            insertToSupabase('quarterly_income_statement', data.income_statement),
+            insertToSupabase('quarterly_balance_sheet', data.balance_sheet),
+            insertToSupabase('quarterly_cash_flow', data.cash_flow),
+            insertToSupabase('quarterly_financial_ratios', data.financial_ratios)
+          ]);
+        } else {
+          log(`${api.name}: No data returned`, 'warn');
+        }
+      } else if (api.id === 'earnings' && data && data.quarterly) {
+        const totalRows = data.quarterly.length + data.yearly.length;
+        if (totalRows > 0) {
+          log(`${api.name}: ${totalRows} total records fetched`, 'success');
+          showPreview('Quarterly Earnings Forecast', data.quarterly.slice(0, 10));
+          await Promise.all([
+            insertToSupabase('earnings_quarterly_forecast', data.quarterly),
+            insertToSupabase('earnings_yearly_forecast', data.yearly)
+          ]);
+        } else {
+          log(`${api.name}: No data returned`, 'warn');
+        }
+      } else if (api.id === 'earnings_surprise' && data && data.length > 0) {
+        log(`${api.name}: ${data.length} records fetched`, 'success');
+        showPreview(api.name, data.slice(0, 10));
+        await insertToSupabase(api.table, data);
+      } else if (api.id === 'institutional_holdings' && data && data.length > 0) {
+        log(`${api.name}: ${data.length} records fetched`, 'success');
+        showPreview(api.name, data.slice(0, 10));
+        await insertToSupabase(api.table, data);
+      } else if (api.id === 'symbol_dividends' && data && data.length > 0) {
+        log(`${api.name}: ${data.length} records fetched`, 'success');
+        showPreview(api.name, data.slice(0, 10));
+        await insertToSupabase(api.table, data);
+      } else if (api.id === 'insider_trades' && data && data.length > 0) {
+        log(`${api.name}: ${data.length} records fetched`, 'success');
+        showPreview(api.name, data.slice(0, 10));
+        await insertToSupabase(api.table, data);
+      } else if (data && data.length > 0) {
+        log(`${api.name}: ${data.length} records fetched`, 'success');
+        showPreview(api.name, data.slice(0, 10));
+        await insertToSupabase(api.table, data);
+      } else {
+        log(`${api.name}: No data returned`, 'warn');
+      }
+    } catch (e) {
+      log(`${api.name} failed: ${e.message}`, 'error');
+    }
+
+    completed++;
+    const pct = Math.round((completed / total) * 100);
+    fill.style.width = pct + '%';
+    percent.textContent = pct + '%';
+  }
+
+  status.textContent = 'Complete!';
+  log('All selected APIs processed.', 'success');
+  await updateStats();
+  document.getElementById('logContainer').classList.remove('active-log');
+
+  btn.disabled = false;
+  btn.textContent = '▶️ Load Data';
+  cancelBtn.style.display = 'none';
+  isLoading = false;
+
+  if (autoReloadEnabled && !cancelRequested && selectedAPIs.size > 0) {
+    log('Auto-reload: next iteration in 2 seconds...', 'info');
+    autoReloadTimeout = setTimeout(() => {
+      if (autoReloadEnabled && !isLoading) startLoading();
+    }, 2000);
+  }
+}
+
+// ============================================================
+// NASDAQ Fetchers
+// ============================================================
+
+async function loadIPOs() {
+  log('Fetching IPO calendar...', 'info');
+  const json = await fetchNasdaq('/api/ipo/calendar');
+  const allRows = [];
+  const sections = ['priced', 'upcoming', 'filed', 'withdrawn'];
+  for (const section of sections) {
+    const secData = json.data?.[section];
+    if (!secData) continue;
+    let rows = [];
+    if (secData.rows) rows = secData.rows;
+    else if (secData.upcomingTable?.rows) rows = secData.upcomingTable.rows;
+    rows.forEach(r => {
+      allRows.push({
+        company_name: r.companyName || r.name || '',
+        symbol: r.symbol || '',
+        market: r.market || '',
+        price: r.price || r.proposedSharePrice || '',
+        shares: r.shares || r.proposedShares || '',
+        expected_date: r.expectedDate || r.pricedDate || null,
+        ipo_type: section,
+        status: section
+      });
+    });
+  }
+  log(`IPO Calendar: ${allRows.length} records found`, 'success');
+  return allRows;
+}
+
+async function loadDividends() {
+  const daysInput = document.getElementById('dividend-days');
+  const daysBack = daysInput ? Math.min(Math.max(parseInt(daysInput.value, 10) || 7, 1), 90) : 7;
+
+  const allRows = [];
+  let totalFetched = 0;
+
+  log(`Starting: Dividend Calendar (${daysBack} day${daysBack > 1 ? 's' : ''})`);
+
+  for (let i = 0; i < daysBack; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+
+    log(`Fetching dividend calendar for ${dateStr}...`);
+
+    try {
+      const data = await fetchNasdaq(`/api/calendar/dividends?date=${dateStr}`);
+
+      let rows = [];
+      if (data?.data?.rows) {
+        rows = data.data.rows;
+      } else if (data?.data?.calendar?.rows) {
+        rows = data.data.calendar.rows;
+      } else if (data?.data?.dividends?.rows) {
+        rows = data.data.dividends.rows;
+      } else if (Array.isArray(data?.data)) {
+        rows = data.data;
+      }
+
+      log(`Dividend Calendar [${dateStr}]: ${rows.length} records found`);
+      allRows.push(...rows);
+      totalFetched += rows.length;
+
+      if (i < daysBack - 1) {
+        await new Promise(r => setTimeout(r, 250));
+      }
+
+    } catch (err) {
+      log(`Dividend Calendar [${dateStr}]: Error — ${err.message}`);
+    }
+  }
+
+  log(`Dividend Calendar: ${totalFetched} raw records fetched`);
+
+  if (allRows.length === 0) {
+    log('Dividend Calendar: No data returned across all dates');
+    return [];
+  }
+
+  // Deduplicate by symbol + dividend_Ex_Date
+  const seen = new Set();
+  const uniqueRows = allRows.filter(row => {
+    const symbol = (row.symbol || '').toString().trim();
+    const exDate = (row.dividend_Ex_Date || '').toString().trim();
+    const key = `${symbol}-${exDate}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  log(`Dividend Calendar: ${uniqueRows.length} unique records after dedup`);
+
+  // Helper: convert M/D/YYYY or MM/DD/YYYY → YYYY-MM-DD, or return null
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    // Handle M/D/YYYY or MM/DD/YYYY
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    // If already ISO-ish, return as-is if it looks valid
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  // Helper: empty/zero → null for text/numbers
+  const toValue = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 ? s : null;
+  };
+
+  const normalized = uniqueRows.map(row => ({
+    symbol: toValue(row.symbol),
+    company_name: toValue(row.companyName),
+    dividend_type: 'Cash', // NASDAQ free API does not return this field; default to Cash
+    dividend_amount: toValue(row.dividend_Rate),
+    ex_date: toISODate(row.dividend_Ex_Date),
+    record_date: toISODate(row.record_Date),
+    payment_date: toISODate(row.payment_Date),
+    declaration_date: toISODate(row.announcement_Date)
+  }));
+
+  return normalized;
+}
+
+// ============================================================
+// Yearly Financials Loader (Income Statement, Balance Sheet, Cash Flow, Ratios)
+// ============================================================
+
+async function loadFinancials() {
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  const cleanValue = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    if (s === '' || s === '--') return null;
+    return s.replace(/[$,]/g, '');
+  };
+
+  const parseTable = (tableData, symbol) => {
+    const rows = [];
+    if (!tableData || !tableData.rows || !tableData.headers) return rows;
+    const headers = tableData.headers;
+    const periods = [];
+    for (let i = 2; i <= 5; i++) {
+      const key = `value${i}`;
+      if (headers[key]) {
+        const isoDate = toISODate(headers[key]);
+        if (isoDate) periods.push({ col: key, date: isoDate });
+      }
+    }
+    if (periods.length === 0) return rows;
+
+    tableData.rows.forEach(row => {
+      const metricName = row.value1;
+      if (!metricName || metricName.trim() === '') return;
+      // Skip section headers that have no data values
+      const sectionHeaders = ['Ratios', 'Assets', 'Liabilities', 'Equity', 'Activities', 'Items'];
+      const isSectionHeader = sectionHeaders.some(suffix => metricName.trim().endsWith(suffix));
+      if (isSectionHeader) {
+        const hasData = periods.some(p => {
+          const v = row[p.col];
+          return v !== undefined && v !== null && v.toString().trim() !== '' && v.toString().trim() !== '--';
+        });
+        if (!hasData) return;
+      }
+
+      periods.forEach(period => {
+        const rawValue = row[period.col];
+        const cleanedValue = cleanValue(rawValue);
+        if (cleanedValue !== null) {
+          rows.push({
+            symbol: symbol,
+            period_ending: period.date,
+            line_item: metricName.trim(),
+            metric_value: cleanedValue
+          });
+        }
+      });
+    });
+    return rows;
+  };
+
+  const fetchSymbolFinancials = async (symbol) => {
+    const path = `/api/company/${symbol}/financials?frequency=1`;
+    const data = await fetchNasdaq(path);
+    const d = data?.data;
+    if (!d) return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] };
+
+    return {
+      income_statement: parseTable(d.incomeStatementTable, symbol),
+      balance_sheet: parseTable(d.balanceSheetTable, symbol),
+      cash_flow: parseTable(d.cashFlowTable, symbol),
+      financial_ratios: parseTable(d.financialRatiosTable, symbol)
+    };
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (financialMode === 'single') {
+    const symbolInput = document.getElementById('fin-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Yearly Financials for ${symbol}`);
+    try {
+      const result = await fetchSymbolFinancials(symbol);
+      const totalRows = result.income_statement.length + result.balance_sheet.length + result.cash_flow.length + result.financial_ratios.length;
+      log(`Financials [${symbol}]: ${totalRows} records fetched (IS:${result.income_statement.length} BS:${result.balance_sheet.length} CF:${result.cash_flow.length} FR:${result.financial_ratios.length})`, 'success');
+      return result;
+    } catch (err) {
+      log(`Financials [${symbol}]: ${err.message}`, 'error');
+      return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] };
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (financialMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Financials: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] }; }
+  } else if (financialMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Financials: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] }; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Financials: Failed to fetch symbol list — ${e.message}`, 'error'); return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] }; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Financials: No symbols found for ${modeLabel}`, 'warn');
+    return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] };
+  }
+
+  log(`Starting: Yearly Financials for ${symbols.length} ${modeLabel} symbols · 4 concurrent · 150ms gap`);
+
+  const result = {
+    income_statement: [],
+    balance_sheet: [],
+    cash_flow: [],
+    financial_ratios: []
+  };
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const data = await fetchSymbolFinancials(symbol);
+      result.income_statement.push(...data.income_statement);
+      result.balance_sheet.push(...data.balance_sheet);
+      result.cash_flow.push(...data.cash_flow);
+      result.financial_ratios.push(...data.financial_ratios);
+      return data;
+    },
+    {
+      concurrency: 4,
+      delayMs: 150,
+      label: 'Yearly Financials',
+      onProgress: (processed, total, ok, fail) => {
+        const totalRows = result.income_statement.length + result.balance_sheet.length + result.cash_flow.length + result.financial_ratios.length;
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Financials ${processed}/${total} · ${totalRows} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  const totalRows = result.income_statement.length + result.balance_sheet.length + result.cash_flow.length + result.financial_ratios.length;
+  log(`Financials: ${totalRows} rows from ${successCount} symbols (${failCount} failed)`);
+  return result;
+}
+
+// ============================================================
+// Quarterly Financials Loader
+// ============================================================
+
+async function loadQuarterlyFinancials() {
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  const cleanValue = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    if (s === '' || s === '--') return null;
+    return s.replace(/[$,]/g, '');
+  };
+
+  const parseTable = (tableData, symbol) => {
+    const rows = [];
+    if (!tableData || !tableData.rows || !tableData.headers) return rows;
+    const headers = tableData.headers;
+    const periods = [];
+    for (let i = 2; i <= 5; i++) {
+      const key = `value${i}`;
+      if (headers[key]) {
+        const isoDate = toISODate(headers[key]);
+        if (isoDate) periods.push({ col: key, date: isoDate });
+      }
+    }
+    if (periods.length === 0) return rows;
+
+    tableData.rows.forEach(row => {
+      const metricName = row.value1;
+      if (!metricName || metricName.trim() === '') return;
+      const sectionHeaders = ['Ratios', 'Assets', 'Liabilities', 'Equity', 'Activities', 'Items'];
+      const isSectionHeader = sectionHeaders.some(suffix => metricName.trim().endsWith(suffix));
+      if (isSectionHeader) {
+        const hasData = periods.some(p => {
+          const v = row[p.col];
+          return v !== undefined && v !== null && v.toString().trim() !== '' && v.toString().trim() !== '--';
+        });
+        if (!hasData) return;
+      }
+
+      periods.forEach(period => {
+        const rawValue = row[period.col];
+        const cleanedValue = cleanValue(rawValue);
+        if (cleanedValue !== null) {
+          rows.push({
+            symbol: symbol,
+            period_ending: period.date,
+            line_item: metricName.trim(),
+            metric_value: cleanedValue
+          });
+        }
+      });
+    });
+    return rows;
+  };
+
+  const fetchSymbolFinancials = async (symbol) => {
+    const path = `/api/company/${symbol}/financials?frequency=2`;
+    const data = await fetchNasdaq(path);
+    const d = data?.data;
+    if (!d) return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] };
+
+    return {
+      income_statement: parseTable(d.incomeStatementTable, symbol),
+      balance_sheet: parseTable(d.balanceSheetTable, symbol),
+      cash_flow: parseTable(d.cashFlowTable, symbol),
+      financial_ratios: parseTable(d.financialRatiosTable, symbol)
+    };
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (quarterlyMode === 'single') {
+    const symbolInput = document.getElementById('qfin-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Quarterly Financials for ${symbol}`);
+    try {
+      const result = await fetchSymbolFinancials(symbol);
+      const totalRows = result.income_statement.length + result.balance_sheet.length + result.cash_flow.length + result.financial_ratios.length;
+      log(`Quarterly Financials [${symbol}]: ${totalRows} records fetched (IS:${result.income_statement.length} BS:${result.balance_sheet.length} CF:${result.cash_flow.length} FR:${result.financial_ratios.length})`, 'success');
+      return result;
+    } catch (err) {
+      log(`Quarterly Financials [${symbol}]: ${err.message}`, 'error');
+      return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] };
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (quarterlyMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Quarterly Financials: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] }; }
+  } else if (quarterlyMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Quarterly Financials: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] }; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Quarterly Financials: Failed to fetch symbol list — ${e.message}`, 'error'); return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] }; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Quarterly Financials: No symbols found for ${modeLabel}`, 'warn');
+    return { income_statement: [], balance_sheet: [], cash_flow: [], financial_ratios: [] };
+  }
+
+  log(`Starting: Quarterly Financials for ${symbols.length} ${modeLabel} symbols · 4 concurrent · 150ms gap`);
+
+  const result = {
+    income_statement: [],
+    balance_sheet: [],
+    cash_flow: [],
+    financial_ratios: []
+  };
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const data = await fetchSymbolFinancials(symbol);
+      result.income_statement.push(...data.income_statement);
+      result.balance_sheet.push(...data.balance_sheet);
+      result.cash_flow.push(...data.cash_flow);
+      result.financial_ratios.push(...data.financial_ratios);
+      return data;
+    },
+    {
+      concurrency: 4,
+      delayMs: 150,
+      label: 'Quarterly Financials',
+      onProgress: (processed, total, ok, fail) => {
+        const totalRows = result.income_statement.length + result.balance_sheet.length + result.cash_flow.length + result.financial_ratios.length;
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Quarterly Financials ${processed}/${total} · ${totalRows} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  const totalRows = result.income_statement.length + result.balance_sheet.length + result.cash_flow.length + result.financial_ratios.length;
+  log(`Quarterly Financials: ${totalRows} rows from ${successCount} symbols (${failCount} failed)`);
+  return result;
+}
+
+// ============================================================
+// Institutional Holdings Loader
+// ============================================================
+
+async function loadInstitutionalHoldings() {
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  const toBigInt = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--') return null;
+    const n = parseInt(cleaned, 10);
+    return isNaN(n) ? null : n;
+  };
+
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' ? s : null;
+  };
+
+  const fetchSymbolHoldings = async (symbol) => {
+    const path = `/api/company/${symbol}/institutional-holdings`;
+    const json = await fetchNasdaq(path);
+    const d = json?.data;
+    if (!d) return [];
+
+    const holdings = d.holdingsTransactions?.table?.rows || [];
+    const sym = symbol.toString().toUpperCase();
+    return holdings.map(row => ({
+      symbol: sym,
+      owner_name: cleanText(row.ownerName),
+      report_date: toISODate(row.date),
+      shares_held: toBigInt(row.sharesHeld),
+      shares_change: toBigInt(row.sharesChange),
+      shares_change_pct: cleanText(row.sharesChangePCT),
+      market_value: toBigInt(row.marketValue),
+      owner_url: cleanText(row.url)
+    })).filter(r => r.owner_name !== null);
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (institutionalMode === 'single') {
+    const symbolInput = document.getElementById('institutional-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Institutional Holdings for ${symbol}`);
+    try {
+      const result = await fetchSymbolHoldings(symbol);
+      log(`Institutional Holdings [${symbol}]: ${result.length} records fetched`, 'success');
+      return result;
+    } catch (err) {
+      log(`Institutional Holdings [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (institutionalMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Institutional Holdings: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (institutionalMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Institutional Holdings: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Institutional Holdings: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Institutional Holdings: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Institutional Holdings for ${symbols.length} ${modeLabel} symbols · 4 concurrent · 150ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolHoldings(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 4,
+      delayMs: 150,
+      label: 'Institutional Holdings',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Institutional Holdings ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Institutional Holdings: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Earnings Forecast Loader
+// ============================================================
+
+async function loadEarnings() {
+  const fetchSymbolEarnings = async (symbol) => {
+    const path = `/api/analyst/${symbol}/earnings-forecast`;
+    const json = await fetchNasdaq(path);
+    const d = json?.data;
+    if (!d) return null;
+
+    const parseRows = (rows, sym) => {
+      return (rows || []).map(row => ({
+        symbol: sym,
+        fiscal_end: (row.fiscalEnd || '').toString().trim(),
+        consensus_eps_forecast: row.consensusEPSForecast != null ? Number(row.consensusEPSForecast) : null,
+        high_eps_forecast: row.highEPSForecast != null ? Number(row.highEPSForecast) : null,
+        low_eps_forecast: row.lowEPSForecast != null ? Number(row.lowEPSForecast) : null,
+        no_of_estimates: row.noOfEstimates != null ? parseInt(row.noOfEstimates, 10) : null,
+        revisions_up: row.up != null ? parseInt(row.up, 10) : null,
+        revisions_down: row.down != null ? parseInt(row.down, 10) : null
+      })).filter(r => r.fiscal_end !== '');
+    };
+
+    const sym = (d.symbol || symbol).toString().toUpperCase();
+    return {
+      quarterly: parseRows(d.quarterlyForecast?.rows, sym),
+      yearly: parseRows(d.yearlyForecast?.rows, sym)
+    };
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (earningsMode === 'single') {
+    const symbolInput = document.getElementById('earnings-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Earnings Forecast for ${symbol}`);
+    try {
+      const result = await fetchSymbolEarnings(symbol);
+      if (result) {
+        const totalRows = result.quarterly.length + result.yearly.length;
+        log(`Earnings Forecast [${symbol}]: ${totalRows} records fetched (Q:${result.quarterly.length} Y:${result.yearly.length})`, 'success');
+        return result;
+      }
+      return { quarterly: [], yearly: [] };
+    } catch (err) {
+      log(`Earnings Forecast [${symbol}]: ${err.message}`, 'error');
+      return { quarterly: [], yearly: [] };
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (earningsMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Earnings Forecast: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return { quarterly: [], yearly: [] }; }
+  } else if (earningsMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Earnings Forecast: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return { quarterly: [], yearly: [] }; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Earnings Forecast: Failed to fetch symbol list — ${e.message}`, 'error'); return { quarterly: [], yearly: [] }; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Earnings Forecast: No symbols found for ${modeLabel}`, 'warn');
+    return { quarterly: [], yearly: [] };
+  }
+
+  log(`Starting: Earnings Forecast for ${symbols.length} ${modeLabel} symbols · 4 concurrent · 150ms gap`);
+
+  const result = { quarterly: [], yearly: [] };
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const data = await fetchSymbolEarnings(symbol);
+      if (data) {
+        result.quarterly.push(...data.quarterly);
+        result.yearly.push(...data.yearly);
+        return data;
+      }
+      return null;
+    },
+    {
+      concurrency: 4,
+      delayMs: 150,
+      label: 'Earnings Forecast',
+      onProgress: (processed, total, ok, fail) => {
+        const totalRows = result.quarterly.length + result.yearly.length;
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Earnings Forecast ${processed}/${total} · ${totalRows} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  const totalRows = result.quarterly.length + result.yearly.length;
+  log(`Earnings Forecast: ${totalRows} rows from ${successCount} symbols (${failCount} failed)`);
+  return result;
+}
+
+// ============================================================
+// Earnings Surprise Loader
+// ============================================================
+
+async function loadEarningsSurprise() {
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  const toNumber = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,%]/g, '').trim();
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+
+  const fetchSymbolSurprise = async (symbol) => {
+    const path = `/api/company/${symbol}/earnings-surprise`;
+    const json = await fetchNasdaq(path);
+    const d = json?.data;
+    if (!d) return null;
+
+    const rows = d.earningsSurpriseTable?.rows || [];
+    const sym = (d.symbol || symbol).toString().toUpperCase();
+    return rows.map(row => ({
+      symbol: sym,
+      fiscal_quarter_end: (row.fiscalQtrEnd || '').toString().trim(),
+      date_reported: toISODate(row.dateReported),
+      eps: toNumber(row.eps),
+      consensus_forecast: toNumber(row.consensusForecast),
+      percentage_surprise: toNumber(row.percentageSurprise)
+    })).filter(r => r.fiscal_quarter_end !== '');
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (earningsSurpriseMode === 'single') {
+    const symbolInput = document.getElementById('earnings-surprise-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Earnings Surprise for ${symbol}`);
+    try {
+      const result = await fetchSymbolSurprise(symbol);
+      log(`Earnings Surprise [${symbol}]: ${result.length} records fetched`, 'success');
+      return result;
+    } catch (err) {
+      log(`Earnings Surprise [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (earningsSurpriseMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Earnings Surprise: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (earningsSurpriseMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Earnings Surprise: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Earnings Surprise: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Earnings Surprise: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Earnings Surprise for ${symbols.length} ${modeLabel} symbols · 4 concurrent · 150ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolSurprise(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 4,
+      delayMs: 150,
+      label: 'Earnings Surprise',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Earnings Surprise ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Earnings Surprise: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Company News Loader
+// ============================================================
+
+async function loadNews() {
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' ? s : null;
+  };
+
+  const toISODateTime = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  };
+
+  const fetchSymbolNews = async (symbol) => {
+    const path = `/api/news/topic/articlebysymbol?q=${encodeURIComponent(symbol + '|STOCKS')}&offset=0&limit=10&fallback=true`;
+    const json = await fetchNasdaq(path);
+    const d = json?.data;
+    if (!d) return [];
+
+    let rows = [];
+    if (Array.isArray(d.rows)) rows = d.rows;
+    else if (Array.isArray(d)) rows = d;
+
+    const sym = symbol.toString().toUpperCase();
+    return rows.map(row => ({
+      symbol: sym,
+      article_id: cleanText(row.id || row.articleId || row.guid),
+      headline: cleanText(row.title || row.headline),
+      summary: cleanText(row.summary || row.description),
+      author: cleanText(row.author),
+      published: toISODateTime(row.published || row.publishDate || row.created),
+      url: cleanText(row.url || row.link),
+      source: cleanText(row.source || row.publisher),
+      tags: cleanText(row.tags ? (Array.isArray(row.tags) ? row.tags.join(', ') : row.tags) : null),
+      image_url: cleanText(row.image || row.imageUrl || row.thumbnail)
+    })).filter(r => r.headline !== null);
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (newsMode === 'single') {
+    const symbolInput = document.getElementById('news-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Company News for ${symbol}`);
+    try {
+      const result = await fetchSymbolNews(symbol);
+      log(`Company News [${symbol}]: ${result.length} records fetched`, 'success');
+      return result;
+    } catch (err) {
+      log(`Company News [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (newsMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Company News: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (newsMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Company News: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Company News: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Company News: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Company News for ${symbols.length} ${modeLabel} symbols · 4 concurrent · 150ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolNews(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 4,
+      delayMs: 150,
+      label: 'Company News',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Company News ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Company News: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Symbol Dividends Loader
+// ============================================================
+
+async function loadSymbolDividends() {
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' ? s : null;
+  };
+
+  const cleanAmount = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().replace(/[$,]/g, '').trim();
+    return s.length > 0 && s !== '--' ? s : null;
+  };
+
+  const fetchSymbolDividends = async (symbol) => {
+    const path = `/api/quote/${symbol}/dividends?assetclass=stocks`;
+    const json = await fetchNasdaq(path);
+    const d = json?.data;
+    if (!d) return [];
+
+    const rows = d.dividends?.rows || [];
+    const sym = symbol.toString().toUpperCase();
+    return rows.map(row => ({
+      symbol: sym,
+      ex_date: toISODate(row.exOrEffDate),
+      dividend_type: cleanText(row.type),
+      dividend_amount: cleanAmount(row.amount),
+      declaration_date: toISODate(row.declarationDate),
+      record_date: toISODate(row.recordDate),
+      payment_date: toISODate(row.paymentDate),
+      currency: cleanText(row.currency)
+    })).filter(r => r.ex_date !== null);
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (symbolDividendsMode === 'single') {
+    const symbolInput = document.getElementById('symbol-dividends-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Symbol Dividends for ${symbol}`);
+    try {
+      const result = await fetchSymbolDividends(symbol);
+      log(`Symbol Dividends [${symbol}]: ${result.length} records fetched`, 'success');
+      return result;
+    } catch (err) {
+      log(`Symbol Dividends [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (symbolDividendsMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Symbol Dividends: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (symbolDividendsMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Symbol Dividends: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Symbol Dividends: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Symbol Dividends: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Symbol Dividends for ${symbols.length} ${modeLabel} symbols · 4 concurrent · 150ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolDividends(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 4,
+      delayMs: 150,
+      label: 'Symbol Dividends',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Symbol Dividends ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Symbol Dividends: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Insider Trades Loader
+// ============================================================
+
+async function loadInsiderTrades() {
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' ? s : null;
+  };
+
+  const toBigInt = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--') return null;
+    const n = parseInt(cleaned, 10);
+    return isNaN(n) ? null : n;
+  };
+
+  const toPrice = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--') return null;
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+
+  const fetchSymbolTrades = async (symbol) => {
+    const path = `/api/company/${symbol}/insider-trades`;
+    const json = await fetchNasdaq(path);
+    const d = json?.data;
+    if (!d) return [];
+
+    const rows = d.transactionTable?.table?.rows || [];
+    const sym = symbol.toString().toUpperCase();
+    return rows.map(row => ({
+      symbol: sym,
+      insider_name: cleanText(row.insider),
+      relation: cleanText(row.relation),
+      last_date: toISODate(row.lastDate),
+      transaction_type: cleanText(row.transactionType),
+      owner_type: cleanText(row.ownType),
+      shares_traded: toBigInt(row.sharesTraded),
+      last_price: toPrice(row.lastPrice),
+      shares_held: toBigInt(row.sharesHeld),
+      insider_url: cleanText(row.url)
+    })).filter(r => r.insider_name !== null);
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (insiderTradesMode === 'single') {
+    const symbolInput = document.getElementById('insider-trades-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Insider Trades for ${symbol}`);
+    try {
+      const result = await fetchSymbolTrades(symbol);
+      log(`Insider Trades [${symbol}]: ${result.length} records fetched`, 'success');
+      return result;
+    } catch (err) {
+      log(`Insider Trades [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (insiderTradesMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Insider Trades: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (insiderTradesMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Insider Trades: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Insider Trades: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Insider Trades: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Insider Trades for ${symbols.length} ${modeLabel} symbols · 4 concurrent · 150ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolTrades(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 4,
+      delayMs: 150,
+      label: 'Insider Trades',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Insider Trades ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Insider Trades: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Supabase Operations (with load_date)
+// ============================================================
+
+async function insertToSupabase(table, rows) {
+  if (!supabaseClient || rows.length === 0) return;
+  const loadDate = getUSLoadDate();
+  // Mutate in-place to avoid creating millions of new objects (saves memory + GC pressure)
+  rows.forEach(r => r.load_date = loadDate);
+
+  // US wall-clock metadata only — never part of any UNIQUE key.
+  const loadTimestamp = getUSLoadTimestamp();
+  rows.forEach(r => r.load_timestamp = loadTimestamp);
+
+  // Factual data-state dedupe: uniqueness on REAL source values only (never
+  // load_date / system ids). Identical re-loads SKIP; any source change appends.
+  const FUNDAMENTAL_CONFLICT_KEYS = {
+    nasdaq_dividends: 'symbol,ex_date,dividend_amount',
+    nasdaq_symbol_dividends: 'symbol,ex_date,dividend_amount',
+    nasdaq_news: 'symbol,article_id',
+    nasdaq_institutional_holdings: 'symbol,owner_name,report_date,shares_held,shares_change,market_value',
+    nasdaq_insider_trades: 'symbol,insider_name,last_date,transaction_type,shares_traded,last_price,shares_held',
+    earnings_quarterly_forecast: 'symbol,fiscal_end,consensus_eps_forecast,high_eps_forecast,low_eps_forecast,no_of_estimates,revisions_up,revisions_down',
+    earnings_yearly_forecast: 'symbol,fiscal_end,consensus_eps_forecast,high_eps_forecast,low_eps_forecast,no_of_estimates,revisions_up,revisions_down',
+    earnings_surprise: 'symbol,fiscal_quarter_end,eps,consensus_forecast,percentage_surprise',
+    yearly_income_statement: 'symbol,period_ending,line_item,metric_value',
+    yearly_balance_sheet: 'symbol,period_ending,line_item,metric_value',
+    yearly_cash_flow: 'symbol,period_ending,line_item,metric_value',
+    yearly_financial_ratios: 'symbol,period_ending,line_item,metric_value',
+    quarterly_income_statement: 'symbol,period_ending,line_item,metric_value',
+    quarterly_balance_sheet: 'symbol,period_ending,line_item,metric_value',
+    quarterly_cash_flow: 'symbol,period_ending,line_item,metric_value',
+    quarterly_financial_ratios: 'symbol,period_ending,line_item,metric_value'
+  };
+
+  // Pre-migration fallback: until supabase_fundamental_tables.sql is applied, the
+  // old unique constraints are still in place. If the factual ON CONFLICT target
+  // does not exist yet, retry with the legacy key so loads never hard-fail.
+  const LEGACY_FALLBACK_KEYS = {
+    nasdaq_dividends: 'symbol,ex_date',
+    nasdaq_symbol_dividends: 'symbol,ex_date,load_date',
+    nasdaq_news: 'symbol,article_id,load_date',
+    nasdaq_institutional_holdings: 'symbol,owner_name,report_date,load_date',
+    nasdaq_insider_trades: 'symbol,insider_name,last_date,transaction_type,load_date',
+    earnings_quarterly_forecast: 'symbol,fiscal_end,load_date',
+    earnings_yearly_forecast: 'symbol,fiscal_end,load_date',
+    earnings_surprise: 'symbol,fiscal_quarter_end,load_date',
+    yearly_income_statement: 'symbol,period_ending,line_item',
+    yearly_balance_sheet: 'symbol,period_ending,line_item',
+    yearly_cash_flow: 'symbol,period_ending,line_item',
+    yearly_financial_ratios: 'symbol,period_ending,line_item',
+    quarterly_income_statement: 'symbol,period_ending,line_item',
+    quarterly_balance_sheet: 'symbol,period_ending,line_item',
+    quarterly_cash_flow: 'symbol,period_ending,line_item',
+    quarterly_financial_ratios: 'symbol,period_ending,line_item'
+  };
+  async function upsertRows(rowsArr, conflictKey) {
+    let error;
+    ({ error } = await supabaseClient.from(table).upsert(rowsArr, { onConflict: conflictKey, ignoreDuplicates: true }));
+    if (error && /load_timestamp|PGRST204/i.test(error.message)) {
+      rowsArr.forEach(r => { delete r.load_timestamp; });
+      ({ error } = await supabaseClient.from(table).upsert(rowsArr, { onConflict: conflictKey, ignoreDuplicates: true }));
+    }
+    if (error && /no unique or exclusion constraint|ON CONFLICT/i.test(error.message)) {
+      const lk = LEGACY_FALLBACK_KEYS[table] || 'symbol,load_date';
+      log(`Table ${table}: factual constraint not found — legacy key fallback (${lk}). Run supabase_fundamental_tables.sql to enable full data-state dedupe.`, 'warn');
+      ({ error } = await supabaseClient.from(table).upsert(rowsArr, { onConflict: lk, ignoreDuplicates: false }));
+    }
+    return error;
+  }
+
+  const rowsWithDate = rows;
+
+  const upsertTables = ['nasdaq_quotes', 'nasdaq_summary', 'nasdaq_basic_quotes'];
+  const upsertDividends = table === 'nasdaq_dividends';
+  const upsertNews = table === 'nasdaq_news';
+  const upsertInstitutionalHoldings = table === 'nasdaq_institutional_holdings';
+  const upsertSymbolDividends = table === 'nasdaq_symbol_dividends';
+  const upsertInsiderTrades = table === 'nasdaq_insider_trades';
+  const financialTables = ['yearly_income_statement', 'yearly_balance_sheet', 'yearly_cash_flow', 'yearly_financial_ratios', 'quarterly_income_statement', 'quarterly_balance_sheet', 'quarterly_cash_flow', 'quarterly_financial_ratios', 'earnings_quarterly_forecast', 'earnings_yearly_forecast', 'earnings_surprise'];
+  const isFinancial = financialTables.includes(table);
+  const useUpsert = upsertDividends || upsertNews || upsertInstitutionalHoldings || upsertSymbolDividends || upsertInsiderTrades || isFinancial;
+
+  // Financial data = millions of rows → bigger batches + parallel concurrency
+  const batchSize = isFinancial ? 1500 : 500;
+  const concurrency = isFinancial ? 10 : 5;
+  const total = rowsWithDate.length;
+  let inserted = 0;
+  let failed = 0;
+
+  log(`${useUpsert ? 'Upserting' : 'Inserting'} ${total.toLocaleString()} rows into ${table} (batch: ${batchSize}, concurrency: ${concurrency})...`);
+
+  // Build all batches up-front
+  const batches = [];
+  for (let i = 0; i < total; i += batchSize) {
+    batches.push(rowsWithDate.slice(i, i + batchSize));
+  }
+
+  // Process one batch
+  const processBatch = async (batch, batchIndex) => {
+    try {
+      let error;
+      const ck = FUNDAMENTAL_CONFLICT_KEYS[table];
+      if (ck) {
+        error = await upsertRows(batch, ck);
+      } else {
+        ({ error } = await supabaseClient.from(table).insert(batch));
+        if (error && /load_timestamp|PGRST204/i.test(error.message)) {
+          batch.forEach(r => { delete r.load_timestamp; });
+          ({ error } = await supabaseClient.from(table).insert(batch));
+        }
+      }
+
+      if (error) {
+        // If the whole batch fails, try row-by-row fallback for this batch to salvage what we can
+        if (batch.length > 1 && (error.message.includes('violates') || error.message.includes('conflict') || error.message.includes('duplicate'))) {
+          let batchInserted = 0;
+          for (const row of batch) {
+            try {
+              let rowError;
+              const ck2 = FUNDAMENTAL_CONFLICT_KEYS[table];
+              if (ck2) {
+                rowError = await upsertRows([row], ck2);
+              } else {
+                ({ error: rowError } = await supabaseClient.from(table).insert([row]));
+              }
+              if (!rowError) batchInserted++;
+            } catch (e2) { /* ignore single-row errors */ }
+          }
+          inserted += batchInserted;
+          failed += (batch.length - batchInserted);
+        } else {
+          log(`Batch ${batchIndex + 1} error: ${error.message}`, 'error');
+          failed += batch.length;
+        }
+      } else {
+        inserted += batch.length;
+      }
+    } catch (e) {
+      log(`Batch ${batchIndex + 1} exception: ${e.message}`, 'error');
+      failed += batch.length;
+    }
+  };
+
+  // Process batches with concurrency limit (sliding window)
+  let batchIndex = 0;
+  const progressEvery = Math.max(1, Math.floor(batches.length / 20)); // ~5% increments
+
+  while (batchIndex < batches.length) {
+    const chunk = batches.slice(batchIndex, batchIndex + concurrency);
+    await Promise.all(chunk.map((batch, i) => processBatch(batch, batchIndex + i)));
+    batchIndex += concurrency;
+
+    // Throttle progress updates to reduce DOM thrashing
+    if (batchIndex % (concurrency * Math.max(1, Math.floor(progressEvery / concurrency))) === 0 || batchIndex >= batches.length) {
+      const pct = Math.min(100, Math.round((inserted / total) * 100));
+      setProgress(pct, `Inserting ${table}... ${inserted.toLocaleString()}/${total.toLocaleString()}`);
+    }
+  }
+
+  const status = failed > 0 ? 'warn' : 'success';
+  log(`${useUpsert ? 'Upserted' : 'Inserted'} ${inserted.toLocaleString()} rows into ${table}${failed > 0 ? ' (' + failed + ' failed)' : ''} · load_date: ${loadDate}`, status);
+}
+
+async function updateStats() {
+  if (!supabaseClient) return;
+  const tables = [
+    { name: 'nasdaq_ipos', statId: 'stat-ipos', metaId: 'meta-ipos' },
+    { name: 'nasdaq_dividends', statId: 'stat-dividends', metaId: 'meta-dividends' },
+    { name: 'yearly_income_statement', statId: 'stat-income', metaId: 'meta-income' },
+    { name: 'yearly_balance_sheet', statId: 'stat-balance', metaId: 'meta-balance' },
+    { name: 'yearly_cash_flow', statId: 'stat-cashflow', metaId: 'meta-cashflow' },
+    { name: 'yearly_financial_ratios', statId: 'stat-ratios', metaId: 'meta-ratios' },
+    { name: 'quarterly_income_statement', statId: 'stat-qincome', metaId: 'meta-qincome' },
+    { name: 'quarterly_balance_sheet', statId: 'stat-qbalance', metaId: 'meta-qbalance' },
+    { name: 'quarterly_cash_flow', statId: 'stat-qcashflow', metaId: 'meta-qcashflow' },
+    { name: 'quarterly_financial_ratios', statId: 'stat-qratios', metaId: 'meta-qratios' },
+    { name: 'earnings_quarterly_forecast', statId: 'stat-eq', metaId: 'meta-eq' },
+    { name: 'earnings_yearly_forecast', statId: 'stat-ey', metaId: 'meta-ey' },
+    { name: 'earnings_surprise', statId: 'stat-es', metaId: 'meta-es' },
+    { name: 'nasdaq_news', statId: 'stat-news', metaId: 'meta-news' },
+    { name: 'nasdaq_institutional_holdings', statId: 'stat-ih', metaId: 'meta-ih' },
+    { name: 'nasdaq_symbol_dividends', statId: 'stat-sd', metaId: 'meta-sd' },
+    { name: 'nasdaq_insider_trades', statId: 'stat-it', metaId: 'meta-it' }
+  ];
+  const today = getUSLoadDate();
+  for (const t of tables) {
+    // Stats bar may be hidden/absent from DOM — null-guard all lookups
+    const statEl = document.getElementById(t.statId);
+    const metaEl = document.getElementById(t.metaId);
+    if (!statEl && !metaEl) continue;
+    try {
+      const { count: totalCount } = await supabaseClient.from(t.name).select('*', { count: 'exact', head: true });
+      if (totalCount != null && statEl) statEl.textContent = totalCount;
+      const { count: todayCount } = await supabaseClient.from(t.name).select('*', { count: 'exact', head: true }).eq('load_date', today);
+      if (todayCount != null && metaEl) metaEl.textContent = `${todayCount} today`;
+    } catch (e) {}
+  }
+}
+
+
+// ============================================================
+// CSV Download Helpers
+// ============================================================
+
+function escapeCSV(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function generateCSVFiles(data, tableName, maxBytes = 5 * 1024 * 1024) {
+  if (!data || data.length === 0) return [];
+  const headers = Object.keys(data[0]);
+  const headerLine = headers.map(escapeCSV).join(',');
+  const encoder = new TextEncoder();
+
+  const files = [];
+  let currentRows = [];
+  let currentSize = encoder.encode(headerLine + '\n').length;
+
+  for (const row of data) {
+    const line = headers.map(h => escapeCSV(row[h])).join(',');
+    const lineWithNL = line + '\n';
+    const lineSize = encoder.encode(lineWithNL).length;
+
+    if (currentSize + lineSize > maxBytes && currentRows.length > 0) {
+      const content = headerLine + '\n' + currentRows.join('\n');
+      files.push({ name: `${tableName}_1_${files.length + 1}.csv`, content });
+      currentRows = [line];
+      currentSize = encoder.encode(headerLine + '\n' + lineWithNL).length;
+    } else {
+      currentRows.push(line);
+      currentSize += lineSize;
+    }
+  }
+
+  if (currentRows.length > 0) {
+    const content = headerLine + '\n' + currentRows.join('\n');
+    files.push({ name: `${tableName}_1_${files.length + 1}.csv`, content });
+  }
+
+  return files;
+}
+
+function getTablesForAPI(apiId) {
+  switch (apiId) {
+    case 'ipos': return ['nasdaq_ipos'];
+    case 'dividends': return ['nasdaq_dividends'];
+    case 'financials': return ['yearly_income_statement', 'yearly_balance_sheet', 'yearly_cash_flow', 'yearly_financial_ratios'];
+    case 'quarterly_financials': return ['quarterly_income_statement', 'quarterly_balance_sheet', 'quarterly_cash_flow', 'quarterly_financial_ratios'];
+    case 'institutional_holdings': return ['nasdaq_institutional_holdings'];
+    case 'earnings': return ['earnings_quarterly_forecast', 'earnings_yearly_forecast'];
+    case 'earnings_surprise': return ['earnings_surprise'];
+    case 'news': return ['nasdaq_news'];
+    case 'symbol_dividends': return ['nasdaq_symbol_dividends'];
+    case 'insider_trades': return ['nasdaq_insider_trades'];
+    default: return [];
+  }
+}
+
+async function fetchAndUpsertAPI(api) {
+  let data;
+  if (api.id === 'ipos') data = await loadIPOs();
+  else if (api.id === 'dividends') data = await loadDividends();
+  else if (api.id === 'financials') data = await loadFinancials();
+  else if (api.id === 'quarterly_financials') data = await loadQuarterlyFinancials();
+  else if (api.id === 'institutional_holdings') data = await loadInstitutionalHoldings();
+  else if (api.id === 'earnings') data = await loadEarnings();
+  else if (api.id === 'earnings_surprise') data = await loadEarningsSurprise();
+  else if (api.id === 'news') data = await loadNews();
+  else if (api.id === 'symbol_dividends') data = await loadSymbolDividends();
+  else if (api.id === 'insider_trades') data = await loadInsiderTrades();
+
+  if (api.id === 'financials' && data && data.income_statement) {
+    const totalRows = data.income_statement.length + data.balance_sheet.length + data.cash_flow.length + data.financial_ratios.length;
+    if (totalRows > 0) {
+      await Promise.all([
+        insertToSupabase('yearly_income_statement', data.income_statement),
+        insertToSupabase('yearly_balance_sheet', data.balance_sheet),
+        insertToSupabase('yearly_cash_flow', data.cash_flow),
+        insertToSupabase('yearly_financial_ratios', data.financial_ratios)
+      ]);
+    }
+  } else if (api.id === 'quarterly_financials' && data && data.income_statement) {
+    const totalRows = data.income_statement.length + data.balance_sheet.length + data.cash_flow.length + data.financial_ratios.length;
+    if (totalRows > 0) {
+      await Promise.all([
+        insertToSupabase('quarterly_income_statement', data.income_statement),
+        insertToSupabase('quarterly_balance_sheet', data.balance_sheet),
+        insertToSupabase('quarterly_cash_flow', data.cash_flow),
+        insertToSupabase('quarterly_financial_ratios', data.financial_ratios)
+      ]);
+    }
+  } else if (api.id === 'earnings' && data && data.quarterly) {
+    const totalRows = data.quarterly.length + data.yearly.length;
+    if (totalRows > 0) {
+      await Promise.all([
+        insertToSupabase('earnings_quarterly_forecast', data.quarterly),
+        insertToSupabase('earnings_yearly_forecast', data.yearly)
+      ]);
+    }
+  } else if (api.id === 'earnings_surprise' && data && data.length > 0) {
+    await insertToSupabase(api.table, data);
+  } else if (api.id === 'institutional_holdings' && data && data.length > 0) {
+    await insertToSupabase(api.table, data);
+  } else if (api.id === 'symbol_dividends' && data && data.length > 0) {
+    await insertToSupabase(api.table, data);
+  } else if (api.id === 'insider_trades' && data && data.length > 0) {
+    await insertToSupabase(api.table, data);
+  } else if (data && data.length > 0) {
+    await insertToSupabase(api.table, data);
+  }
+
+  return data;
+}
+
+async function downloadTableAsCSV(tableName, loadDate, symbolFilter = null) {
+  if (!supabaseClient) {
+    log('Supabase not initialized', 'error');
+    return;
+  }
+
+  // Watchlist scoping: when a Gamma IntraDay / Gamma LongTerm mode is active,
+  // restrict the download to exactly those symbols so the CSV matches the fetch.
+  let query = supabaseClient.from(tableName).select('*').eq('load_date', loadDate);
+  if (Array.isArray(symbolFilter)) {
+    if (symbolFilter.length === 0) {
+      log(`${tableName}: watchlist is empty — nothing to download`, 'warn');
+      return;
+    }
+    query = query.in('symbol', symbolFilter);
+    log(`Download filter: ${symbolFilter.length} watchlist symbol(s) applied to ${tableName}`, 'info');
+  }
+
+  log(`Querying ${tableName} for ${loadDate}...`);
+  const { data, error } = await query;
+  if (error) {
+    log(`Error querying ${tableName}: ${error.message}`, 'error');
+    return;
+  }
+  if (!data || data.length === 0) {
+    log(`No data in ${tableName} for ${loadDate}`, 'warn');
+    return;
+  }
+
+  const files = generateCSVFiles(data, tableName);
+  const encoder = new TextEncoder();
+  const totalSize = files.reduce((sum, f) => sum + encoder.encode(f.content).length, 0);
+  const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+
+  log(`${tableName}: ${data.length} rows · ${sizeMB} MB · ${files.length} file(s) to download`, 'info');
+
+  await new Promise(r => setTimeout(r, 300));
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const blob = new Blob([file.content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (i < files.length - 1) await new Promise(r => setTimeout(r, 150));
+  }
+
+  log(`Downloaded ${files.length} file(s) for ${tableName}`, 'success');
+}
+
+async function downloadAPI(apiId) {
+  if (isLoading) {
+    log('Another operation is in progress. Please wait.', 'warn');
+    return;
+  }
+  const backend = getBackendUrl();
+  const sbUrl = document.getElementById('sbUrl').value.trim();
+  const sbKey = document.getElementById('sbKey').value.trim();
+
+  if (!backend || !sbUrl || !sbKey) {
+    log('Please configure Backend key, Bridge, and Security Key in Settings first.', 'warn');
+    const settingsPanel = document.getElementById('settingsPanel');
+    settingsPanel.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  focusLog();
+
+  const api = NASDAQ_ENDPOINTS.find(a => a.id === apiId);
+  if (!api) return;
+
+  // Resolve the active Gamma watchlist filter for THIS endpoint.
+  let symbolFilter = null;
+  const activeMode = getActiveModeForAPI(api.id);
+  if (activeMode === 'gamma_intraday' || activeMode === 'gamma_longterm') {
+    const watchTable = activeMode === 'gamma_intraday' ? 'gammapace_intraday' : 'gammapace_longterm';
+    try {
+      symbolFilter = await getGammaPaceSymbols(watchTable);
+      log(`${api.name}: ${MODE_LABELS[activeMode]} filter — ${symbolFilter.length} symbol(s) from ${watchTable}`, 'info');
+      if (symbolFilter.length === 0) {
+        log(`Add tickers in the GammaPace ${activeMode === 'gamma_intraday' ? 'IntraDay' : 'LongTerm'} panel first (💾 Add), then retry.`, 'warn');
+      }
+    } catch (e) {
+      log(`Failed to resolve ${MODE_LABELS[activeMode]} watchlist: ${e.message}`, 'error');
+      symbolFilter = [];
+    }
+  }
+
+  isLoading = true;
+  cancelRequested = false;
+
+  const progress = document.getElementById('progressContainer');
+  const fill = document.getElementById('progressFill');
+  const status = document.getElementById('progressStatus');
+  const percent = document.getElementById('progressPercent');
+  progress.classList.add('active');
+  const loadDateBadge = document.getElementById('loadDateBadge');
+  if (loadDateBadge) loadDateBadge.textContent = `📅 Load Date: ${getUSLoadDateDisplay()}`;
+
+  log(`Download flow started for ${api.name}...`);
+
+  const hasSupabase = initSupabase();
+  if (!hasSupabase) {
+    isLoading = false;
+    progress.classList.remove('active');
+    return;
+  }
+
+  try {
+    status.textContent = `Fetching ${api.name}...`;
+    await fetchAndUpsertAPI(api);
+
+    const loadDate = getUSLoadDate();
+    const tables = getTablesForAPI(api.id);
+
+    for (let i = 0; i < tables.length; i++) {
+      const tableName = tables[i];
+      const pct = Math.round(((i + 1) / (tables.length + 1)) * 100);
+      fill.style.width = pct + '%';
+      percent.textContent = pct + '%';
+      status.textContent = `Downloading ${tableName}...`;
+      await downloadTableAsCSV(tableName, loadDate, symbolFilter);
+    }
+
+    fill.style.width = '100%';
+    percent.textContent = '100%';
+    status.textContent = 'Download complete!';
+    log(`Download flow complete for ${api.name}`, 'success');
+  } catch (e) {
+    log(`Download flow failed: ${e.message}`, 'error');
+  }
+
+  document.getElementById('logContainer').classList.remove('active-log');
+  isLoading = false;
+}
+
+// ============================================================
+// GammaPace Recommends — IntraDay & LongTerm (v1.0.18 parity)
+// Tables (run supabase_gammapace.sql once): gammapace_intraday(_hist),
+// gammapace_longterm(_hist). Engines read SQL from gammapace_internal_mapping
+// (sno=4 IntraDay / sno=5 LongTerm) executed via execute_dynamic_sql().
+// ============================================================
+
+function getUTCTimestamp() {
+  return new Date().toISOString(); // e.g. "2026-08-22T08:17:50.123Z"
+}
+
+function parseSymbolList(text) {
+  return (text || "")
+    .split(',')
+    .map(s => s.trim().toUpperCase())
+    .filter(s => s.length > 0);
+}
+
+function gammaRequireSupabase() {
+  if (!supabaseClient) {
+    const url = document.getElementById('sbUrl')?.value.trim();
+    const key = document.getElementById('sbKey')?.value.trim();
+    if (url && key && initSupabase()) return true;
+    log('Supabase not initialized. Configure Bridge and Security Key in Settings.', 'error');
+    document.getElementById('settingsPanel').classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return false;
+  }
+  return true;
+}
+
+function gammaErrorHint(msg) {
+  const m = (msg || '').toString();
+  if (/schema cache|does not exist|Could not find the table|relation/i.test(m)) {
+    return ' · Hint: table missing — run supabase_gammapace.sql and verify the Bridge URL points to the same Supabase project';
+  }
+  if (/row-level security|RLS/i.test(m)) {
+    return ' · Hint: RLS is blocking writes — run ALTER TABLE ... DISABLE ROW LEVEL SECURITY from supabase_gammapace.sql';
+  }
+  if (/Invalid API key|JWT|apikey/i.test(m)) {
+    return ' · Hint: Security Key invalid — paste the correct anon/publishable key in Settings';
+  }
+  return '';
+}
+
+function setGammaStatus(elementId, msg, type = 'info') {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'gamma-status' + (type === 'success' ? ' success' : type === 'error' ? ' error' : ' info');
+}
+
+let pendingGammaReset = null;
+
+function requestGammaReset(section) {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); return; }
+  pendingGammaReset = section;
+  const msgEl = document.getElementById('gammaResetMessage');
+  if (msgEl) {
+    msgEl.textContent = section === 'intraday'
+      ? 'This will move ALL tickers from gammapace_intraday into the archive history table (gammapace_intraday_hist), then DELETE every ticker from the active table.'
+      : 'This will move ALL tickers from gammapace_longterm into the archive history table (gammapace_longterm_hist), then DELETE every ticker from the active table.';
+  }
+  document.getElementById('gammaResetModal').style.display = 'flex';
+}
+
+function closeGammaResetModal() {
+  document.getElementById('gammaResetModal').style.display = 'none';
+  pendingGammaReset = null;
+}
+
+function confirmGammaReset() {
+  const section = pendingGammaReset;
+  pendingGammaReset = null;
+  document.getElementById('gammaResetModal').style.display = 'none';
+  if (section === 'intraday') executeIntradayReset();
+  else if (section === 'longterm') executeLongTermReset();
+}
+
+async function gammaIntradayRefresh() {
+  if (!isAdminUnlocked) { setGammaStatus('intradayStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('intradayStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  const { data, error } = await supabaseClient.from('gammapace_intraday').select('symbol').order('symbol');
+  if (error) { setGammaStatus('intradayStatus', `❌ Refresh failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  const symbols = (data || []).map(r => r.symbol);
+  document.getElementById('intradaySymbols').value = symbols.join(', ');
+  setGammaStatus('intradayStatus', `✅ Text space refreshed — ${symbols.length} symbol(s) pulled from gammapace_intraday`, 'success');
+}
+
+async function gammaIntradayLoad() {
+  if (!isAdminUnlocked) { setGammaStatus('intradayStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('intradayStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  const symbols = parseSymbolList(document.getElementById('intradaySymbols').value);
+  if (symbols.length === 0) { setGammaStatus('intradayStatus', '⚠️ No symbols to load — text area is empty', 'info'); return; }
+  const now = getUTCTimestamp();
+  const rows = symbols.map(symbol => ({ symbol, load_date_utc: now }));
+  const { error } = await supabaseClient.from('gammapace_intraday').upsert(rows, { onConflict: 'symbol' });
+  if (error) { setGammaStatus('intradayStatus', `❌ Load failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  setGammaStatus('intradayStatus', `✅ Table updated — ${symbols.length} symbol(s) upserted to gammapace_intraday (UTC ${now})`, 'success');
+}
+
+const INTRADAY_ENGINE_SQL_SOURCE = {
+  table: 'gammapace_internal_mapping',
+  title: 'Gamma_engine in Intraday symbols list update from SQL_Anlysis',
+  sno: 4
+};
+const LONGTERM_ENGINE_SQL_SOURCE = {
+  table: 'gammapace_internal_mapping',
+  title: 'Gamma_engine_hist in Longterm symbols list update from SQL_Anlysis',
+  sno: 5
+};
+
+async function runGammaEngine(source, statusId, watchTable, textareaId, label) {
+  if (!isAdminUnlocked) { setGammaStatus(statusId, '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus(statusId, '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  setGammaStatus(statusId, `⚙️ Fetching ${label} SQL from gammapace_internal_mapping...`, 'info');
+  const { data: sqlRows, error: sqlError } = await supabaseClient
+    .from(source.table)
+    .select('sql')
+    .eq('title', source.title)
+    .eq('sno', source.sno)
+    .limit(1);
+  if (sqlError) { setGammaStatus(statusId, `❌ Engine SQL lookup failed: ${sqlError.message}${gammaErrorHint(sqlError.message)}`, 'error'); return; }
+  const sqlText = sqlRows && sqlRows[0] && sqlRows[0].sql ? sqlRows[0].sql.trim() : null;
+  if (!sqlText) {
+    setGammaStatus(statusId, `⚠️ No engine SQL found in ${source.table} for that title/sno`, 'info');
+    return;
+  }
+  setGammaStatus(statusId, `⚙️ Executing ${label} SQL...`, 'info');
+  let execResult = null;
+  try {
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_sql', { query: sqlText });
+    if (error) throw error;
+    execResult = typeof data === 'string' ? data : 'OK';
+  } catch (execError) {
+    const hint = /PGRST202|Could not find the function|schema cache/i.test(execError.message)
+      ? ' · Hint: run supabase_gamma_engine.sql once in the Supabase SQL Editor to create execute_dynamic_sql()'
+      : '';
+    setGammaStatus(statusId, `❌ Engine SQL execution failed: ${execError.message}${hint || gammaErrorHint(execError.message)}`, 'error');
+    return;
+  }
+  if (execResult && /^ERROR/i.test(execResult)) {
+    setGammaStatus(statusId, `❌ Engine SQL failed: ${execResult}`, 'error');
+    return;
+  }
+  const { data: symRows, error: symError } = await supabaseClient.from(watchTable).select('symbol').order('symbol');
+  if (symError) { setGammaStatus(statusId, `✅ SQL executed, but symbol refresh failed: ${symError.message}${gammaErrorHint(symError.message)}`, 'error'); return; }
+  const symbols = (symRows || []).map(r => r.symbol);
+  document.getElementById(textareaId).value = symbols.join(', '); 
+  setGammaStatus(statusId, `✅ ${label} executed — symbols list updated — ${symbols.length} symbol(s) pulled from ${watchTable}`, 'success');
+}
+
+async function gammaIntradayEngine() {
+  await runGammaEngine(INTRADAY_ENGINE_SQL_SOURCE, 'intradayStatus', 'gammapace_intraday', 'intradaySymbols', 'Gamma engine');
+}
+
+async function gammaLongTermEngine() {
+  await runGammaEngine(LONGTERM_ENGINE_SQL_SOURCE, 'longTermStatus', 'gammapace_longterm', 'longTermSymbols', 'Gamma_engine_hist');
+}
+
+async function gammaIntradayReset() { requestGammaReset('intraday'); }
+async function gammaLongTermReset() { requestGammaReset('longterm'); }
+
+async function executeIntradayReset() {
+  if (!isAdminUnlocked) { setGammaStatus('intradayStatus', '🔒 Admin locked', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('intradayStatus', '❌ Supabase not connected', 'error'); return; }
+  const { data, error } = await supabaseClient.from('gammapace_intraday').select('*');
+  if (error) { setGammaStatus('intradayStatus', `❌ Reset failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  if (data && data.length > 0) {
+    const archiveRows = data.map(r => ({ symbol: r.symbol, load_date_utc: r.load_date_utc }));
+    const { error: insErr } = await supabaseClient.from('gammapace_intraday_hist').insert(archiveRows);
+    if (insErr) { setGammaStatus('intradayStatus', `❌ Reset failed during archive: ${insErr.message}`, 'error'); return; }
+    const { error: delErr } = await supabaseClient.from('gammapace_intraday').delete().neq('symbol', '');
+    if (delErr) { setGammaStatus('intradayStatus', `❌ Reset failed during delete: ${delErr.message}`, 'error'); return; }
+    setGammaStatus('intradayStatus', `✅ Table truncated/reset — ${data.length} ticker(s) archived to gammapace_intraday_hist`, 'success');
+  } else {
+    setGammaStatus('intradayStatus', 'ℹ️ Table already empty — nothing to reset', 'info');
+  }
+}
+
+async function executeLongTermReset() {
+  if (!isAdminUnlocked) { setGammaStatus('longTermStatus', '🔒 Admin locked', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('longTermStatus', '❌ Supabase not connected', 'error'); return; }
+  const { data, error } = await supabaseClient.from('gammapace_longterm').select('*');
+  if (error) { setGammaStatus('longTermStatus', `❌ Reset failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  if (data && data.length > 0) {
+    const archiveRows = data.map(r => ({ symbol: r.symbol, load_date_utc: r.load_date_utc }));
+    const { error: insErr } = await supabaseClient.from('gammapace_longterm_hist').insert(archiveRows);
+    if (insErr) { setGammaStatus('longTermStatus', `❌ Reset failed during archive: ${insErr.message}`, 'error'); return; }
+    const { error: delErr } = await supabaseClient.from('gammapace_longterm').delete().neq('symbol', '');
+    if (delErr) { setGammaStatus('longTermStatus', `❌ Reset failed during delete: ${delErr.message}`, 'error'); return; }
+    setGammaStatus('longTermStatus', `✅ Table truncated/reset — ${data.length} ticker(s) archived to gammapace_longterm_hist`, 'success');
+  } else {
+    setGammaStatus('longTermStatus', 'ℹ️ Table already empty — nothing to reset', 'info');
+  }
+}
+
+// ============================================================
+// Data Preview
+// ============================================================
+// Data Preview
+// ============================================================
+
+function showPreview(title, rows) {
+  if (!isAdminUnlocked) return;
+  const card = document.getElementById('previewCard');
+  const container = document.getElementById('previewTable');
+  if (!rows || rows.length === 0) return;
+  const keys = Object.keys(rows[0]);
+  let html = '<table><thead><tr>';
+  keys.forEach(k => html += `<th>${k}</th>`);
+  html += '</tr></thead><tbody>';
+  rows.forEach(row => {
+    html += '<tr>';
+    keys.forEach(k => { const val = row[k] != null ? String(row[k]).substring(0, 60) : ''; html += `<td>${val}</td>`; });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+  card.style.display = 'block';
+}
+
+function clearPreview() {
+  document.getElementById('previewCard').style.display = 'none';
+  document.getElementById('previewTable').innerHTML = '';
+}
+
+// ============================================================
+// Navigation
+// ============================================================
+
+function selectHome() {
+  // Placeholder — user will wire functionality later
+  log('Home selected', 'info');
+}
+
+// ============================================================
+// Mobile Menu
+// ============================================================
+
+function toggleMobileMenu() {
+  const navMenu = document.getElementById('navMenu');
+  const toggleBtn = document.querySelector('.mobile-menu-toggle');
+  navMenu.classList.toggle('active');
+  const icon = toggleBtn.querySelector('i');
+  if (navMenu.classList.contains('active')) {
+    icon.className = 'fas fa-times';
+    toggleBtn.setAttribute('aria-expanded', 'true');
+  } else {
+    icon.className = 'fas fa-bars';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+  }
+}
+
+document.addEventListener('click', function(event) {
+  const navMenu = document.getElementById('navMenu');
+  const toggleBtn = document.querySelector('.mobile-menu-toggle');
+  const navbar = document.querySelector('.navbar');
+  if (!navbar.contains(event.target) && navMenu.classList.contains('active')) {
+    navMenu.classList.remove('active');
+    const icon = toggleBtn.querySelector('i');
+    icon.className = 'fas fa-bars';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+  }
+});
+
+// ============================================================
+// Init
+// ============================================================
+
+discoverAPIs();
+document.getElementById('loadDateBadge').textContent = `📅 Load Date: ${getUSLoadDateDisplay()}`;
+const toggleInit = document.getElementById('autoReloadToggle');
+if (toggleInit) toggleInit.classList.add('locked');
+log('NASDAQ Analysis AI — Company Fundamental Data initialized. Full record fetch enabled.', 'success');
+log('Endpoints: Symbol Dividends | Dividend Calendar | Earnings Forecast | Earnings Surprise | Yearly Financials | Quarterly Financials | Insider Trades | Institutional Holdings | IPO Calendar | Company News', 'info');
+</script>
+
+</body>
+</html>

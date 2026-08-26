@@ -513,7 +513,8 @@
                          <div class="nav-bottom-row">
                                  <ul class="nav-menu" id="navMenu">
                     <li><a href="#home" class="active"><i class="fas fa-home"></i> Home</a></li>
-                    <li><a href="IELTS/index.html"><i class="fas fa-clipboard-check"></i> IELTS</a></li>
+                    <li><a href="Global%20Investing/index.html"><i class="fas fa-globe"></i> Global Investing</a></li>
+                    <li><a href="IELTS/index.html"><i class="fas fa-clipboard-check"></i> Global Language</a></li>
                 </ul>
              </div>
         </nav>
@@ -530,6 +531,9 @@
             </p>
                          <a href="IELTS/index.html" class="cta-button">
                  <i class="fas fa-rocket"></i> Start your IELTS Journey
+             </a>
+                         <a href="Global%20Investing/index.html" class="cta-button">
+                 <i class="fas fa-chart-line"></i> Start Global Investing
              </a>
         </section>
 
@@ -588,6 +592,51 @@
                 <div class="stat-item">
                     <span class="stat-number">∞</span>
                     <span class="stat-label">Learning Possibilities</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Global Investing Section -->
+        <section class="global-investing-section fade-in-up" id="global-investing">
+            <h2 style="font-size: 2.5rem; color: #8b4513; margin-bottom: 1rem; font-weight: bold; font-family: 'Century Gothic', sans-serif; text-align: center;">
+                <i class="fas fa-globe" style="margin-right: 0.5rem;"></i> Global Investing
+            </h2>
+            <p style="color: #666; font-size: 1.1rem; margin-bottom: 2rem; text-align: center; font-family: 'Century Gothic', sans-serif;">
+                NASDAQ intelligence, Gamma Reports, and market-grade data to power smarter investment decisions.
+            </p>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                <div class="vision-card">
+                    <i class="fas fa-chart-line vision-icon" style="color: #8b4513;"></i>
+                    <h3 class="vision-title">US NASDAQ Intelligence</h3>
+                    <p class="vision-description">
+                        Explore market &amp; trading data, company &amp; fundamental fundamentals, funds, indices, crypto, events, ownership and news — all for the NASDAQ universe.
+                    </p>
+                    <a href="Global%20Investing/index.html" class="cta-button" style="margin-top: 1rem;">
+                        <i class="fas fa-chart-line"></i> Open Intelligence
+                    </a>
+                </div>
+
+                <div class="vision-card">
+                    <i class="fas fa-file-alt vision-icon" style="color: #8b4513;"></i>
+                    <h3 class="vision-title">Gamma Report</h3>
+                    <p class="vision-description">
+                        Dollar volume movers, advance movers, and intraday reports surfaced by the GammaPace engine for actionable market signals.
+                    </p>
+                    <a href="Global%20Investing/index.html" class="cta-button" style="margin-top: 1rem;">
+                        <i class="fas fa-file-alt"></i> View Gamma Report
+                    </a>
+                </div>
+
+                <div class="vision-card">
+                    <i class="fas fa-database vision-icon" style="color: #8b4513;"></i>
+                    <h3 class="vision-title">Market-Grade Data</h3>
+                    <p class="vision-description">
+                        Fundamental data, quarterly financials, insider trades, institutional holdings, and more — driven by live Supabase-backed pipelines.
+                    </p>
+                    <a href="Global%20Investing/CompanyFundamentalData.html" class="cta-button" style="margin-top: 1rem;">
+                        <i class="fas fa-database"></i> Explore Data
+                    </a>
                 </div>
             </div>
         </section>
@@ -710,6 +759,7 @@
                 // Always initialize tracking regardless of tag creation status
                 trackUserInteractions();
                 trackIELTSMenuInteractions();
+                trackGlobalInvestingMenuInteractions();
             }, 1000);
         });
 
@@ -793,7 +843,7 @@
             navLinks.forEach(link => {
                 // Skip IELTS elements - they have their own specific tracking
                 const linkHref = link.getAttribute('href');
-                if (linkHref && linkHref.includes('IELTS/index.html')) {
+                if (linkHref && (linkHref.includes('IELTS/index.html') || linkHref.includes('Global%20Investing/index.html'))) {
                     return; // Skip this element
                 }
                 
@@ -941,6 +991,71 @@
                 }
             }, 500); // Wait 500ms for DOM to be fully ready
         }
+
+        // ============================================================================
+        // 🌐 GLOBAL INVESTING INTERACTION TRACKING (FIRE AND FORGET)
+        // ============================================================================
+        function trackGlobalInvestingMenuInteractions() {
+            setTimeout(() => {
+                const GI_LINK = 'Global%20Investing/index.html';
+
+                // Create a single function to handle Global Investing navigation and create tag
+                const handleGINavigation = (elementType, elementText) => {
+                    if (typeof createTag === 'function') {
+                        createTag({
+                            eventType: 'Global Investing Menu Click',
+                            pageName: '/',
+                            processName: 'global_investing_navigation',
+                            processStatus: 'completed',
+                            elementType: elementType,
+                            elementText: elementText,
+                            actionType: 'global_investing_navigation',
+                            clickTimestamp: Date.now(),
+                            userAgent: navigator.userAgent,
+                            platform: navigator.platform
+                        }).then(() => {
+                            window.location.href = GI_LINK;
+                        }).catch(() => {
+                            window.location.href = GI_LINK;
+                        });
+                    } else {
+                        window.location.href = GI_LINK;
+                    }
+                };
+
+                // Track Global Investing navigation link click
+                const giNavLink = document.querySelector(`nav a[href="${GI_LINK}"]`);
+                if (giNavLink) {
+                    const newNavLink = giNavLink.cloneNode(true);
+                    giNavLink.parentNode.replaceChild(newNavLink, giNavLink);
+                    newNavLink.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        handleGINavigation('Navigation Link', this.textContent.trim());
+                    });
+                }
+
+                // Track Global Investing CTA buttons (hero + section cards)
+                const giCTAButtons = document.querySelectorAll(`.cta-button[href="${GI_LINK}"]`);
+                giCTAButtons.forEach((btn) => {
+                    const newBtn = btn.cloneNode(true);
+                    btn.parentNode.replaceChild(newBtn, btn);
+                    newBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        handleGINavigation('CTA Button', this.textContent.trim());
+                    });
+                });
+            }, 500); // Wait 500ms for DOM to be fully ready
+        }
+
+        // Quick debug function to check Global Investing tracking status
+        window.checkGlobalInvestingStatus = function() {
+            const giNavLink = document.querySelector('nav a[href="Global%20Investing/index.html"]');
+            const giCTAButton = document.querySelector('.cta-button[href="Global%20Investing/index.html"]');
+            console.log('Global Investing Nav Link found:', !!giNavLink);
+            console.log('Global Investing CTA Button found:', !!giCTAButton);
+            console.log('createTag function available:', typeof createTag === 'function');
+            console.log('trackGlobalInvestingMenuInteractions function:', typeof trackGlobalInvestingMenuInteractions === 'function');
+        };
 
         // Quick debug function to check IELTS tracking status
         window.checkIELTSStatus = function() {

@@ -1,0 +1,3876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NASDAQ Analysis AI — Market & Trading Data</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+<style>
+  .fas { font-family: "Font Awesome 6 Free"; font-weight: 900; font-style: normal; text-rendering: auto; -webkit-font-smoothing: antialiased; }
+  .fa-bars:before { content: "\f0c9"; }
+  .fa-times:before { content: "\f00d"; }
+  .fa-home:before { content: "\f015"; }
+
+  :root {
+    --bg: linear-gradient(135deg, #d4af37 0%, #b8860b 50%, #cd853f 100%);
+    --bg-card: rgba(255, 255, 255, 0.95);
+    --bg-elevated: #f8f5f0;
+    --border: #e0d5c5;
+    --border-hover: #d4af37;
+    --text: #3c2d1f;
+    --text-muted: #8b7355;
+    --text-dim: #a09080;
+    --accent: #8b4513;
+    --accent-glow: rgba(139, 69, 19, 0.15);
+    --accent-secondary: #d4af37;
+    --success: #2d7a3e;
+    --warning: #b8860b;
+    --error: #a03030;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+    overflow-x: hidden;
+    touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    color: #3c2d1f;
+    padding: 0;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    width: 100%;
+    min-height: 80px;
+  }
+
+  .navbar {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    gap: 0.5rem;
+  }
+
+  .nav-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 45px;
+  }
+
+  .nav-bottom-row {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    padding-top: 0.3rem;
+  }
+
+  .logo {
+    text-decoration: none;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .master-guruvammal-logo {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    box-sizing: border-box !important;
+    font-family: 'Century Gothic', sans-serif !important;
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.5px !important;
+    line-height: 1 !important;
+    color: #5d3a0a !important;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3) !important;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(139, 69, 19, 0.25) 50%, rgba(205, 133, 63, 0.2) 100%) !important;
+    backdrop-filter: blur(10px) !important;
+    border-radius: 4px !important;
+    padding: 8px !important;
+    box-shadow: 0 4px 12px rgba(139, 69, 19, 0.2), 0 0 20px rgba(212, 175, 55, 0.1) !important;
+    z-index: 10000 !important;
+    transition: all 0.3s ease !important;
+  }
+
+  .master-guruvammal-logo .musical-corner {
+    position: absolute !important;
+    top: 2px !important;
+    right: 3px !important;
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    background-color: transparent !important;
+    border: 0.8px solid #5d3a0a !important;
+    color: #5d3a0a !important;
+    font-family: 'Century Gothic', sans-serif !important;
+    font-size: 4.5px !important;
+    font-weight: 900 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3) !important;
+    box-shadow: none !important;
+  }
+
+  .master-guruvammal-logo:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 30px rgba(139, 69, 19, 0.4), 0 0 50px rgba(212, 175, 55, 0.3);
+  }
+
+  .mobile-menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #8b4513;
+    cursor: pointer;
+    padding: 0.5rem;
+  }
+
+  .nav-menu {
+    display: flex;
+    list-style: none;
+    align-items: center;
+    gap: 1.2rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .nav-menu li { position: relative; }
+
+  .nav-menu a, .nav-menu span {
+    color: #3c2d1f;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .nav-menu a:hover {
+    color: #8b4513;
+    background: rgba(139, 69, 19, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 120px 24px 24px;
+    position: relative;
+  }
+
+  .hero {
+    padding: 40px 0 60px;
+    text-align: center;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #8b4513 0%, #d4af37 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    font-size: 1.15rem;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto 40px;
+  }
+
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 60px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    transition: var(--transition);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  }
+
+  .stat-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(139, 69, 19, 0.15);
+  }
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .stat-meta {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    padding: 32px;
+    margin-bottom: 24px;
+    transition: var(--transition);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  }
+
+  .card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 8px 30px rgba(139, 69, 19, 0.12);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-title .icon {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent-secondary), #b8860b);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(139, 69, 19, 0.2);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 30px rgba(139, 69, 19, 0.3);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+
+  .btn-secondary:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-sm {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+  }
+
+  .btn-danger {
+    background: var(--error);
+    color: #fff;
+  }
+
+  .btn-danger:hover {
+    background: #802020;
+    transform: translateY(-1px);
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .input-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .input-group input, .input-group select, .input-group textarea {
+    background: #fff;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+    transition: var(--transition);
+    font-family: inherit;
+  }
+
+  .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .input-group textarea {
+    resize: vertical;
+    min-height: 120px;
+    line-height: 1.5;
+    text-transform: uppercase;
+  }
+
+  .api-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .api-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+    cursor: pointer;
+  }
+
+  .api-item:hover {
+    border-color: var(--accent);
+    background: rgba(139, 69, 19, 0.03);
+  }
+
+  .api-item.selected {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  .api-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .api-method {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(139, 69, 19, 0.1);
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .api-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .api-desc {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .api-status {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-weight: 600;
+  }
+
+  .status-active {
+    background: rgba(45, 122, 62, 0.1);
+    color: var(--success);
+  }
+
+  .status-pending {
+    background: rgba(184, 134, 11, 0.1);
+    color: var(--warning);
+  }
+
+  .exchange-selector, .quote-count-selector {
+    display: flex;
+    gap: 10px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .exchange-chip, .quote-count-chip {
+    padding: 8px 16px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: 600;
+    user-select: none;
+  }
+
+  .exchange-chip:hover, .quote-count-chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .exchange-chip.selected, .quote-count-chip.selected {
+    background: linear-gradient(135deg, var(--accent-secondary), #b8860b);
+    color: #fff;
+    border-color: var(--accent-secondary);
+  }
+
+  .progress-container {
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    display: none;
+  }
+
+  .progress-container.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e0d5c5;
+    border-radius: 100px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+    border-radius: 100px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+
+  .progress-text {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .data-table-container {
+    overflow-x: auto;
+    margin-top: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    max-height: 400px;
+    overflow-y: auto;
+    background: #fff;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  th {
+    background: var(--accent);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #fff;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+  }
+
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  tr:hover td {
+    background: rgba(139, 69, 19, 0.03);
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  .log-container {
+    background: #2a1f14;
+    border: 1px solid #5d3a0a;
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    max-height: 320px;
+    overflow-y: auto;
+    margin-top: 16px;
+    color: #d4af37;
+    transition: var(--transition);
+    scroll-margin-top: 100px;
+  }
+  .log-container.active-log {
+    border-color: #d4af37;
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+  }
+
+  .log-entry {
+    margin-bottom: 4px;
+    padding: 2px 0;
+  }
+
+  .log-time {
+    color: #8b7355;
+    margin-right: 8px;
+  }
+
+  .log-success { color: #7cb342; }
+  .log-error { color: #e57373; }
+  .log-info { color: #d4af37; }
+  .log-warn { color: #ffb74d; }
+
+  .settings-panel {
+    display: none;
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  }
+
+  .settings-panel.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .toggle-row:last-child {
+    border-bottom: none;
+  }
+
+  .toggle-switch {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    background: var(--bg-elevated);
+    border-radius: 100px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: var(--transition);
+  }
+
+  .toggle-switch.active {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: var(--transition);
+  }
+
+  .toggle-switch.active::after {
+    left: 25px;
+  }
+
+  .alert {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    display: none;
+  }
+
+  .alert.active {
+    display: block;
+  }
+
+  .alert-info {
+    background: rgba(139, 69, 19, 0.08);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    color: var(--accent);
+  }
+
+  .alert-warn {
+    background: rgba(184, 134, 11, 0.08);
+    border: 1px solid rgba(184, 134, 11, 0.2);
+    color: var(--warning);
+  }
+
+  .load-date-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    background: rgba(139, 69, 19, 0.1);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .section-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .estimate-text {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: rgba(139, 69, 19, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .btn-download {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+  .btn-download:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-download:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(255,255,255,0.3); }
+  ::-webkit-scrollbar-thumb { background: #c4a265; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #8b4513; }
+
+  .toggle-switch.locked {
+    background: #d0c8bc;
+    border-color: #c0b8ac;
+    cursor: not-allowed;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .toggle-switch.locked::after {
+    background: #a09080;
+  }
+  #adminModal {
+    backdrop-filter: blur(4px);
+  }
+
+  .gamma-status {
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 10px;
+    min-height: 18px;
+    color: var(--text-muted);
+  }
+  .gamma-status.success { color: var(--success); }
+  .gamma-status.error { color: var(--error); }
+  .gamma-status.info { color: var(--text-muted); }
+
+  @media (max-width: 768px) {
+    .mobile-menu-toggle { display: block; }
+    .nav-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      flex-direction: column;
+      padding: 1rem;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+      border-radius: 0 0 8px 8px;
+    }
+    .nav-menu.active { display: flex; }
+    .nav-menu li { width: 100%; }
+    .nav-menu a, .nav-menu span { width: 100%; justify-content: flex-start; padding: 0.8rem; }
+    .hero { padding: 20px 0 40px; }
+    .card { padding: 20px; }
+    .api-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .exchange-selector, .quote-count-selector { justify-content: center; }
+    .container { padding: 100px 16px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <nav class="navbar">
+    <div class="nav-top-row">
+      <a href="index.html" class="logo">
+        <div class="master-guruvammal-logo">
+          Ga<span class="musical-corner">P</span>
+        </div>
+      </a>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-secondary btn-sm" onclick="toggleSettings()">⚙️ Settings</button>
+        <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle mobile menu" aria-expanded="false">
+          <i class="fas fa-bars" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div class="nav-bottom-row">
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+      </ul>
+    </div>
+  </nav>
+</header>
+
+<div class="container">
+
+  <!-- Stats bar hidden per user request -->
+
+  <div class="settings-panel" id="settingsPanel">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">⚙️</span> Configuration</div>
+      <button class="btn btn-sm" id="adminLockBtn" onclick="toggleAdminLock()" title="Admin Lock" style="background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px 8px;color:var(--accent);">🔒</button>
+    </div>
+    <div class="settings-grid">
+      <div class="input-group">
+        <label>Backend key</label>
+        <input type="text" id="backendUrl" placeholder="https://nasdaq-historical-api.vercel.app" value="https://nasdaq-historical-api.vercel.app">
+      </div>
+      <div class="input-group">
+        <label>Bridge</label>
+        <input type="text" id="sbUrl" placeholder="https://your-project.supabase.co" value="https://mushchoxbywxcpfmgavj.supabase.co">
+      </div>
+      <div class="input-group">
+        <label>Security Key</label>
+        <input type="password" id="sbKey" placeholder="sb_publishable_...">
+      </div>
+    </div>
+    <div class="alert alert-info active" style="margin-top:12px;">
+      Email GammaPace@outlook.com to request your security keys—no payment required.
+    </div>
+  </div>
+
+
+  <!-- Admin Password Modal -->
+  <div id="adminModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-card); padding:28px; border-radius:var(--radius); max-width:340px; width:90%; box-shadow:0 10px 40px rgba(0,0,0,0.2); border:1px solid var(--border);">
+      <h3 style="margin-bottom:16px; font-size:1.1rem; color:var(--text);">🔐 Admin Access</h3>
+      <div class="input-group" style="margin-bottom:0;">
+        <label>Password</label>
+        <input type="password" id="adminPassword" placeholder="Enter password" style="width:100%;" onkeydown="if(event.key==='Enter')checkAdminPassword()">
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+        <button class="btn btn-secondary btn-sm" onclick="closeAdminModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="checkAdminPassword()">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GammaPace DB Reset Confirmation Modal -->
+  <div id="gammaResetModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-card); padding:28px; border-radius:var(--radius); max-width:380px; width:90%; box-shadow:0 10px 40px rgba(0,0,0,0.2); border:1px solid var(--border);">
+      <h3 style="margin-bottom:16px; font-size:1.1rem; color:var(--error);">⚠️ Confirm DB Reset</h3>
+      <p id="gammaResetMessage" style="font-size:0.9rem; color:var(--text); line-height:1.5;"></p>
+      <p style="font-size:0.8rem; color:var(--text-muted);">This action cannot be undone.</p>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+        <button class="btn btn-secondary btn-sm" onclick="closeGammaResetModal()">Cancel</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmGammaReset()">OK — Proceed</button>
+      </div>
+    </div>
+  </div>
+  <!-- Getting Started Instructions -->
+  <div class="card" id="instructionsCard">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">👋</span> Getting Started</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="background:linear-gradient(135deg, var(--accent-secondary), #b8860b);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0;">1</div>
+        <div>
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px;">Configure Your Keys</div>
+          <div style="font-size:0.9rem;color:var(--text-muted);">Click the <strong>⚙️ Settings</strong> button in the header, then enter your <strong>Backend key</strong>, <strong>Bridge</strong>, and <strong>Security Key</strong> in the Configuration panel.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="background:linear-gradient(135deg, var(--accent-secondary), #b8860b);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0;">2</div>
+        <div>
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px;">Download Data</div>
+          <div style="font-size:0.9rem;color:var(--text-muted);">Click the <strong>⬇️ CSV</strong> button next to any data source below to fetch fresh data and download it as a CSV file.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin-only Load Database controls -->
+  <div id="adminPanel" style="display:none;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🗄️</span> Load Database</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="load-date-badge" id="loadDateBadge">📅 Load Date: —</span>
+          <button class="btn btn-primary" id="loadBtn" onclick="startLoading()">▶️ Load Data</button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="toggle-switch locked" id="autoReloadToggle" onclick="toggleAutoReload()" title="Auto-reload every 2s"></div>
+            <span style="font-size:0.8rem;color:var(--text-muted);font-weight:500;">Loop</span>
+          </div>
+          <button class="btn btn-danger" id="cancelBtn" onclick="cancelLoading()" style="display:none;">⏹ Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin-only GammaPace Recommends controls -->
+  <div id="gammaPacePanel" style="display:none;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">⚡</span> GammaPace IntraDay</div>
+      </div>
+      <div class="input-group">
+        <label>Ticker Symbols (comma-separated)</label>
+        <textarea id="intradaySymbols" rows="5" placeholder="AAPL, MSFT, NVDA, GOOGL, AMZN"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="gammaIntradayRefresh()">🔄 Active</button>
+        <button class="btn btn-primary btn-sm" onclick="gammaIntradayLoad()">💾 Add</button>
+        <button class="btn btn-primary btn-sm" onclick="gammaIntradayEngine()">⚙️ Gamma_engine</button>
+        <button class="btn btn-danger btn-sm" onclick="gammaIntradayReset()">🗑️ DB Reset</button>
+      </div>
+      <div id="intradayStatus" class="gamma-status"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📈</span> GammaPace LongTerm</div>
+      </div>
+      <div class="input-group">
+        <label>Ticker Symbols (comma-separated)</label>
+        <textarea id="longTermSymbols" rows="5" placeholder="AAPL, MSFT, NVDA, GOOGL, AMZN"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="gammaLongTermRefresh()">🔄 Active</button>
+        <button class="btn btn-primary btn-sm" onclick="gammaLongTermLoad()">💾 Add</button>
+        <button class="btn btn-primary btn-sm" onclick="gammaLongTermEngine()">⚙️ Gamma_engine_hist</button>
+        <button class="btn btn-danger btn-sm" onclick="gammaLongTermReset()">🗑️ DB Reset</button>
+      </div>
+      <div id="longTermStatus" class="gamma-status"></div>
+    </div>
+  </div>
+
+  <!-- Public Data Sources -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">📡</span> Available Data Sources</div>
+    </div>
+    <div class="api-list" id="apiList"></div>
+
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text">
+        <span id="progressStatus">Initializing...</span>
+        <span id="progressPercent">0%</span>
+      </div>
+    </div>
+
+    <div class="log-container" id="logContainer">
+      <div class="log-entry"><span class="log-time">--:--:--</span> Ready. Configure your Backend key, Bridge, and Security Key in Settings to begin.</div>
+    </div>
+  </div>
+
+  <div class="card" id="previewCard" style="display:none;">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">👁️</span> Data Preview</div>
+      <button class="btn btn-secondary btn-sm" onclick="clearPreview()">Clear</button>
+    </div>
+    <div class="data-table-container" id="previewTable"></div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// NASDAQ Analysis AI — Market & Trading Data (Frontend / GitHub Pages)
+// Full record fetch + load_date (US Eastern Time) + ALL quotes
+// ============================================================
+
+const NASDAQ_ENDPOINTS = [
+  { id: 'market_movers', name: 'Market Movers', path: '/api/marketmovers', description: 'Top movers — Stocks, ETFs & Mutual Funds (insert-only snapshots)', table: 'nasdaq_movers_stock_activity', status: 'active' },
+  { id: 'chart', name: 'Chart Data', path: '/api/quote/{symbol}/chart?assetclass=stocks&charttype=rs', description: 'Intraday price chart data for a symbol (updates every minute)', table: 'nasdaq_chart', status: 'active' },
+  { id: 'realtime_trades', name: 'Realtime Trades', path: '/api/quote/{symbol}/realtime-trades', description: 'Real-time trade records for a symbol (updates every 30 seconds)', table: 'nasdaq_realtime_trades', status: 'active' },
+  { id: 'screener', name: 'Stock Screener', path: '/api/screener/stocks?tableonly=true&limit=500000&exchange=nasdaq', description: 'List all stocks with price, change, market cap — FULL UNIVERSE (one call, no truncation)', table: 'nasdaq_stocks', status: 'active' },
+  { id: 'basic_quotes', name: 'Current Quote (Basic)', path: '/api/quote/basic?symbol={symbol}|stocks', description: 'Lightweight ticker: price, change, percent change, and delta indicator only', table: 'nasdaq_basic_quotes', status: 'active' },
+  { id: 'quotes', name: 'Quote Info', path: '/api/quote/{symbol}/info?assetclass=stocks', description: 'Detailed quote data for individual symbols', table: 'nasdaq_quotes', status: 'active' },
+  { id: 'historical', name: 'Historical Prices', path: '/api/quote/{symbol}/historical', description: 'Daily OHLCV price history for a symbol', table: 'nasdaq_historical', status: 'active' },
+  { id: 'summary', name: 'Quote Summary', path: '/api/quote/{symbol}/summary?assetclass=stocks', description: 'Key stats: sector, industry, market cap, volume, yield, bid/ask', table: 'nasdaq_summary', status: 'active' },
+  { id: 'option_chain', name: 'Option Chain', path: '/api/quote/{symbol}/option-chain?assetclass=stocks', description: 'Options chain with calls and puts, strikes, bid/ask, volume, and open interest', table: 'nasdaq_option_chain', status: 'active' }
+];
+
+// Market Movers — maps each asset class × category to its own insert-only table
+const MOVER_TABLES = [
+  { assetClass: 'STOCKS', category: 'MostActiveByShareVolume', table: 'nasdaq_movers_stock_activity' },
+  { assetClass: 'STOCKS', category: 'MostAdvanced', table: 'nasdaq_movers_stock_advanced' },
+  { assetClass: 'STOCKS', category: 'MostDeclined', table: 'nasdaq_movers_stock_declined' },
+  { assetClass: 'STOCKS', category: 'MostActiveByDollarVolume', table: 'nasdaq_movers_stock_dollarvol' },
+  { assetClass: 'STOCKS', category: 'Nasdaq100Movers', table: 'nasdaq_movers_stock_nasdaq100' },
+  { assetClass: 'ETF', category: 'MostActiveByShareVolume', table: 'nasdaq_movers_etf_activity' },
+  { assetClass: 'ETF', category: 'MostAdvanced', table: 'nasdaq_movers_etf_advanced' },
+  { assetClass: 'ETF', category: 'MostDeclined', table: 'nasdaq_movers_etf_declined' },
+  { assetClass: 'MUTUALFUNDS', category: 'MostAdvanced', table: 'nasdaq_movers_funds_advanced' },
+  { assetClass: 'MUTUALFUNDS', category: 'MostDeclined', table: 'nasdaq_movers_funds_declined' }
+];
+
+let selectedAPIs = new Set(['screener']);
+let supabaseClient = null;
+let isLoading = false;
+let cancelRequested = false;
+let selectedExchange = 'nasdaq';
+let quoteCount = 'ALL';
+let historicalMode = 'all';  // 'all' or 'single'
+let summaryMode = 'single';  // 'all' or 'single'
+let optionChainMode = 'single';  // 'all' or 'single'
+let basicQuotesMode = 'single';  // 'all' or 'single'
+let chartMode = 'single';  // 'all' or 'single'
+let realtimeTradesMode = 'single';  // 'all' or 'single'
+let quotesMode = 'single';  // 'all' or 'single'
+let autoReloadEnabled = false;
+let autoReloadTimeout = null;
+let screenerSymbolsCache = null; // Cache NASDAQ symbol list for the session
+let isAdminUnlocked = false;
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function getUSLoadDate() {
+  const now = new Date();
+  const usStr = now.toLocaleDateString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const [m, d, y] = usStr.split('/');
+  return `${y}-${m}-${d}`;
+}
+
+function getUSLoadDateDisplay() {
+  return new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function getUSLoadTimestamp() {
+  // Returns US NASDAQ wall-clock ISO 8601 timestamp with offset + milliseconds,
+  // e.g. "2026-08-20T19:20:27.463-04:00". Unique per load → append-only snapshots.
+  const now = new Date();
+  const usStr = now.toLocaleString('en-US', { timeZone: 'America/New_York', hour12: false });
+  const [datePart, timePart] = usStr.split(', ');
+  const [m, d, y] = datePart.split('/');
+  let [hh, mm, ss] = timePart.split(':');
+  if (hh === '24') hh = '00'; // en-US 24h quirk at midnight
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  const date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  const time = `${hh}:${mm}:${ss}.${ms}`;
+  const tzName = now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' }).split(' ').pop();
+  const offset = tzName === 'EDT' ? '-04:00' : '-05:00';
+  return `${date}T${time}${offset}`;
+}
+
+function log(msg, type = 'info') {
+  const container = document.getElementById('logContainer');
+  const time = new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: 'America/New_York' });
+  const cls = type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : type === 'warn' ? 'log-warn' : 'log-info';
+  container.innerHTML += `<div class="log-entry"><span class="log-time">${time}</span><span class="${cls}">${msg}</span></div>`;
+  container.scrollTop = container.scrollHeight;
+  if (container.classList.contains('active-log')) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPercent').textContent = Math.round(pct) + '%';
+  if (label) document.getElementById('progressStatus').textContent = label;
+}
+
+function toggleSettings() { document.getElementById('settingsPanel').classList.toggle('active'); }
+function scrollToLog() {
+  const logContainer = document.getElementById('logContainer');
+  logContainer.classList.add('active-log');
+  logContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => logContainer.classList.remove('active-log'), 3000);
+}
+
+function focusLog() {
+  const logContainer = document.getElementById('logContainer');
+  logContainer.classList.add('active-log');
+  logContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+const MODE_LABELS = { all: 'ALL NASDAQ', single: 'Single Symbol', gamma_intraday: 'Gamma IntraDay', gamma_longterm: 'Gamma LongTerm' };
+
+function selectHistoricalMode(el) {
+  historicalMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Historical mode: ${MODE_LABELS[historicalMode] || historicalMode}`, 'info');
+}
+
+function selectSummaryMode(el) {
+  summaryMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Quote Summary mode: ${MODE_LABELS[summaryMode] || summaryMode}`, 'info');
+}
+
+function selectOptionChainMode(el) {
+  optionChainMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Option Chain mode: ${MODE_LABELS[optionChainMode] || optionChainMode}`, 'info');
+}
+
+function selectBasicQuotesMode(el) {
+  basicQuotesMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Current Quote (Basic) mode: ${MODE_LABELS[basicQuotesMode] || basicQuotesMode}`, 'info');
+}
+
+function selectChartMode(el) {
+  chartMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Chart Data mode: ${MODE_LABELS[chartMode] || chartMode}`, 'info');
+}
+
+function selectRealtimeTradesMode(el) {
+  realtimeTradesMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Realtime Trades mode: ${MODE_LABELS[realtimeTradesMode] || realtimeTradesMode}`, 'info');
+}
+
+function selectQuotesMode(el) {
+  quotesMode = el.dataset.mode;
+  // Re-render to update chip styles and symbol input visibility
+  discoverAPIs();
+  log(`Quote Info mode: ${MODE_LABELS[quotesMode] || quotesMode}`, 'info');
+}
+
+function toggleAdminLock() {
+  if (isAdminUnlocked) {
+    isAdminUnlocked = false;
+    autoReloadEnabled = false;
+    if (autoReloadTimeout) { clearTimeout(autoReloadTimeout); autoReloadTimeout = null; }
+    const toggle = document.getElementById('autoReloadToggle');
+    if (toggle) { toggle.classList.remove('active'); toggle.classList.add('locked'); }
+    const lockBtn = document.getElementById('adminLockBtn');
+    if (lockBtn) { lockBtn.textContent = '🔒'; lockBtn.title = 'Admin Lock'; }
+    const adminPanel = document.getElementById('adminPanel');
+    if (adminPanel) adminPanel.style.display = 'none';
+    const gammaPacePanel = document.getElementById('gammaPacePanel');
+    if (gammaPacePanel) gammaPacePanel.style.display = 'none';
+    log('Admin lock engaged. Loop toggle disabled.', 'info');
+  } else {
+    document.getElementById('adminModal').style.display = 'flex';
+    document.getElementById('adminPassword').value = '';
+    setTimeout(() => document.getElementById('adminPassword').focus(), 100);
+  }
+}
+
+function closeAdminModal() {
+  document.getElementById('adminModal').style.display = 'none';
+}
+
+function checkAdminPassword() {
+  const input = document.getElementById('adminPassword');
+  if (input.value === '191') {
+    isAdminUnlocked = true;
+    const toggle = document.getElementById('autoReloadToggle');
+    if (toggle) toggle.classList.remove('locked');
+    const lockBtn = document.getElementById('adminLockBtn');
+    if (lockBtn) { lockBtn.textContent = '🔓'; lockBtn.title = 'Admin Unlock'; }
+    const adminPanel = document.getElementById('adminPanel');
+    if (adminPanel) adminPanel.style.display = 'block';
+    const gammaPacePanel = document.getElementById('gammaPacePanel');
+    if (gammaPacePanel) gammaPacePanel.style.display = 'block';
+    closeAdminModal();
+    log('Admin unlocked. Loop toggle is now enabled.', 'success');
+  } else {
+    log('Incorrect password. Access denied.', 'error');
+    input.value = '';
+    input.style.borderColor = 'var(--error)';
+    setTimeout(() => input.style.borderColor = '', 1000);
+  }
+}
+
+function cancelLoading() {
+  cancelRequested = true;
+  if (autoReloadTimeout) {
+    clearTimeout(autoReloadTimeout);
+    autoReloadTimeout = null;
+  }
+  autoReloadEnabled = false;
+  const toggle = document.getElementById('autoReloadToggle');
+  if (toggle) toggle.classList.remove('active');
+  log('Cancel requested. Auto-reload stopped.', 'warn');
+  document.getElementById('cancelBtn').style.display = 'none';
+}
+function toggleAutoReload() {
+  if (!isAdminUnlocked) {
+    log('Loop toggle is locked. Unlock in Settings to enable.', 'warn');
+    return;
+  }
+  const toggle = document.getElementById('autoReloadToggle');
+  autoReloadEnabled = !autoReloadEnabled;
+  toggle.classList.toggle('active');
+  if (autoReloadEnabled) {
+    log('Auto-reload enabled. After each load completes, will wait 2s and reload.', 'info');
+  } else {
+    if (autoReloadTimeout) {
+      clearTimeout(autoReloadTimeout);
+      autoReloadTimeout = null;
+    }
+    log('Auto-reload disabled.', 'info');
+  }
+}
+
+function discoverAPIs() {
+  const list = document.getElementById('apiList');
+  list.innerHTML = '';
+  NASDAQ_ENDPOINTS.forEach(api => {
+    const item = document.createElement('div');
+    item.className = `api-item ${selectedAPIs.has(api.id) ? 'selected' : ''}`;
+    item.onclick = () => toggleAPI(api.id, item);
+
+    // Add date range + mode inputs for historical prices
+    const summaryInputHtml = api.id === 'summary' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="summary-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${summaryMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="summary-mode-chip ${summaryMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectSummaryMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${summaryMode === 'all' ? '#d4af37' : '#fff'};color:${summaryMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="summary-mode-chip ${summaryMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectSummaryMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${summaryMode === 'single' ? '#d4af37' : '#fff'};color:${summaryMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="summary-mode-chip ${summaryMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectSummaryMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${summaryMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${summaryMode === 'gamma_intraday' ? '#fff' : '#8b4513'};">Gamma IntraDay</span>
+          <span class="summary-mode-chip ${summaryMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectSummaryMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${summaryMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${summaryMode === 'gamma_longterm' ? '#fff' : '#8b4513'};">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const optionChainInputHtml = api.id === 'option_chain' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="option-chain-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${optionChainMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="option-chain-mode-chip ${optionChainMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectOptionChainMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${optionChainMode === 'all' ? '#d4af37' : '#fff'};color:${optionChainMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="option-chain-mode-chip ${optionChainMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectOptionChainMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${optionChainMode === 'single' ? '#d4af37' : '#fff'};color:${optionChainMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="option-chain-mode-chip ${optionChainMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectOptionChainMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${optionChainMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${optionChainMode === 'gamma_intraday' ? '#fff' : '#8b4513'};">Gamma IntraDay</span>
+          <span class="option-chain-mode-chip ${optionChainMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectOptionChainMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${optionChainMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${optionChainMode === 'gamma_longterm' ? '#fff' : '#8b4513'};">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const chartInputHtml = api.id === 'chart' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="chart-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${chartMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="chart-mode-chip ${chartMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectChartMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${chartMode === 'all' ? '#d4af37' : '#fff'};color:${chartMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="chart-mode-chip ${chartMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectChartMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${chartMode === 'single' ? '#d4af37' : '#fff'};color:${chartMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="chart-mode-chip ${chartMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectChartMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${chartMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${chartMode === 'gamma_intraday' ? '#fff' : '#8b4513'};">Gamma IntraDay</span>
+          <span class="chart-mode-chip ${chartMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectChartMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${chartMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${chartMode === 'gamma_longterm' ? '#fff' : '#8b4513'};">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const realtimeTradesInputHtml = api.id === 'realtime_trades' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="realtime-trades-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${realtimeTradesMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="realtime-trades-mode-chip ${realtimeTradesMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectRealtimeTradesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${realtimeTradesMode === 'all' ? '#d4af37' : '#fff'};color:${realtimeTradesMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="realtime-trades-mode-chip ${realtimeTradesMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectRealtimeTradesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${realtimeTradesMode === 'single' ? '#d4af37' : '#fff'};color:${realtimeTradesMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="realtime-trades-mode-chip ${realtimeTradesMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectRealtimeTradesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${realtimeTradesMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${realtimeTradesMode === 'gamma_intraday' ? '#fff' : '#8b4513'};">Gamma IntraDay</span>
+          <span class="realtime-trades-mode-chip ${realtimeTradesMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectRealtimeTradesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${realtimeTradesMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${realtimeTradesMode === 'gamma_longterm' ? '#fff' : '#8b4513'};">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const basicQuotesInputHtml = api.id === 'basic_quotes' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="basic-quotes-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${basicQuotesMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="basic-quotes-mode-chip ${basicQuotesMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectBasicQuotesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${basicQuotesMode === 'all' ? '#d4af37' : '#fff'};color:${basicQuotesMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="basic-quotes-mode-chip ${basicQuotesMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectBasicQuotesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${basicQuotesMode === 'single' ? '#d4af37' : '#fff'};color:${basicQuotesMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="basic-quotes-mode-chip ${basicQuotesMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectBasicQuotesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${basicQuotesMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${basicQuotesMode === 'gamma_intraday' ? '#fff' : '#8b4513'};">Gamma IntraDay</span>
+          <span class="basic-quotes-mode-chip ${basicQuotesMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectBasicQuotesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${basicQuotesMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${basicQuotesMode === 'gamma_longterm' ? '#fff' : '#8b4513'};">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+    const historicalInputHtml = api.id === 'historical' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <span style="color: #8b7355; font-size: 0.8rem;">From</span>
+        <input type="date" id="hist-from" 
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 130px; font-size: 0.8rem; outline: none;"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="color: #8b7355; font-size: 0.8rem;">to</span>
+        <input type="date" id="hist-to"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 130px; font-size: 0.8rem; outline: none;"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="hist-mode-chip ${historicalMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectHistoricalMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${historicalMode === 'all' ? '#d4af37' : '#fff'};color:${historicalMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="hist-mode-chip ${historicalMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectHistoricalMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${historicalMode === 'single' ? '#d4af37' : '#fff'};color:${historicalMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="hist-mode-chip ${historicalMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectHistoricalMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${historicalMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${historicalMode === 'gamma_intraday' ? '#fff' : '#8b4513'};">Gamma IntraDay</span>
+          <span class="hist-mode-chip ${historicalMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectHistoricalMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${historicalMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${historicalMode === 'gamma_longterm' ? '#fff' : '#8b4513'};">Gamma LongTerm</span>
+        </span>
+        <input type="text" id="hist-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${historicalMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+      </span>
+    ` : '';
+    const quotesInputHtml = api.id === 'quotes' ? `
+      <span class="days-input-wrap" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;" onclick="event.stopPropagation()">
+        <input type="text" id="quotes-symbol" placeholder="SYMBOL" value="AAPL"
+          style="background: #fff; color: #8b4513; border: 2px solid #ddd; border-radius: 8px; padding: 3px 6px; width: 70px; font-size: 0.85rem; text-align: center; outline: none; text-transform: uppercase; display:${quotesMode === 'single' ? 'inline-block' : 'none'};"
+          onfocus="this.style.borderColor='#8b4513'" onblur="this.style.borderColor='#ddd'">
+        <span style="display:inline-flex;gap:4px;align-items:center;margin-left:4px;">
+          <span class="quotes-mode-chip ${quotesMode === 'all' ? 'selected' : ''}" data-mode="all" onclick="selectQuotesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${quotesMode === 'all' ? '#d4af37' : '#fff'};color:${quotesMode === 'all' ? '#fff' : '#8b4513'};">ALL NASDAQ</span>
+          <span class="quotes-mode-chip ${quotesMode === 'single' ? 'selected' : ''}" data-mode="single" onclick="selectQuotesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${quotesMode === 'single' ? '#d4af37' : '#fff'};color:${quotesMode === 'single' ? '#fff' : '#8b4513'};">Single Symbol</span>
+          <span class="quotes-mode-chip ${quotesMode === 'gamma_intraday' ? 'selected' : ''}" data-mode="gamma_intraday" onclick="selectQuotesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${quotesMode === 'gamma_intraday' ? '#d4af37' : '#fff'};color:${quotesMode === 'gamma_intraday' ? '#fff' : '#8b4513'};">Gamma IntraDay</span>
+          <span class="quotes-mode-chip ${quotesMode === 'gamma_longterm' ? 'selected' : ''}" data-mode="gamma_longterm" onclick="selectQuotesMode(this)" style="cursor:pointer;padding:2px 8px;border-radius:6px;font-size:0.75rem;border:1px solid #d4af37;background:${quotesMode === 'gamma_longterm' ? '#d4af37' : '#fff'};color:${quotesMode === 'gamma_longterm' ? '#fff' : '#8b4513'};">Gamma LongTerm</span>
+        </span>
+      </span>
+    ` : '';
+
+    item.innerHTML = `
+      <div class="api-info">
+        <span class="api-method">GET</span>
+        <div>
+          <div class="api-name">${api.name}${chartInputHtml}${realtimeTradesInputHtml}${basicQuotesInputHtml}${historicalInputHtml}${summaryInputHtml}${optionChainInputHtml}${quotesInputHtml}</div>
+          <div class="api-desc">${api.description}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+      <span class="api-status ${api.status === 'active' ? 'status-active' : 'status-pending'}">${api.status}</span>
+      <button class="btn-download" onclick="event.stopPropagation(); downloadAPI('${api.id}')" title="Download as CSV">⬇️ CSV</button>
+    </div>
+    `;
+    list.appendChild(item);
+  });
+  // Set default dates for historical inputs (30 days ago → today)
+  const histFrom = document.getElementById('hist-from');
+  const histTo = document.getElementById('hist-to');
+  if (histFrom && !histFrom.value) {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    histFrom.value = d.toISOString().split('T')[0];
+  }
+  if (histTo && !histTo.value) {
+    histTo.value = new Date().toISOString().split('T')[0];
+  }
+
+  log('API discovery complete. 8 endpoints found.', 'success');
+}
+
+function toggleAPI(id, element) {
+  if (selectedAPIs.has(id)) { selectedAPIs.delete(id); element.classList.remove('selected'); }
+  else { selectedAPIs.add(id); element.classList.add('selected'); }
+}
+
+function getBackendUrl() { return document.getElementById('backendUrl').value.trim().replace(/\/$/, ''); }
+
+function initSupabase() {
+  const url = document.getElementById('sbUrl').value.trim();
+  const key = document.getElementById('sbKey').value.trim();
+  if (!url || !key) { log('Please configure Supabase URL and Anon Key in Settings', 'error'); document.getElementById('settingsPanel').classList.add('active'); return false; }
+  try { supabaseClient = supabase.createClient(url, key); log('Supabase client initialized', 'success'); return true; }
+  catch (e) { log('Failed to initialize Supabase: ' + e.message, 'error'); return false; }
+}
+
+// ============================================================
+// Vercel Backend Proxy
+// ============================================================
+
+async function fetchNasdaq(path, timeoutMs = 20000) {
+  const backend = getBackendUrl();
+  if (!backend) throw new Error('Backend URL not configured. Open Settings and paste your Vercel URL.');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${backend}/api/nasdaq-proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || `HTTP ${res.status}`); }
+    return res.json();
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error(`Request timeout after ${timeoutMs}ms for ${path}`);
+    throw e;
+  }
+}
+
+async function getScreenerSymbols() {
+  if (screenerSymbolsCache) return screenerSymbolsCache;
+  log('Fetching NASDAQ symbol list...');
+  const data = await fetchNasdaq('/api/screener/stocks?tableonly=true&limit=500000&exchange=nasdaq');
+  const rows = data?.data?.table?.rows || [];
+  screenerSymbolsCache = rows.map(r => r.symbol).filter(s => s);
+  log(`${screenerSymbolsCache.length} NASDAQ symbols cached for session`, 'success');
+  return screenerSymbolsCache;
+}
+
+// GammaPace watchlist symbol source — reads the public gammapace_* tables.
+// Used by the "Gamma IntraDay" / "Gamma LongTerm" mode chips on per-symbol endpoints,
+// and by the CSV / Load Data flows to scope fetch + download to the watchlist.
+// v1.0.14: AUTO-INITIALIZES Supabase from Settings when null (parity with
+// gammaRequireSupabase) — resolves former limitation #17, so selecting a Gamma
+// chip and immediately clicking ⬇️ CSV or ▶️ Load Data works standalone.
+// Symbols are unique by PRIMARY KEY, so this satisfies "SELECT DISTINCT symbol".
+async function getGammaPaceSymbols(table) {
+  if (!supabaseClient) {
+    const url = document.getElementById('sbUrl')?.value.trim();
+    const key = document.getElementById('sbKey')?.value.trim();
+    if (!(url && key && initSupabase())) {
+      log('Supabase not initialized. Configure Bridge and Security Key in Settings.', 'error');
+      document.getElementById('settingsPanel').classList.add('active');
+      return [];
+    }
+  }
+  const { data, error } = await supabaseClient.from(table).select('symbol').order('symbol');
+  if (error) {
+    log(`Failed to fetch symbols from ${table}: ${error.message}`, 'error');
+    return [];
+  }
+  // DISTINCT safety (v1.0.15): the active tables use symbol as PRIMARY KEY, so
+  // select('symbol') already returns unique symbols (equivalent to
+  // "SELECT DISTINCT symbol"). This JS-level dedupe guarantees DISTINCT even if
+  // a table were ever created without a PK.
+  const symbols = [...new Set((data || []).map(r => r.symbol).filter(s => s))];
+  log(`${symbols.length} symbols loaded from ${table}`, 'success');
+  return symbols;
+}
+
+// Active mode for an endpoint id — used by the CSV download flow to apply the
+// same Gamma IntraDay / Gamma LongTerm symbol filter that the loaders use.
+function getActiveModeForAPI(apiId) {
+  switch (apiId) {
+    case 'chart': return chartMode;
+    case 'realtime_trades': return realtimeTradesMode;
+    case 'basic_quotes': return basicQuotesMode;
+    case 'quotes': return quotesMode;
+    case 'historical': return historicalMode;
+    case 'summary': return summaryMode;
+    case 'option_chain': return optionChainMode;
+    default: return null; // market_movers / screener have no mode chips
+  }
+}
+
+// Generic parallel fetch worker for ALL-mode endpoints
+// fetchFn: async (symbol) => data   — should throw on failure
+// options: { concurrency, delayMs, label, onBatch, onProgress }
+async function parallelFetchAll(symbols, fetchFn, options = {}) {
+  const { concurrency = 4, delayMs = 150, label = 'Fetch', onBatch, onProgress, logEvery = 20 } = options;
+  const results = [];
+  let successCount = 0;
+  let failCount = 0;
+  const total = symbols.length;
+
+  for (let i = 0; i < total; i += concurrency) {
+    if (cancelRequested) {
+      log(`${label}: Cancelled by user at ${i}/${total}`, 'warn');
+      break;
+    }
+
+    const batch = symbols.slice(i, i + concurrency);
+    const batchResults = await Promise.allSettled(batch.map(sym => fetchFn(sym)));
+
+    batchResults.forEach((res, idx) => {
+      const symbol = batch[idx];
+      if (res.status === 'fulfilled') {
+        results.push({ symbol, data: res.value, success: true });
+        successCount++;
+      } else {
+        results.push({ symbol, error: res.reason, success: false });
+        failCount++;
+        if (failCount <= 5 || i === total - 1) {
+          log(`${label} [${symbol}]: ${res.reason?.message || res.reason}`, 'warn');
+        }
+      }
+    });
+
+    if (onBatch) onBatch(batchResults, batch, i);
+
+    const processed = Math.min(i + concurrency, total);
+    if (onProgress) onProgress(processed, total, successCount, failCount);
+    if ((processed) % logEvery === 0 || processed === total) {
+      const pct = Math.round((processed / total) * 100);
+      setProgress(pct, `${label} ${processed}/${total} · ${successCount} ok · ${failCount} fail`);
+      log(`${label}: ${processed}/${total} symbols · ${successCount} ok · ${failCount} fail`);
+    }
+
+    if (i + concurrency < total && !cancelRequested) {
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+
+  log(`${label}: ${successCount} succeeded · ${failCount} failed · ${results.length} total`);
+  return { results, successCount, failCount };
+}
+
+// ============================================================
+// Data Loading Orchestrator
+// ============================================================
+
+async function startLoading() {
+  if (isLoading) return;
+  if (selectedAPIs.size === 0) { log('No APIs selected. Please select at least one API.', 'error'); return; }
+  const backend = getBackendUrl();
+  if (!backend) { log('Backend URL missing. Open Settings and paste your Vercel deployment URL.', 'error'); document.getElementById('settingsPanel').classList.add('active'); return; }
+  scrollToLog();
+
+  isLoading = true;
+  cancelRequested = false;
+  const btn = document.getElementById('loadBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading...';
+  cancelBtn.style.display = 'inline-flex';
+
+  const progress = document.getElementById('progressContainer');
+  const fill = document.getElementById('progressFill');
+  const status = document.getElementById('progressStatus');
+  const percent = document.getElementById('progressPercent');
+  progress.classList.add('active');
+  const loadDateBadge = document.getElementById('loadDateBadge');
+  if (loadDateBadge) loadDateBadge.textContent = `📅 Load Date: ${getUSLoadDateDisplay()}`;
+
+  const hasSupabase = initSupabase();
+  if (!hasSupabase) { btn.disabled = false; btn.textContent = '▶️ Load Data'; cancelBtn.style.display = 'none'; isLoading = false; return; }
+
+  const apis = Array.from(selectedAPIs);
+  const total = apis.length;
+  let completed = 0;
+
+  for (const apiId of apis) {
+    const api = NASDAQ_ENDPOINTS.find(a => a.id === apiId);
+    if (!api) continue;
+    status.textContent = `Loading ${api.name}...`;
+    // v1.0.14: surface the active filter on every cycle (incl. Loop iterations)
+    const loadingMode = getActiveModeForAPI(api.id);
+    if (loadingMode === 'gamma_intraday' || loadingMode === 'gamma_longterm') {
+      log(`Starting: ${api.name} · filter: ${MODE_LABELS[loadingMode]} (symbols from ${loadingMode === 'gamma_intraday' ? 'gammapace_intraday' : 'gammapace_longterm'})`);
+    } else {
+      log(`Starting: ${api.name}`);
+    }
+
+    try {
+      let data;
+      if (api.id === 'market_movers') {
+        // Multi-table endpoint: loadMarketMovers() returns groups of { table, rows }
+        const groups = await loadMarketMovers();
+        if (groups && groups.length > 0) {
+          const totalRows = groups.reduce((sum, g) => sum + (g.rows?.length || 0), 0);
+          log(`Market Movers: ${totalRows} records fetched across ${groups.length} tables`, 'success');
+          const first = groups.find(g => g.rows && g.rows.length > 0);
+          if (first) showPreview(api.name, first.rows.slice(0, 10));
+          for (const group of groups) {
+            if (group.rows && group.rows.length > 0) {
+              log(`Market Movers → ${group.table}: ${group.rows.length} rows`, 'info');
+              await insertToSupabase(group.table, group.rows);
+            }
+          }
+        } else {
+          log(`${api.name}: No data returned`, 'warn');
+        }
+      } else {
+        if (api.id === 'chart') data = await loadChart();
+        else if (api.id === 'realtime_trades') data = await loadRealtimeTrades();
+        else if (api.id === 'screener') data = await loadScreener();
+        else if (api.id === 'basic_quotes') data = await loadBasicQuotes();
+        else if (api.id === 'quotes') data = await loadQuotes();
+        else if (api.id === 'historical') data = await loadHistorical();
+        else if (api.id === 'summary') data = await loadSummary();
+        else if (api.id === 'option_chain') data = await loadOptionChain();
+
+        if (data && data.length > 0) {
+          log(`${api.name}: ${data.length} records fetched`, 'success');
+          showPreview(api.name, data.slice(0, 10));
+          await insertToSupabase(api.table, data);
+        } else {
+          log(`${api.name}: No data returned`, 'warn');
+        }
+      }
+    } catch (e) {
+      log(`${api.name} failed: ${e.message}`, 'error');
+    }
+
+    completed++;
+    const pct = Math.round((completed / total) * 100);
+    fill.style.width = pct + '%';
+    percent.textContent = pct + '%';
+  }
+
+  status.textContent = 'Complete!';
+  log('All selected APIs processed.', 'success');
+  await updateStats();
+  document.getElementById('logContainer').classList.remove('active-log');
+
+  btn.disabled = false;
+  btn.textContent = '▶️ Load Data';
+  cancelBtn.style.display = 'none';
+  isLoading = false;
+
+  if (autoReloadEnabled && !cancelRequested && selectedAPIs.size > 0) {
+    log('Auto-reload: next iteration in 2 seconds...', 'info');
+    autoReloadTimeout = setTimeout(() => {
+      if (autoReloadEnabled && !isLoading) startLoading();
+    }, 2000);
+  }
+}
+
+// ============================================================
+// Market Movers Loader (v1.0.3)
+// ============================================================
+//
+// NASDAQ /api/marketmovers — ONE call returns movers for STOCKS, ETF,
+// and MUTUALFUNDS. Each category (MostActiveByShareVolume, MostAdvanced,
+// MostDeclined, MostActiveByDollarVolume, Nasdaq100Movers) has its own
+// insert-only table.
+//
+// Category shape (from marketmovers.json):
+//   data[assetClass][category] = {
+//     dataAsOf: "Data as of Aug 19, 2026 4:00 PM ET",
+//     lastTradeTimestamp: "Aug 19, 2026 4:00 PM ET",
+//     table: { rows: [{ symbol, name, lastSalePrice, lastSaleChange, change, deltaIndicator }] }
+//   }
+//
+// Insert-only design: no UNIQUE constraints on the 10 tables →
+// insertToSupabase() uses the plain insert() fast path (zero conflict overhead).
+// Every Loop run appends a fresh dated snapshot — history accumulates.
+//
+// Returns: array of groups [ { table: 'nasdaq_movers_...', rows: [...] }, ... ]
+// ============================================================
+
+async function loadMarketMovers() {
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' && s !== 'n/a' ? s : null;
+  };
+
+  const toPrice = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--' || cleaned === '-') return null;
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+
+  log('Starting: Market Movers — fetching all asset classes in one call');
+  setProgress(5, 'Fetching Market Movers...');
+
+  const json = await fetchNasdaq('/api/marketmovers');
+  const d = json?.data;
+  if (!d) {
+    log('Market Movers: no data in response', 'warn');
+    return [];
+  }
+
+  const groups = [];
+  let totalRows = 0;
+
+  for (const def of MOVER_TABLES) {
+    const cat = d[def.assetClass]?.[def.category];
+    if (!cat || !cat.table || !Array.isArray(cat.table.rows)) {
+      log(`Market Movers: skipped ${def.assetClass}.${def.category} (no rows)`, 'info');
+      continue;
+    }
+
+    const dataAsOf = cleanText(cat.dataAsOf);
+    const lastTradeTimestamp = cleanText(cat.lastTradeTimestamp);
+    const rows = [];
+
+    for (const r of cat.table.rows) {
+      rows.push({
+        symbol: cleanText(r.symbol),
+        name: cleanText(r.name),
+        last_sale_price: toPrice(r.lastSalePrice),
+        last_sale_change: toPrice(r.lastSaleChange),
+        change: cleanText(r.change),              // raw "+7.25%" | "167,984,229.70"
+        delta_indicator: cleanText(r.deltaIndicator),
+        data_as_of: dataAsOf,                     // "Data as of Aug 19, 2026 4:00 PM ET"
+        last_trade_timestamp: lastTradeTimestamp  // "Aug 19, 2026 4:00 PM ET"
+      });
+    }
+
+    groups.push({ table: def.table, rows });
+    totalRows += rows.length;
+    log(`Market Movers → ${def.table}: ${rows.length} rows`, 'success');
+  }
+
+  setProgress(30, `Market Movers: ${totalRows} rows across ${groups.length} tables`);
+  log(`Market Movers: ${totalRows} rows across ${groups.length} tables fetched`, 'success');
+  return groups;
+}
+
+// ============================================================
+// NASDAQ Fetchers
+// ============================================================
+
+async function loadScreener() {
+  const loadDate = getUSLoadDate();
+  log(`Starting Stock Screener load (Exchange: ${selectedExchange || 'ALL'}, Load Date: ${getUSLoadDateDisplay()})`);
+  setProgress(5, 'Fetching stock screener...');
+
+  const exchangeParam = selectedExchange ? `&exchange=${selectedExchange}` : '';
+  const LIMIT = 500000; // Full universe — NASDAQ never caps below this
+  let allRows = [];
+  let totalRecords = 0;
+
+  // Page 1 — the complete dataset arrives in ONE call
+  const data = await fetchNasdaq(`/api/screener/stocks?tableonly=true&limit=${LIMIT}${exchangeParam}`);
+  totalRecords = parseInt(data?.data?.totalrecords || '0', 10);
+  let rows = data?.data?.table?.rows || [];
+  allRows = allRows.concat(rows);
+  log(`Screener API returned ${allRows.length} rows (totalrecords: ${totalRecords})`, 'success');
+
+  // Pagination safety net: if NASDAQ caps a single response below totalrecords,
+  // keep pulling pages with &offset= until the FULL universe is captured.
+  let offset = allRows.length;
+  while (totalRecords > 0 && allRows.length < totalRecords && offset < totalRecords) {
+    if (cancelRequested) {
+      log(`Screener pagination cancelled at ${allRows.length}/${totalRecords} rows`, 'warn');
+      break;
+    }
+    const page = await fetchNasdaq(`/api/screener/stocks?tableonly=true&limit=${LIMIT}&offset=${offset}${exchangeParam}`);
+    const pageRows = page?.data?.table?.rows || [];
+    if (pageRows.length === 0) break; // no more data available
+    allRows = allRows.concat(pageRows);
+    offset = allRows.length;
+    setProgress(10 + Math.round((allRows.length / totalRecords) * 40), `Screener: ${allRows.length}/${totalRecords} rows...`);
+    log(`Screener: fetched ${allRows.length}/${totalRecords} rows`, 'info');
+  }
+
+  if (allRows.length === 0) { log('No stock data returned', 'err'); return []; }
+
+  const mapped = allRows.map(r => ({
+    symbol: r.symbol || '',
+    name: r.name || '',
+    last_sale: r.lastsale || '',
+    net_change: r.netchange || '',
+    pct_change: r.pctchange || '',
+    market_cap: r.marketCap || '',
+    exchange: selectedExchange || 'ALL',
+    url: r.url || ''
+  }));
+
+  setProgress(20, `Preparing ${mapped.length} stocks for data-state dedupe upsert...`);
+  return mapped;
+}
+
+
+// ============================================================
+// Current Quote (Basic) Loader
+// ============================================================
+//
+// NASDAQ /api/quote/basic — CURRENT STRUCTURE (v1.0.11, verified 2026-08-23):
+//   {"data":{"date":"Data as of Aug 20, 2026","records":[{
+//     "key":"AAPL|STOCKS","ticker":["AAPL","Apple Inc. Common Stock"],
+//     "lastSale":"$309.35","change":"-1.95","pctChange":"-0.63%",
+//     "deltaIndicator":"down","volume":"46,876,985",
+//     "url":"/market-activity/stocks/aapl","assetclass":"STOCKS"}]},
+//    "message":null,"status":{"rCode":200,"bCodeMessage":null}}
+//
+// Field mapping (v1.0.12 schema — company/date/url/asset stored, OHLC removed):
+//   symbol            ← records[].ticker[0]  (fallback: key before "|")
+//   company_name      ← records[].ticker[1]       ("Apple Inc. Common Stock")
+//   last_sale_price   ← records[].lastSale        ($ , stripped)
+//   net_change        ← records[].change          (numeric)
+//   percentage_change ← records[].pctChange       (% sign kept)
+//   delta_indicator   ← records[].deltaIndicator
+//   volume            ← records[].volume          (commas stripped)
+//   data_as_of        ← data.date                 ("Data as of Aug 20, 2026")
+//   url               ← records[].url             ("/market-activity/stocks/aapl")
+//   asset_class       ← records[].assetclass      ("STOCKS")
+//
+// REMOVED FROM SCHEMA (v1.0.12): open_price, high_price, low_price,
+//   previous_close — never returned by the current API. Migrate an
+//   existing table with supabase_basic_quotes_update.sql.
+//
+// Still not provided by this endpoint (use Quote Info / Screener instead):
+//   stock_type, exchange, market_status,
+//   fifty_two_week_range, last_trade_timestamp
+//
+// Invalid/unknown symbol → NASDAQ returns rCode 400 with data:null
+// ("Symbol not exists or bad symbol") — handled gracefully (row skipped).
+//
+// Multi-symbol batching is NOT supported (comma list → rCode 400
+// "Invalid or no asset") — one symbol per request via parallelFetchAll.
+//
+// LEGACY fallback: the pre-v1.0.11 flat shape (data.lastSalePrice /
+// netChange / percentageChange / deltaIndicator) is still accepted
+// defensively in case NASDAQ reverts or serves mixed responses.
+//
+// ============================================================
+
+async function loadBasicQuotes() {
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' && s !== 'n/a' ? s : null;
+  };
+
+  const toPrice = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--' || cleaned === '-') return null;
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+
+  const toBigInt = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--' || cleaned === '-') return null;
+    const n = parseInt(cleaned, 10);
+    return isNaN(n) ? null : n;
+  };
+
+  const fetchSymbolBasic = async (symbol) => {
+    const path = `/api/quote/basic?symbol=${encodeURIComponent(symbol + '|stocks')}`;
+    let json;
+    try {
+      json = await fetchNasdaq(path);
+    } catch (e) {
+      log(`Basic Quote [${symbol}]: fetch error — ${e.message}`, 'warn');
+      return [];
+    }
+    if (!json) {
+      log(`Basic Quote [${symbol}]: empty response`, 'warn');
+      return [];
+    }
+
+    // OPTIMIZED (v1.0.6): direct property access on the known response root —
+    // no recursive deepFind overhead (2-3× faster per symbol for ALL mode).
+    let d = json?.data;
+    if (!d && json?.symbol) d = json;                                  // unwrapped flat response
+    if (!d && Array.isArray(json) && json.length > 0) d = json[0];     // array response
+    if (!d || typeof d !== 'object') {
+      log(`Basic Quote [${symbol}]: no data in response`, 'warn');
+      return [];
+    }
+
+    // ── CURRENT STRUCTURE (v1.0.11): quotes arrive in data.records[] ──
+    if (Array.isArray(d.records)) {
+      const rows = [];
+      for (const rec of d.records) {
+        if (!rec || typeof rec !== 'object') continue;
+        const ticker = Array.isArray(rec.ticker) ? rec.ticker : [];
+        const keySym = typeof rec.key === 'string' ? rec.key.split('|')[0] : undefined;
+        rows.push({
+          symbol: cleanText(ticker[0]) || cleanText(keySym) || symbol,
+          company_name: cleanText(ticker[1]),
+          last_sale_price: toPrice(rec.lastSale),
+          net_change: toPrice(rec.change),
+          percentage_change: cleanText(rec.pctChange),
+          delta_indicator: cleanText(rec.deltaIndicator),
+          volume: toBigInt(rec.volume),
+          // Envelope-level metadata (same for every record in this response)
+          data_as_of: cleanText(d.date),
+          url: cleanText(rec.url),
+          asset_class: cleanText(rec.assetclass)
+        });
+      }
+      if (rows.length > 0) return rows;
+      log(`Basic Quote [${symbol}]: records array present but empty`, 'warn');
+      return [];
+    }
+
+    // ── LEGACY FLAT STRUCTURE fallback (pre-v1.0.11 shape) ──
+    // Light multi-key fallback across direct properties only (no tree scan)
+    const f = (...keys) => {
+      for (const k of keys) {
+        const v = d[k];
+        if (v !== undefined && v !== null && v !== '') return v;
+      }
+      return undefined;
+    };
+
+    const result = {
+      symbol: cleanText(f('symbol', 'Symbol', 'SYMBOL')) || symbol,
+      last_sale_price: toPrice(f('lastSalePrice', 'lastSale', 'lastsale', 'last', 'Last', 'price', 'Price')),
+      net_change: toPrice(f('netChange', 'net_change', 'NetChange', 'change', 'Change', 'netChangePrice')),
+      percentage_change: cleanText(f('percentageChange', 'percentage_change', 'PercentageChange', 'percentChange', 'pctChange', 'pctchange', 'changePercent')),
+      delta_indicator: cleanText(f('deltaIndicator', 'delta_indicator', 'DeltaIndicator', 'delta', 'Delta')),
+      volume: toBigInt(f('volume', 'Volume', 'shareVolume', 'totalVolume', 'vol'))
+    };
+
+    return [result];
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (basicQuotesMode === 'single') {
+    const symbolInput = document.getElementById('basic-quotes-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Current Quote (Basic) for ${symbol}`);
+    try {
+      const rows = await fetchSymbolBasic(symbol);
+      if (rows.length > 0) {
+        log(`Current Quote (Basic) [${symbol}]: ${rows.length} record(s) fetched`, 'success');
+        return rows;
+      }
+      return [];
+    } catch (err) {
+      log(`Current Quote (Basic) [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (basicQuotesMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Current Quote (Basic): Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (basicQuotesMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Current Quote (Basic): Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Current Quote (Basic): Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Current Quote (Basic): No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Current Quote (Basic) for ${symbols.length} ${modeLabel} symbols · 10 concurrent · 25ms gap (supersonic)`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolBasic(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 10,
+      delayMs: 25,
+      label: 'Current Quote (Basic)',
+      logEvery: 50,
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Current Quote (Basic) ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Current Quote (Basic): ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Chart Data Loader
+// ============================================================
+//
+// NASDAQ /api/quote/{symbol}/chart?assetclass=stocks&charttype=rs
+// returns intraday price points (one per minute). Each point:
+//   {
+//     "w": 13707.154855,        // shares (numeric)
+//     "z": {
+//       "time": "2:32 PM",      // display time
+//       "shares": "13707.154855",
+//       "price": "$155.53",
+//       "prevCls": "171.38"     // previous close
+//     },
+//     "x": 1787063520000,       // Unix epoch ms — unique per minute
+//     "y": 155.53               // price (numeric)
+//   }
+//
+// Unique constraint: (symbol, timestamp) with ignoreDuplicates: true
+// → Loop re-runs insert ONLY new minutes, never overwrite history.
+//
+// ============================================================
+
+async function loadChart() {
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' && s !== 'n/a' ? s : null;
+  };
+
+  const toPrice = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--' || cleaned === '-') return null;
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+
+  const toBigInt = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--' || cleaned === '-') return null;
+    const n = parseInt(cleaned, 10);
+    return isNaN(n) ? null : n;
+  };
+
+  // Deep-search any value inside an object tree (including arrays)
+  const deepFind = (obj, keys) => {
+    if (obj === null || obj === undefined) return undefined;
+    if (typeof obj !== 'object') return undefined;
+    for (const k of keys) {
+      if (k in obj && obj[k] !== null && obj[k] !== undefined && obj[k] !== '') {
+        return obj[k];
+      }
+    }
+    for (const v of Object.values(obj)) {
+      if (v && typeof v === 'object') {
+        const found = deepFind(v, keys);
+        if (found !== undefined) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const fetchSymbolChart = async (symbol) => {
+    const path = `/api/quote/${symbol}/chart?assetclass=stocks&charttype=rs`;
+    let json;
+    try {
+      json = await fetchNasdaq(path);
+    } catch (e) {
+      log(`Chart Data [${symbol}]: fetch error — ${e.message}`, 'warn');
+      return [];
+    }
+    if (!json) {
+      log(`Chart Data [${symbol}]: empty response`, 'warn');
+      return [];
+    }
+
+    // Defensive extraction: try data.chart, data array, chart array, or flat array roots
+    let chart = json?.data?.chart;
+    if (!chart && Array.isArray(json?.data)) chart = json.data;
+    if (!chart && Array.isArray(json?.chart)) chart = json.chart;
+    if (!chart && Array.isArray(json)) chart = json;
+    if (!chart && json?.data && typeof json.data === 'object') {
+      chart = deepFind(json.data, ['chart', 'points', 'rows', 'data']) || null;
+    }
+    if (!Array.isArray(chart)) {
+      log(`Chart Data [${symbol}]: no chart array in response`, 'warn');
+      return [];
+    }
+
+    const sym = symbol.toString().toUpperCase();
+    const result = [];
+
+    for (const point of chart) {
+      // "z" holds display strings; "x"/"y"/"w" hold numeric values
+      const z = point?.z || {};
+
+      const timestamp = toBigInt(point?.x) || toBigInt(deepFind(point, ['x', 'timestamp', 'time_ms', 't']));
+      if (timestamp === null) continue; // skip points without a unique timestamp
+
+      result.push({
+        symbol: sym,
+        timestamp: timestamp,
+        price: toPrice(point?.y) || toPrice(z?.price) || toPrice(deepFind(point, ['price', 'value', 'close'])),
+        shares: toPrice(point?.w) || toPrice(z?.shares) || toPrice(deepFind(point, ['shares', 'volume'])),
+        previous_close: toPrice(z?.prevCls) || toPrice(deepFind(point, ['prevCls', 'previousClose', 'prevClose'])),
+        time_text: cleanText(z?.time) || cleanText(deepFind(point, ['time', 'label']))
+      });
+    }
+
+    return result;
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (chartMode === 'single') {
+    const symbolInput = document.getElementById('chart-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Chart Data for ${symbol}`);
+    try {
+      const result = await fetchSymbolChart(symbol);
+      if (result.length > 0) {
+        log(`Chart Data [${symbol}]: ${result.length} records fetched`, 'success');
+        return result;
+      }
+      return [];
+    } catch (err) {
+      log(`Chart Data [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (chartMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Chart Data: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (chartMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Chart Data: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Chart Data: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Chart Data: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Chart Data for ${symbols.length} ${modeLabel} symbols · 10 concurrent · 25ms gap · 10s timeout (supersonic)`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolChart(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 10,
+      delayMs: 25,
+      label: 'Chart Data',
+      logEvery: 50,
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Chart Data ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Chart Data: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Realtime Trades Loader
+// ============================================================
+//
+// NASDAQ /api/quote/{symbol}/realtime-trades
+// returns real-time trade records for a symbol. Response shape:
+//   {
+//     "data": {
+//       "symbol": "aapl",
+//       "totalRecords": 0,
+//       "rows": [],                    // ← trade records go here during market hours
+//       "topTable": {
+//         "asOf": null,                // ← "Data as of ..." timestamp during market hours
+//         "headers": { ... },
+//         "rows": [{
+//           "nlsVolume": "46,876,985",
+//           "previousClose": "$311.30",
+//           "todayHighLow": "/",
+//           "fiftyTwoWeekHighLow": "$344.5699/$223.7804"
+//         }]
+//       }
+//     },
+//     "message": "Real-Time trades not available"
+//   }
+//
+// ATTRIBUTE ALIGNMENT (v1.0.13) — every meaningful endpoint field maps to a column:
+//   data.symbol                       → symbol
+//   data.rows[].price                 → price            (market hours)
+//   data.rows[].size                  → size             (market hours)
+//   data.rows[].time                  → time_text        (market hours)
+//   data.topTable.nlsVolume           → nls_volume
+//   data.topTable.previousClose       → previous_close
+//   data.topTable.todayHighLow        → today_high_low
+//   data.topTable.fiftyTwoWeekHighLow → fifty_two_week_range
+//   data.topTable.asOf                → as_of            (NEW v1.0.13; NULL outside market hours)
+// Envelope chrome (totalRecords/offset/limit/headers/description/message) is
+// UI metadata and intentionally NOT stored.
+//
+// Unique constraint (v1.0.5): UNIQUE NULLS NOT DISTINCT
+//   (symbol, nls_volume, previous_close, today_high_low, fifty_two_week_range)
+// → history = market data CHANGES; identical re-loads are SKIPPED.
+//
+// FIX (v1.0.5): The free NASDAQ API always returns rows: [] with
+//   message "Real-Time trades not available", but the topTable summary
+//   is REAL data (nls_volume / previous_close / today_high_low /
+//   fifty_two_week_range). We therefore ALWAYS store one summary snapshot
+//   row per symbol so the table finally fills 24/7 — even outside market hours.
+//
+// ============================================================
+
+async function loadRealtimeTrades() {
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' && s !== 'n/a' ? s : null;
+  };
+
+  const toPrice = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--' || cleaned === '-') return null;
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+
+  const toBigInt = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--' || cleaned === '-') return null;
+    const n = parseInt(cleaned, 10);
+    return isNaN(n) ? null : n;
+  };
+
+  // Deep-search any value inside an object tree (including arrays)
+  const deepFind = (obj, keys) => {
+    if (obj === null || obj === undefined) return undefined;
+    if (typeof obj !== 'object') return undefined;
+    for (const k of keys) {
+      if (k in obj && obj[k] !== null && obj[k] !== undefined && obj[k] !== '') {
+        return obj[k];
+      }
+    }
+    for (const v of Object.values(obj)) {
+      if (v && typeof v === 'object') {
+        const found = deepFind(v, keys);
+        if (found !== undefined) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const fetchSymbolTrades = async (symbol) => {
+    const path = `/api/quote/${symbol}/realtime-trades`;
+    let json;
+    try {
+      json = await fetchNasdaq(path);
+    } catch (e) {
+      log(`Realtime Trades [${symbol}]: fetch error — ${e.message}`, 'warn');
+      return [];
+    }
+    if (!json) {
+      log(`Realtime Trades [${symbol}]: empty response`, 'warn');
+      return [];
+    }
+
+    const d = json?.data;
+    if (!d) {
+      log(`Realtime Trades [${symbol}]: no data in response`, 'warn');
+      return [];
+    }
+
+    // Extract trade rows defensively (multiple paths + deepFind fallback)
+    let rows = d.rows || [];
+    if ((!rows || rows.length === 0) && Array.isArray(d)) rows = d;
+    if ((!rows || rows.length === 0) && json?.rows) rows = json.rows;
+    if (!rows || rows.length === 0) {
+      const found = deepFind(json, ['rows', 'trades', 'tradeRecords', 'data']);
+      if (Array.isArray(found)) rows = found;
+    }
+    if (!Array.isArray(rows)) rows = [];
+
+    // Extract topTable summary (same for all rows in this batch)
+    const topRow = d.topTable?.rows?.[0] || {};
+    const nlsVolume = toBigInt(topRow.nlsVolume);
+    const previousClose = toPrice(topRow.previousClose);
+    const todayHighLow = cleanText(topRow.todayHighLow);
+    const fiftyTwoWeekRange = cleanText(topRow.fiftyTwoWeekHighLow);
+    const asOf = cleanText(d.topTable?.asOf);
+
+    const sym = symbol.toString().toUpperCase();
+    const result = [];
+
+    // FIX: ALWAYS emit a per-symbol summary snapshot row. When the free API
+    // returns zero trade rows, the topTable summary (nls_volume etc.) is still
+    // real data — dedupe is on those factual values, so identical re-loads are
+    // skipped and market CHANGES append new rows.
+    if (rows.length === 0) {
+      result.push({
+        symbol: sym,
+        price: null,
+        size: null,
+        time_text: null,
+        nls_volume: nlsVolume,
+        previous_close: previousClose,
+        today_high_low: todayHighLow,
+        fifty_two_week_range: fiftyTwoWeekRange,
+        as_of: asOf
+      });
+      return result;
+    }
+
+    const stamp = new Date().toLocaleTimeString('en-US', { hour12: false }) + '.' + new Date().getMilliseconds();
+    for (let idx = 0; idx < rows.length; idx++) {
+      const row = rows[idx];
+      const timeText = cleanText(deepFind(row, ['time', 'Time', 'timestamp', 'tradeTime', 'trade_time', 'dateTime', 'date_time', 'executionTime', 'transactionTime', 'TimeStamp', 'TIMESTAMP', 'tradeTimeString', 'displayTime'])) || `${stamp}:${idx}`;
+
+      result.push({
+        symbol: sym,
+        price: toPrice(deepFind(row, ['price', 'Price', 'tradePrice', 'lastSale', 'last_sale'])),
+        size: toBigInt(deepFind(row, ['size', 'Size', 'volume', 'Volume', 'shareVolume', 'shares'])),
+        time_text: timeText,
+        nls_volume: nlsVolume,
+        previous_close: previousClose,
+        today_high_low: todayHighLow,
+        fifty_two_week_range: fiftyTwoWeekRange,
+        as_of: asOf
+      });
+    }
+
+    return result;
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (realtimeTradesMode === 'single') {
+    const symbolInput = document.getElementById('realtime-trades-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Realtime Trades for ${symbol}`);
+    try {
+      const result = await fetchSymbolTrades(symbol);
+      if (result.length > 0) {
+        log(`Realtime Trades [${symbol}]: ${result.length} records fetched`, 'success');
+        return result;
+      }
+      return [];
+    } catch (err) {
+      log(`Realtime Trades [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (realtimeTradesMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Realtime Trades: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (realtimeTradesMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Realtime Trades: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Realtime Trades: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Realtime Trades: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Realtime Trades for ${symbols.length} ${modeLabel} symbols · 10 concurrent · 25ms gap (supersonic)`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolTrades(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 10,
+      delayMs: 25,
+      label: 'Realtime Trades',
+      logEvery: 50,
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Realtime Trades ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Realtime Trades: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Quote Info Loader (v1.0.15 — 4-mode support)
+// ============================================================
+//
+// NASDAQ /api/quote/{symbol}/info?assetclass=stocks
+// returns detailed quote data for a single symbol.
+//
+// v1.0.15: Added the full 4-mode system (ALL NASDAQ / Single Symbol /
+// Gamma IntraDay / Gamma LongTerm) matching the other per-symbol endpoints.
+//   - Single:        fetch one symbol from the #quotes-symbol input (default AAPL)
+//   - ALL:           fetch all symbols via getScreenerSymbols()
+//   - Gamma IntraDay: fetch only symbols in gammapace_intraday
+//   - Gamma LongTerm: fetch only symbols in gammapace_longterm
+// The legacy resume/localStorage + nasdaq_stocks-sourced symbol logic is
+// preserved ONLY for the ALL mode path (it was the historical behavior).
+// ============================================================
+
+async function loadQuotes() {
+  const loadDate = getUSLoadDate();
+  log(`Starting Quote Info load (Load Date: ${getUSLoadDateDisplay()})`);
+  setProgress(5, 'Fetching quotes...');
+
+  if (!supabaseClient) { log('Supabase not initialized', 'err'); return []; }
+
+  const fetchQuote = async (sym) => {
+    let retries = 0;
+    while (retries < 3) {
+      try {
+        const json = await fetchNasdaq(`/api/quote/${sym}/info?assetclass=stocks`);
+        const d = json.data;
+        if (!d) return null;
+        const pd = d.primaryData || {};
+        const ks = d.keyStats || {};
+        return {
+          symbol: d.symbol || sym,
+          company_name: d.companyName || '',
+          stock_type: d.stockType || '',
+          exchange: d.exchange || '',
+          is_nasdaq_listed: d.isNasdaqListed === 'True' || d.isNasdaqListed === true,
+          is_nasdaq_100: d.isNasdaq100 === 'True' || d.isNasdaq100 === true,
+          last_sale_price: pd.lastSalePrice || '',
+          net_change: pd.netChange || '',
+          percentage_change: pd.percentageChange || '',
+          volume: pd.volume || '',
+          market_status: d.marketStatus || '',
+          asset_class: d.assetClass || '',
+          delta_indicator: pd.deltaIndicator || '',
+          last_trade_timestamp: pd.lastTradeTimestamp || '',
+          fifty_two_week_range: ks.fiftyTwoWeekHighLow?.value || '',
+          day_range: ks.dayrange?.value || ''
+        };
+      } catch (e) {
+        retries++;
+        if (retries < 3) await new Promise(r => setTimeout(r, 300 * retries));
+      }
+    }
+    log(`Quote fetch failed for ${sym} after 3 attempts`, 'error');
+    return null;
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (quotesMode === 'single') {
+    const symbolInput = document.getElementById('quotes-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Quote Info for ${symbol}`);
+    try {
+      const result = await fetchQuote(symbol);
+      if (result) {
+        log(`Quote Info [${symbol}]: 1 record fetched`, 'success');
+        return [result];
+      }
+      return [];
+    } catch (err) {
+      log(`Quote Info [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (quotesMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Quote Info: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (quotesMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Quote Info: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    // ALL NASDAQ — legacy behavior: source symbols from today's nasdaq_stocks
+    // (market_cap order, deduped) with resume support.
+    const resumeKey = `quote_resume_${loadDate}_${selectedExchange}`;
+    const resumeEl = document.getElementById('resumeQuotes');
+    const resumeEnabled = resumeEl ? resumeEl.checked : true;
+    let resumeIndex = 0;
+
+    if (resumeEnabled) {
+      const saved = localStorage.getItem(resumeKey);
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          if (data.exchange === selectedExchange && data.loadDate === loadDate) {
+            resumeIndex = data.index || 0;
+            if (resumeIndex > 0) log(`Resuming quotes from symbol #${resumeIndex + 1}...`, 'info');
+          }
+        } catch (e) { /* ignore corrupt resume state */ }
+      }
+    }
+
+    // Get symbols from already-loaded nasdaq_stocks for today
+    let query = supabaseClient.from('nasdaq_stocks').select('symbol').eq('load_date', loadDate).order('market_cap', { ascending: false });
+    if (selectedExchange) query = query.eq('exchange', selectedExchange);
+    const { data: symbolRows, error } = await query;
+    if (error || !symbolRows || symbolRows.length === 0) { log('No symbols found in nasdaq_stocks for today. Run Stock Screener first.', 'warn'); return []; }
+
+    // Multi-load history: nasdaq_stocks may hold several same-day snapshots,
+    // so dedupe to unique symbols (first occurrence — keeps market_cap order).
+    const seen = new Set();
+    for (const row of symbolRows) {
+      if (!seen.has(row.symbol)) {
+        seen.add(row.symbol);
+        symbols.push(row.symbol);
+      }
+    }
+    const totalAvailable = symbols.length;
+    if (quoteCount !== 'ALL') symbols = symbols.slice(0, parseInt(quoteCount));
+    if (resumeIndex > 0 && resumeIndex < symbols.length) symbols = symbols.slice(resumeIndex);
+    else resumeIndex = 0;
+
+    log(`Fetching quotes for ${symbols.length} symbols (total: ${totalAvailable}, start: #${resumeIndex + 1}) · 5 concurrent · 80ms gap`);
+    const quotes = [];
+    const startTime = Date.now();
+
+    const CONCURRENCY = 5;
+    const DELAY_MS = 80;
+
+    for (let i = 0; i < symbols.length; i += CONCURRENCY) {
+      if (cancelRequested) {
+        log(`Cancel received. Saved progress at symbol #${resumeIndex + i + 1}.`, 'warn');
+        if (resumeEnabled) localStorage.setItem(resumeKey, JSON.stringify({ exchange: selectedExchange, loadDate, index: resumeIndex + i }));
+        break;
+      }
+
+      const batch = symbols.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.allSettled(batch.map(sym => fetchQuote(sym)));
+
+      batchResults.forEach((res) => {
+        if (res.status === 'fulfilled' && res.value) {
+          quotes.push(res.value);
+        }
+      });
+
+      const overallIndex = resumeIndex + Math.min(i + CONCURRENCY, symbols.length);
+      const pct = Math.round((overallIndex / totalAvailable) * 100);
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const rate = elapsed > 0 ? (overallIndex / elapsed).toFixed(1) : 0;
+      setProgress(pct, `Quote ${overallIndex}/${totalAvailable} · ${rate}/s · ${quotes.length} fetched`);
+
+      if (resumeEnabled && (i + CONCURRENCY) % 20 === 0) {
+        localStorage.setItem(resumeKey, JSON.stringify({ exchange: selectedExchange, loadDate, index: overallIndex }));
+      }
+
+      if (i + CONCURRENCY < symbols.length && !cancelRequested) {
+        await new Promise(r => setTimeout(r, DELAY_MS));
+      }
+    }
+
+    if (!cancelRequested && resumeEnabled) {
+      localStorage.removeItem(resumeKey);
+      log('Quote loading complete. Resume progress cleared.', 'success');
+    }
+    return quotes;
+  }
+
+  if (symbols.length === 0) {
+    log(`Quote Info: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Quote Info for ${symbols.length} ${modeLabel} symbols · 5 concurrent · 80ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const result = await fetchQuote(symbol);
+      if (result) {
+        allRows.push(result);
+        return result;
+      }
+      return null;
+    },
+    {
+      concurrency: 5,
+      delayMs: 80,
+      label: 'Quote Info',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Quote Info ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Quote Info: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Historical Prices Loader
+// ============================================================
+
+async function loadHistorical() {
+  const fromInput = document.getElementById('hist-from');
+  const toInput = document.getElementById('hist-to');
+
+  const fromDate = fromInput?.value;
+  const toDate = toInput?.value;
+
+  if (!fromDate || !toDate) {
+    log('Historical Prices: Please select both From and To dates.', 'error');
+    return [];
+  }
+
+  // Shared helpers
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  const toNumber = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+
+  const normalizeRows = (rows, symbol) => {
+    return rows.map(row => {
+      const getField = (names) => {
+        for (const name of names) {
+          if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+            return row[name];
+          }
+        }
+        return null;
+      };
+      return {
+        symbol: symbol,
+        date: toISODate(getField(['date', 'tradingDate', 'tradeDate'])),
+        open: toNumber(getField(['open', 'openPrice', '$open'])),
+        high: toNumber(getField(['high', 'highPrice', '$high'])),
+        low: toNumber(getField(['low', 'lowPrice', '$low'])),
+        close: toNumber(getField(['close', 'closePrice', '$close', 'lastSale'])),
+        volume: toNumber(getField(['volume', 'shareVolume', '$volume', 'totalVolume']))
+      };
+    }).filter(r => r.date !== null);
+  };
+
+  const fetchSymbolHistory = async (symbol) => {
+    const path = `/api/quote/${symbol}/historical?assetclass=stocks&fromdate=${fromDate}&todate=${toDate}&limit=5000`;
+    const data = await fetchNasdaq(path);
+    let rows = [];
+    if (data?.data?.tradesTable?.rows) {
+      rows = data.data.tradesTable.rows;
+    } else if (data?.data?.historical?.rows) {
+      rows = data.data.historical.rows;
+    } else if (Array.isArray(data?.data)) {
+      rows = data.data;
+    }
+    return normalizeRows(rows, symbol);
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (historicalMode === 'single') {
+    const symbolInput = document.getElementById('hist-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Historical Prices for ${symbol} (${fromDate} to ${toDate})`);
+
+    try {
+      const normalized = await fetchSymbolHistory(symbol);
+      log(`Historical Prices [${symbol}]: ${normalized.length} records fetched`, 'success');
+      return normalized;
+    } catch (err) {
+      log(`Historical Prices [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (historicalMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Historical Prices: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (historicalMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Historical Prices: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Historical Prices: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Historical Prices: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Historical Prices for ${symbols.length} ${modeLabel} symbols (${fromDate} to ${toDate}) · 8 concurrent · 40ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const normalized = await fetchSymbolHistory(symbol);
+      if (normalized.length > 0) {
+        allRows.push(...normalized);
+        return normalized;
+      }
+      return [];
+    },
+    {
+      concurrency: 8,
+      delayMs: 40,
+      label: 'Historical Prices',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Historical ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Historical Prices: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Quote Summary Loader
+// ============================================================
+
+async function loadSummary() {
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' ? s : null;
+  };
+
+  const fetchSymbolSummary = async (symbol) => {
+    const path = `/api/quote/${symbol}/summary?assetclass=stocks`;
+    const json = await fetchNasdaq(path);
+    const d = json?.data;
+    if (!d) return null;
+
+    const sd = d.summaryData || {};
+    const ba = d.bidAsk || {};
+
+    return {
+      symbol: d.symbol || symbol,
+      exchange: cleanText(sd.Exchange?.value),
+      sector: cleanText(sd.Sector?.value),
+      industry: cleanText(sd.Industry?.value),
+      one_year_target: cleanText(sd.OneYrTarget?.value),
+      today_high_low: cleanText(sd.TodayHighLow?.value),
+      share_volume: cleanText(sd.ShareVolume?.value),
+      average_volume: cleanText(sd.AverageVolume?.value),
+      previous_close: cleanText(sd.PreviousClose?.value),
+      fifty_two_week_high_low: cleanText(sd.FiftTwoWeekHighLow?.value),
+      market_cap: cleanText(sd.MarketCap?.value),
+      annualized_dividend: cleanText(sd.AnnualizedDividend?.value),
+      ex_dividend_date: cleanText(sd.ExDividendDate?.value),
+      dividend_payment_date: cleanText(sd.DividendPaymentDate?.value),
+      yield: cleanText(sd.Yield?.value),
+      bid_size: cleanText(ba['Bid * Size']?.value),
+      ask_size: cleanText(ba['Ask * Size']?.value)
+    };
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (summaryMode === 'single') {
+    const symbolInput = document.getElementById('summary-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Quote Summary for ${symbol}`);
+    try {
+      const result = await fetchSymbolSummary(symbol);
+      if (result) {
+        log(`Quote Summary [${symbol}]: 1 record fetched`, 'success');
+        return [result];
+      }
+      return [];
+    } catch (err) {
+      log(`Quote Summary [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (summaryMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Quote Summary: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (summaryMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Quote Summary: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Quote Summary: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Quote Summary: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Quote Summary for ${symbols.length} ${modeLabel} symbols · 8 concurrent · 40ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const result = await fetchSymbolSummary(symbol);
+      if (result) {
+        allRows.push(result);
+        return result;
+      }
+      return null;
+    },
+    {
+      concurrency: 8,
+      delayMs: 40,
+      label: 'Quote Summary',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Quote Summary ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Quote Summary: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Option Chain Loader
+// ============================================================
+
+async function loadOptionChain() {
+  const toISODate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  };
+
+  const toPrice = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--') return null;
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+
+  const toBigInt = (val) => {
+    if (val === null || val === undefined) return null;
+    const cleaned = val.toString().replace(/[$,]/g, '').trim();
+    if (cleaned === '' || cleaned === '--') return null;
+    const n = parseInt(cleaned, 10);
+    return isNaN(n) ? null : n;
+  };
+
+  const cleanText = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = val.toString().trim();
+    return s.length > 0 && s !== 'N/A' ? s : null;
+  };
+
+  // Parse "Aug 14" (no year) → use current year; "Aug 14, 2026" → full date
+  const parseExpiryDate = (val) => {
+    const s = (val || '').toString().trim();
+    if (!s) return null;
+    // Try full date format: "Aug 14, 2026"
+    const fullMatch = s.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s+(\d{4})$/);
+    if (fullMatch) {
+      const months = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
+      const m = months[fullMatch[1]];
+      const d = parseInt(fullMatch[2], 10);
+      const y = parseInt(fullMatch[3], 10);
+      if (m && !isNaN(d) && !isNaN(y)) {
+        return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+    // Try short format: "Aug 14" → current year
+    const shortMatch = s.match(/^([A-Za-z]{3})\s+(\d{1,2})$/);
+    if (shortMatch) {
+      const months = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
+      const m = months[shortMatch[1]];
+      const d = parseInt(shortMatch[2], 10);
+      if (m && !isNaN(d)) {
+        const now = new Date();
+        let y = now.getFullYear();
+        // If the date is in the past, assume next year (options expire in the future)
+        const candidate = new Date(y, m - 1, d);
+        if (candidate < now) y++;
+        return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+    // Fallback to toISODate for M/D/YYYY format
+    return toISODate(s);
+  };
+
+  const fetchSymbolOptions = async (symbol) => {
+    const path = `/api/quote/${symbol}/option-chain?assetclass=stocks`;
+    const json = await fetchNasdaq(path);
+    const d = json?.data;
+    if (!d) return [];
+
+    const rows = d.table?.rows || [];
+    const sym = symbol.toString().toUpperCase();
+    const result = [];
+
+    // Track current expiry group (rows with expirygroup are group headers)
+    let currentExpiry = null;
+
+    for (const row of rows) {
+      // Group header row: has expirygroup, all other fields null
+      if (row.expirygroup) {
+        currentExpiry = parseExpiryDate(row.expirygroup);
+        continue;
+      }
+
+      // Data row: skip if no strike or no expiry date
+      const strike = toPrice(row.strike);
+      const expiryDate = parseExpiryDate(row.expiryDate) || currentExpiry;
+      if (strike === null || expiryDate === null) continue;
+
+      result.push({
+        symbol: sym,
+        expiry_date: expiryDate,
+        strike: strike,
+        call_last: toPrice(row.c_Last),
+        call_change: toPrice(row.c_Change),
+        call_bid: toPrice(row.c_Bid),
+        call_ask: toPrice(row.c_Ask),
+        call_volume: toBigInt(row.c_Volume),
+        call_open_interest: toBigInt(row.c_Openinterest),
+        put_last: toPrice(row.p_Last),
+        put_change: toPrice(row.p_Change),
+        put_bid: toPrice(row.p_Bid),
+        put_ask: toPrice(row.p_Ask),
+        put_volume: toBigInt(row.p_Volume),
+        put_open_interest: toBigInt(row.p_Openinterest),
+        drill_down_url: cleanText(row.drillDownURL)
+      });
+    }
+
+    return result;
+  };
+
+  // ── SINGLE SYMBOL MODE ──
+  if (optionChainMode === 'single') {
+    const symbolInput = document.getElementById('option-chain-symbol');
+    const symbol = (symbolInput?.value || 'AAPL').toString().trim().toUpperCase();
+    log(`Starting: Option Chain for ${symbol}`);
+    try {
+      const result = await fetchSymbolOptions(symbol);
+      log(`Option Chain [${symbol}]: ${result.length} records fetched`, 'success');
+      return result;
+    } catch (err) {
+      log(`Option Chain [${symbol}]: ${err.message}`, 'error');
+      return [];
+    }
+  }
+
+  // ── BULK MODES: ALL NASDAQ / Gamma IntraDay / Gamma LongTerm ──
+  let symbols = [];
+  let modeLabel = 'ALL NASDAQ';
+  if (optionChainMode === 'gamma_intraday') {
+    modeLabel = 'GammaPace IntraDay';
+    try { symbols = await getGammaPaceSymbols('gammapace_intraday'); }
+    catch (e) { log(`Option Chain: Failed to fetch GammaPace IntraDay symbols — ${e.message}`, 'error'); return []; }
+  } else if (optionChainMode === 'gamma_longterm') {
+    modeLabel = 'GammaPace LongTerm';
+    try { symbols = await getGammaPaceSymbols('gammapace_longterm'); }
+    catch (e) { log(`Option Chain: Failed to fetch GammaPace LongTerm symbols — ${e.message}`, 'error'); return []; }
+  } else {
+    try { symbols = await getScreenerSymbols(); }
+    catch (e) { log(`Option Chain: Failed to fetch symbol list — ${e.message}`, 'error'); return []; }
+  }
+
+  if (symbols.length === 0) {
+    log(`Option Chain: No symbols found for ${modeLabel}`, 'warn');
+    return [];
+  }
+
+  log(`Starting: Option Chain for ${symbols.length} ${modeLabel} symbols · 6 concurrent · 50ms gap`);
+
+  const allRows = [];
+
+  const { successCount, failCount } = await parallelFetchAll(
+    symbols,
+    async (symbol) => {
+      const rows = await fetchSymbolOptions(symbol);
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+        return rows;
+      }
+      return [];
+    },
+    {
+      concurrency: 6,
+      delayMs: 50,
+      label: 'Option Chain',
+      onProgress: (processed, total, ok, fail) => {
+        const pct = Math.round((processed / total) * 100);
+        setProgress(pct, `Option Chain ${processed}/${total} · ${allRows.length} rows · ${ok} ok`);
+      }
+    }
+  );
+
+  log(`Option Chain: ${allRows.length} rows from ${successCount} symbols (${failCount} failed)`);
+  return allRows;
+}
+
+// ============================================================
+// Supabase Operations (with load_date)
+// ============================================================
+
+async function insertToSupabase(table, rows) {
+  if (!supabaseClient || rows.length === 0) return;
+  const loadDate = getUSLoadDate();
+  // Mutate in-place to avoid creating millions of new objects (saves memory + GC pressure)
+  rows.forEach(r => r.load_date = loadDate);
+
+  // Stamp the exact US NASDAQ wall-clock time on every row as informational
+  // metadata only — it is NOT part of any UNIQUE key. Dedupe is on the REAL
+  // factual data values of each table (data-state history, not time).
+  const loadTimestamp = getUSLoadTimestamp();
+  rows.forEach(r => r.load_timestamp = loadTimestamp);
+
+  const rowsWithDate = rows;
+
+  // Factual data-state conflict keys — every table dedupes on its real values:
+  const upsertScreener = table === 'nasdaq_stocks';
+  const upsertRealtimeTrades = table === 'nasdaq_realtime_trades';
+  const upsertBasicQuotes = table === 'nasdaq_basic_quotes';
+  const upsertQuotes = table === 'nasdaq_quotes';
+  const upsertSummary = table === 'nasdaq_summary';
+  const upsertHistorical = table === 'nasdaq_historical';
+  const upsertOptionChain = table === 'nasdaq_option_chain';
+  const upsertChart = table === 'nasdaq_chart';
+  const useUpsert = upsertScreener || upsertRealtimeTrades || upsertBasicQuotes || upsertQuotes || upsertSummary || upsertHistorical || upsertOptionChain || upsertChart;
+
+  const getConflictKey = () => {
+    if (upsertScreener) return 'symbol,last_sale,net_change,pct_change,market_cap';
+    if (upsertRealtimeTrades) return 'symbol,nls_volume,previous_close,today_high_low,fifty_two_week_range';
+    if (upsertBasicQuotes) return 'symbol,last_sale_price,net_change,percentage_change,delta_indicator,volume';
+    if (upsertQuotes) return 'symbol,last_sale_price,net_change,percentage_change,volume,market_status,last_trade_timestamp,day_range';
+    if (upsertSummary) return 'symbol,one_year_target,today_high_low,share_volume,average_volume,previous_close,fifty_two_week_high_low,market_cap,annualized_dividend,yield,bid_size,ask_size';
+    if (upsertHistorical) return 'symbol,date';
+    if (upsertOptionChain) return 'symbol,expiry_date,strike,call_last,call_volume,put_last,put_volume';
+    if (upsertChart) return 'symbol,timestamp';
+    return null;
+  };
+  const conflictKey = getConflictKey();
+
+  // Universal optimized mechanism: 2,000-row batches across ALL tables.
+  // Screener keeps 2 concurrency (single call, big payload); others 5.
+  const batchSize = 2000;
+  const concurrency = table === 'nasdaq_stocks' ? 2 : 5;
+  const total = rowsWithDate.length;
+  let inserted = 0;
+  let failed = 0;
+
+  if (useUpsert) {
+    log(`Data-state dedupe upsert — ${total.toLocaleString()} rows into ${table} · conflict: ${conflictKey}`, 'info');
+  }
+  log(`${useUpsert ? 'Upserting' : 'Inserting'} ${total.toLocaleString()} rows into ${table} (batch: ${batchSize}, concurrency: ${concurrency})...`);
+
+  // Build all batches up-front
+  const batches = [];
+  for (let i = 0; i < total; i += batchSize) {
+    batches.push(rowsWithDate.slice(i, i + batchSize));
+  }
+
+  // Process one batch
+  const processBatch = async (batch, batchIndex) => {
+    try {
+      let error;
+      if (conflictKey) {
+        // Factual data-state dedupe — ON CONFLICT (real value columns) DO NOTHING.
+        // Identical re-loads are skipped; any data CHANGE appends a new row.
+        ({ error } = await supabaseClient.from(table).upsert(batch, { onConflict: conflictKey, ignoreDuplicates: true }));
+      } else {
+        ({ error } = await supabaseClient.from(table).insert(batch));
+      }
+
+      if (error) {
+        // If the whole batch fails, try row-by-row fallback for this batch to salvage what we can
+        if (batch.length > 1 && (error.message.includes('violates') || error.message.includes('conflict') || error.message.includes('duplicate'))) {
+          let batchInserted = 0;
+          for (const row of batch) {
+            try {
+              let rowError;
+              if (conflictKey) {
+                ({ error: rowError } = await supabaseClient.from(table).upsert([row], { onConflict: conflictKey, ignoreDuplicates: true }));
+              } else {
+                ({ error: rowError } = await supabaseClient.from(table).insert([row]));
+              }
+              if (!rowError) batchInserted++;
+            } catch (e2) { /* ignore single-row errors */ }
+          }
+          inserted += batchInserted;
+          failed += (batch.length - batchInserted);
+        } else {
+          log(`Batch ${batchIndex + 1} error: ${error.message}`, 'error');
+          failed += batch.length;
+        }
+      } else {
+        inserted += batch.length;
+      }
+    } catch (e) {
+      log(`Batch ${batchIndex + 1} exception: ${e.message}`, 'error');
+      failed += batch.length;
+    }
+  };
+
+  // Process batches with concurrency limit (sliding window)
+  let batchIndex = 0;
+  const progressEvery = Math.max(1, Math.floor(batches.length / 20)); // ~5% increments
+
+  while (batchIndex < batches.length) {
+    const chunk = batches.slice(batchIndex, batchIndex + concurrency);
+    await Promise.all(chunk.map((batch, i) => processBatch(batch, batchIndex + i)));
+    batchIndex += concurrency;
+
+    // Throttle progress updates to reduce DOM thrashing
+    if (batchIndex % (concurrency * Math.max(1, Math.floor(progressEvery / concurrency))) === 0 || batchIndex >= batches.length) {
+      const pct = Math.min(100, Math.round((inserted / total) * 100));
+      setProgress(pct, `Inserting ${table}... ${inserted.toLocaleString()}/${total.toLocaleString()}`);
+    }
+  }
+
+  const status = failed > 0 ? 'warn' : 'success';
+  log(`${useUpsert ? 'Upserted' : 'Inserted'} ${inserted.toLocaleString()} rows into ${table}${failed > 0 ? ' (' + failed + ' failed)' : ''} · load_date: ${loadDate}`, status);
+}
+
+async function updateStats() {
+  if (!supabaseClient) return;
+  const tables = [
+    { name: 'nasdaq_movers_stock_activity', statId: 'stat-mm1', metaId: 'meta-mm1' },
+    { name: 'nasdaq_movers_stock_advanced', statId: 'stat-mm2', metaId: 'meta-mm2' },
+    { name: 'nasdaq_movers_stock_declined', statId: 'stat-mm3', metaId: 'meta-mm3' },
+    { name: 'nasdaq_movers_stock_dollarvol', statId: 'stat-mm4', metaId: 'meta-mm4' },
+    { name: 'nasdaq_movers_stock_nasdaq100', statId: 'stat-mm5', metaId: 'meta-mm5' },
+    { name: 'nasdaq_movers_etf_activity', statId: 'stat-mm6', metaId: 'meta-mm6' },
+    { name: 'nasdaq_movers_etf_advanced', statId: 'stat-mm7', metaId: 'meta-mm7' },
+    { name: 'nasdaq_movers_etf_declined', statId: 'stat-mm8', metaId: 'meta-mm8' },
+    { name: 'nasdaq_movers_funds_advanced', statId: 'stat-mm9', metaId: 'meta-mm9' },
+    { name: 'nasdaq_movers_funds_declined', statId: 'stat-mm10', metaId: 'meta-mm10' },
+    { name: 'nasdaq_chart', statId: 'stat-chart', metaId: 'meta-chart' },
+    { name: 'nasdaq_realtime_trades', statId: 'stat-rt', metaId: 'meta-rt' },
+    { name: 'nasdaq_stocks', statId: 'stat-stocks', metaId: 'meta-stocks' },
+    { name: 'nasdaq_basic_quotes', statId: 'stat-basic', metaId: 'meta-basic' },
+    { name: 'nasdaq_quotes', statId: 'stat-quotes', metaId: 'meta-quotes' },
+    { name: 'nasdaq_historical', statId: 'stat-historical', metaId: 'meta-historical' },
+    { name: 'nasdaq_summary', statId: 'stat-summary', metaId: 'meta-summary' },
+    { name: 'nasdaq_option_chain', statId: 'stat-oc', metaId: 'meta-oc' }
+  ];
+  const today = getUSLoadDate();
+  for (const t of tables) {
+    // Stats bar may be hidden/absent from DOM — null-guard all lookups
+    const statEl = document.getElementById(t.statId);
+    const metaEl = document.getElementById(t.metaId);
+    if (!statEl && !metaEl) continue;
+    try {
+      const { count: totalCount } = await supabaseClient.from(t.name).select('*', { count: 'exact', head: true });
+      if (totalCount != null && statEl) statEl.textContent = totalCount;
+      const { count: todayCount } = await supabaseClient.from(t.name).select('*', { count: 'exact', head: true }).eq('load_date', today);
+      if (todayCount != null && metaEl) metaEl.textContent = `${todayCount} today`;
+    } catch (e) {}
+  }
+}
+
+
+// ============================================================
+// CSV Download Helpers
+// ============================================================
+
+function escapeCSV(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function generateCSVFiles(data, tableName, maxBytes = 5 * 1024 * 1024) {
+  if (!data || data.length === 0) return [];
+  const headers = Object.keys(data[0]);
+  const headerLine = headers.map(escapeCSV).join(',');
+  const encoder = new TextEncoder();
+
+  const files = [];
+  let currentRows = [];
+  let currentSize = encoder.encode(headerLine + '\n').length;
+
+  for (const row of data) {
+    const line = headers.map(h => escapeCSV(row[h])).join(',');
+    const lineWithNL = line + '\n';
+    const lineSize = encoder.encode(lineWithNL).length;
+
+    if (currentSize + lineSize > maxBytes && currentRows.length > 0) {
+      const content = headerLine + '\n' + currentRows.join('\n');
+      files.push({ name: `${tableName}_1_${files.length + 1}.csv`, content });
+      currentRows = [line];
+      currentSize = encoder.encode(headerLine + '\n' + lineWithNL).length;
+    } else {
+      currentRows.push(line);
+      currentSize += lineSize;
+    }
+  }
+
+  if (currentRows.length > 0) {
+    const content = headerLine + '\n' + currentRows.join('\n');
+    files.push({ name: `${tableName}_1_${files.length + 1}.csv`, content });
+  }
+
+  return files;
+}
+
+function getTablesForAPI(apiId) {
+  switch (apiId) {
+    case 'market_movers': return MOVER_TABLES.map(t => t.table);
+    case 'chart': return ['nasdaq_chart'];
+    case 'realtime_trades': return ['nasdaq_realtime_trades'];
+    case 'screener': return ['nasdaq_stocks'];
+    case 'basic_quotes': return ['nasdaq_basic_quotes'];
+    case 'quotes': return ['nasdaq_quotes'];
+    case 'historical': return ['nasdaq_historical'];
+    case 'summary': return ['nasdaq_summary'];
+    case 'option_chain': return ['nasdaq_option_chain'];
+    default: return [];
+  }
+}
+
+async function fetchAndUpsertAPI(api) {
+  let data;
+  if (api.id === 'market_movers') {
+    const groups = await loadMarketMovers();
+    if (groups && groups.length > 0) {
+      for (const group of groups) {
+        if (group.rows && group.rows.length > 0) {
+          await insertToSupabase(group.table, group.rows);
+        }
+      }
+    }
+    return groups;
+  }
+  if (api.id === 'chart') data = await loadChart();
+  else if (api.id === 'realtime_trades') data = await loadRealtimeTrades();
+  else if (api.id === 'screener') data = await loadScreener();
+  else if (api.id === 'basic_quotes') data = await loadBasicQuotes();
+  else if (api.id === 'quotes') data = await loadQuotes();
+  else if (api.id === 'historical') data = await loadHistorical();
+  else if (api.id === 'summary') data = await loadSummary();
+  else if (api.id === 'option_chain') data = await loadOptionChain();
+
+  if (data && data.length > 0) {
+    await insertToSupabase(api.table, data);
+  }
+
+  return data;
+}
+
+async function downloadTableAsCSV(tableName, loadDate, symbolFilter = null) {
+  if (!supabaseClient) {
+    log('Supabase not initialized', 'error');
+    return;
+  }
+
+  // Optional watchlist scoping (v1.0.14): when a Gamma IntraDay / Gamma LongTerm
+  // mode is active, restrict the download to exactly those symbols so the CSV
+  // matches what was fetched — never mixes in earlier ALL-NASDAQ rows.
+  let query = supabaseClient.from(tableName).select('*').eq('load_date', loadDate);
+  if (Array.isArray(symbolFilter)) {
+    if (symbolFilter.length === 0) {
+      log(`${tableName}: watchlist is empty — nothing to download`, 'warn');
+      return;
+    }
+    query = query.in('symbol', symbolFilter);
+    log(`Download filter: ${symbolFilter.length} watchlist symbol(s) applied to ${tableName}`, 'info');
+  }
+
+  log(`Querying ${tableName} for ${loadDate}...`);
+  const { data, error } = await query;
+  if (error) {
+    log(`Error querying ${tableName}: ${error.message}`, 'error');
+    return;
+  }
+  if (!data || data.length === 0) {
+    log(`No data in ${tableName} for ${loadDate}`, 'warn');
+    return;
+  }
+
+  const files = generateCSVFiles(data, tableName);
+  const encoder = new TextEncoder();
+  const totalSize = files.reduce((sum, f) => sum + encoder.encode(f.content).length, 0);
+  const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+
+  log(`${tableName}: ${data.length} rows · ${sizeMB} MB · ${files.length} file(s) to download`, 'info');
+
+  await new Promise(r => setTimeout(r, 300));
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const blob = new Blob([file.content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (i < files.length - 1) await new Promise(r => setTimeout(r, 150));
+  }
+
+  log(`Downloaded ${files.length} file(s) for ${tableName}`, 'success');
+}
+
+async function downloadAPI(apiId) {
+  if (isLoading) {
+    log('Another operation is in progress. Please wait.', 'warn');
+    return;
+  }
+  const backend = getBackendUrl();
+  const sbUrl = document.getElementById('sbUrl').value.trim();
+  const sbKey = document.getElementById('sbKey').value.trim();
+
+  if (!backend || !sbUrl || !sbKey) {
+    log('Please configure Backend key, Bridge, and Security Key in Settings first.', 'warn');
+    const settingsPanel = document.getElementById('settingsPanel');
+    settingsPanel.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  focusLog();
+
+  const api = NASDAQ_ENDPOINTS.find(a => a.id === apiId);
+  if (!api) return;
+
+  // Resolve the active Gamma watchlist filter for THIS endpoint (v1.0.14).
+  // When a Gamma IntraDay / Gamma LongTerm chip is selected, BOTH the fetch
+  // (via the loader's mode variable) and the CSV download are scoped to the
+  // watchlist symbols from gammapace_intraday / gammapace_longterm.
+  let symbolFilter = null;
+  const activeMode = getActiveModeForAPI(api.id);
+  if (activeMode === 'gamma_intraday' || activeMode === 'gamma_longterm') {
+    const watchTable = activeMode === 'gamma_intraday' ? 'gammapace_intraday' : 'gammapace_longterm';
+    try {
+      symbolFilter = await getGammaPaceSymbols(watchTable);
+      log(`${api.name}: ${MODE_LABELS[activeMode]} filter — ${symbolFilter.length} symbol(s) from ${watchTable}`, 'info');
+      if (symbolFilter.length === 0) {
+        log(`Add tickers in the GammaPace ${activeMode === 'gamma_intraday' ? 'IntraDay' : 'LongTerm'} panel first (💾 Add), then retry.`, 'warn');
+      }
+    } catch (e) {
+      log(`Failed to resolve ${MODE_LABELS[activeMode]} watchlist: ${e.message}`, 'error');
+      symbolFilter = [];
+    }
+  }
+
+  isLoading = true;
+  cancelRequested = false;
+
+  const progress = document.getElementById('progressContainer');
+  const fill = document.getElementById('progressFill');
+  const status = document.getElementById('progressStatus');
+  const percent = document.getElementById('progressPercent');
+  progress.classList.add('active');
+  const loadDateBadge = document.getElementById('loadDateBadge');
+  if (loadDateBadge) loadDateBadge.textContent = `📅 Load Date: ${getUSLoadDateDisplay()}`;
+
+  log(`Download flow started for ${api.name}...`);
+
+  const hasSupabase = initSupabase();
+  if (!hasSupabase) {
+    isLoading = false;
+    progress.classList.remove('active');
+    return;
+  }
+
+  try {
+    status.textContent = `Fetching ${api.name}...`;
+    await fetchAndUpsertAPI(api);
+
+    const loadDate = getUSLoadDate();
+    const tables = getTablesForAPI(api.id);
+
+    for (let i = 0; i < tables.length; i++) {
+      const tableName = tables[i];
+      const pct = Math.round(((i + 1) / (tables.length + 1)) * 100);
+      fill.style.width = pct + '%';
+      percent.textContent = pct + '%';
+      status.textContent = `Downloading ${tableName}...`;
+      await downloadTableAsCSV(tableName, loadDate, symbolFilter);
+    }
+
+    fill.style.width = '100%';
+    percent.textContent = '100%';
+    status.textContent = 'Download complete!';
+    log(`Download flow complete for ${api.name}`, 'success');
+  } catch (e) {
+    log(`Download flow failed: ${e.message}`, 'error');
+  }
+
+  document.getElementById('logContainer').classList.remove('active-log');
+  isLoading = false;
+}
+
+// ============================================================
+// GammaPace Recommends — IntraDay & LongTerm
+// ============================================================
+// Admin-only sections. Tables (run supabase_gammapace.sql once):
+//   gammapace_intraday / gammapace_intraday_hist
+//   gammapace_longterm / gammapace_longterm_hist
+// Each active table: symbol (PK) + load_date_utc (UTC timestamp).
+// Engine SQLs are extension points — populate the arrays below
+// with the SQL/procedure names you provide later.
+// ============================================================
+
+// Extension points — fill with the IntraDay SQLs you provide later.
+const INTRADAY_ENGINE_SQLS = [];
+// Extension points — fill with the LongTerm SQLs/procedures/triggers you provide later.
+const LONGTERM_ENGINE_SQLS = [];
+
+function getUTCTimestamp() {
+  return new Date().toISOString(); // e.g. "2026-08-22T08:17:50.123Z"
+}
+
+function parseSymbolList(text) {
+  return (text || '')
+    .split(',')
+    .map(s => s.trim().toUpperCase())
+    .filter(s => s.length > 0);
+}
+
+function gammaRequireSupabase() {
+  if (!supabaseClient) {
+    // Auto-initialize from Settings if Bridge + Security Key are already filled in —
+    // the GammaPace buttons must work standalone without running Load Data / CSV first.
+    const url = document.getElementById('sbUrl')?.value.trim();
+    const key = document.getElementById('sbKey')?.value.trim();
+    if (url && key && initSupabase()) return true;
+    log('Supabase not initialized. Configure Bridge and Security Key in Settings.', 'error');
+    document.getElementById('settingsPanel').classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return false;
+  }
+  return true;
+}
+
+// Human-readable hint appended to Supabase errors on the GammaPace status lines
+function gammaErrorHint(msg) {
+  const m = (msg || '').toString();
+  if (/schema cache|does not exist|Could not find the table|relation/i.test(m)) {
+    return ' · Hint: table missing — re-run supabase_gammapace.sql and verify the Bridge URL in Settings points to the same Supabase project';
+  }
+  if (/row-level security|RLS/i.test(m)) {
+    return ' · Hint: RLS is blocking writes — run ALTER TABLE ... DISABLE ROW LEVEL SECURITY from supabase_gammapace.sql';
+  }
+  if (/Invalid API key|JWT|apikey/i.test(m)) {
+    return ' · Hint: Security Key invalid — paste the correct anon/publishable key in Settings';
+  }
+  return '';
+}
+
+// Inline status feedback under each section's buttons.
+// type: 'success' | 'error' | 'info'
+function setGammaStatus(elementId, msg, type = 'info') {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'gamma-status' + (type === 'success' ? ' success' : type === 'error' ? ' error' : ' info');
+}
+
+// ── DB Reset confirmation modal ─────────────────────────────
+let pendingGammaReset = null; // 'intraday' | 'longterm'
+
+function requestGammaReset(section) {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); return; }
+  pendingGammaReset = section;
+  const msgEl = document.getElementById('gammaResetMessage');
+  if (msgEl) {
+    msgEl.textContent = section === 'intraday'
+      ? 'This will move ALL tickers from gammapace_intraday into the archive history table (gammapace_intraday_hist), then DELETE every ticker from the active table.'
+      : 'This will move ALL tickers from gammapace_longterm into the archive history table (gammapace_longterm_hist), then DELETE every ticker from the active table.';
+  }
+  document.getElementById('gammaResetModal').style.display = 'flex';
+}
+
+function closeGammaResetModal() {
+  document.getElementById('gammaResetModal').style.display = 'none';
+  pendingGammaReset = null;
+}
+
+function confirmGammaReset() {
+  const section = pendingGammaReset;
+  pendingGammaReset = null;
+  document.getElementById('gammaResetModal').style.display = 'none';
+  if (section === 'intraday') executeIntradayReset();
+  else if (section === 'longterm') executeLongTermReset();
+}
+
+// ── IntraDay ────────────────────────────────────────────────
+
+async function gammaIntradayRefresh() {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); setGammaStatus('intradayStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('intradayStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  const { data, error } = await supabaseClient.from('gammapace_intraday').select('symbol').order('symbol');
+  if (error) { log(`GammaPace IntraDay Refresh error: ${error.message}`, 'error'); setGammaStatus('intradayStatus', `❌ Refresh failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  const symbols = (data || []).map(r => r.symbol);
+  document.getElementById('intradaySymbols').value = symbols.join(', ');
+  log(`GammaPace IntraDay: ${symbols.length} symbols loaded into text area`, 'success');
+  setGammaStatus('intradayStatus', `✅ Text space refreshed — ${symbols.length} symbol(s) pulled from gammapace_intraday`, 'success');
+}
+
+async function gammaIntradayLoad() {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); setGammaStatus('intradayStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('intradayStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  const symbols = parseSymbolList(document.getElementById('intradaySymbols').value);
+  if (symbols.length === 0) { log('GammaPace IntraDay: No symbols to load.', 'warn'); setGammaStatus('intradayStatus', '⚠️ No symbols to load — text area is empty', 'info'); return; }
+  const now = getUTCTimestamp();
+  const rows = symbols.map(symbol => ({ symbol, load_date_utc: now }));
+  const { error } = await supabaseClient.from('gammapace_intraday').upsert(rows, { onConflict: 'symbol' });
+  if (error) { log(`GammaPace IntraDay Load error: ${error.message}`, 'error'); setGammaStatus('intradayStatus', `❌ Load failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  log(`GammaPace IntraDay: ${symbols.length} symbols upserted (UTC ${now})`, 'success');
+  setGammaStatus('intradayStatus', `✅ Table updated — ${symbols.length} symbol(s) upserted to gammapace_intraday (UTC ${now})`, 'success');
+}
+
+// ⚙️ Gamma_engine (v1.0.17): fetches the engine SQL from gammapace_internal_mapping
+// and executes it, then reloads the watchlist into the text area like 🔄 Active does.
+const INTRADAY_ENGINE_SQL_SOURCE = {
+  table: 'gammapace_internal_mapping',
+  title: 'Gamma_engine in Intraday symbols list update from SQL_Anlysis',
+  sno: 4
+};
+
+async function gammaIntradayEngine() {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); setGammaStatus('intradayStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('intradayStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+
+  // Step 1 — read the engine SQL from the mapping table
+  setGammaStatus('intradayStatus', '⚙️ Fetching Gamma engine SQL from gammapace_internal_mapping...', 'info');
+  const { data: sqlRows, error: sqlError } = await supabaseClient
+    .from(INTRADAY_ENGINE_SQL_SOURCE.table)
+    .select('sql')
+    .eq('title', INTRADAY_ENGINE_SQL_SOURCE.title)
+    .eq('sno', INTRADAY_ENGINE_SQL_SOURCE.sno)
+    .limit(1);
+  if (sqlError) { log(`GammaPace IntraDay Engine mapping error: ${sqlError.message}`, 'error'); setGammaStatus('intradayStatus', `❌ Engine SQL lookup failed: ${sqlError.message}${gammaErrorHint(sqlError.message)}`, 'error'); return; }
+  const sqlText = sqlRows && sqlRows[0] && sqlRows[0].sql ? sqlRows[0].sql.trim() : null;
+  if (!sqlText) {
+    log(`GammaPace IntraDay Engine: no SQL found for "${INTRADAY_ENGINE_SQL_SOURCE.title}" (sno=${INTRADAY_ENGINE_SQL_SOURCE.sno})`, 'warn');
+    setGammaStatus('intradayStatus', `⚠️ No engine SQL found in ${INTRADAY_ENGINE_SQL_SOURCE.table} for that title/sno`, 'info');
+    return;
+  }
+  log(`GammaPace IntraDay Engine: executing SQL (${sqlText.length} chars) from ${INTRADAY_ENGINE_SQL_SOURCE.table} [sno=${INTRADAY_ENGINE_SQL_SOURCE.sno}]...`, 'info');
+  setGammaStatus('intradayStatus', '⚙️ Executing Gamma engine SQL...', 'info');
+
+  // Step 2 — execute it via the execute_dynamic_sql Postgres function (run supabase_gamma_engine.sql once)
+  let execResult = null;
+  try {
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_sql', { query: sqlText });
+    if (error) throw error;
+    execResult = typeof data === 'string' ? data : 'OK';
+  } catch (execError) {
+    log(`GammaPace IntraDay Engine execution error: ${execError.message}`, 'error');
+    const hint = /PGRST202|Could not find the function|schema cache/i.test(execError.message)
+      ? ' · Hint: run supabase_gamma_engine.sql once in the Supabase SQL Editor to create execute_dynamic_sql()'
+      : '';
+    setGammaStatus('intradayStatus', `❌ Engine SQL execution failed: ${execError.message}${hint || gammaErrorHint(execError.message)}`, 'error');
+    return;
+  }
+  if (execResult && /^ERROR/i.test(execResult)) {
+    log(`GammaPace IntraDay Engine SQL failed inside Postgres: ${execResult}`, 'error');
+    setGammaStatus('intradayStatus', `❌ Engine SQL failed: ${execResult}`, 'error');
+    return;
+  }
+  log('GammaPace IntraDay Engine: SQL executed successfully.', 'success');
+
+  // Step 3 — populate the text area with the resulting symbols from gammapace_intraday
+  const { data: symRows, error: symError } = await supabaseClient.from('gammapace_intraday').select('symbol').order('symbol');
+  if (symError) { log(`GammaPace IntraDay Engine refresh error: ${symError.message}`, 'error'); setGammaStatus('intradayStatus', `✅ SQL executed, but symbol refresh failed: ${symError.message}${gammaErrorHint(symError.message)}`, 'error'); return; }
+  const symbols = (symRows || []).map(r => r.symbol);
+  document.getElementById('intradaySymbols').value = symbols.join(', ');
+  log(`GammaPace IntraDay Engine: ${symbols.length} symbol(s) loaded into text area`, 'success');
+  setGammaStatus('intradayStatus', `✅ Gamma engine executed — symbols list updated — ${symbols.length} symbol(s) pulled from gammapace_intraday`, 'success');
+}
+
+async function gammaIntradayReset() {
+  requestGammaReset('intraday');
+}
+
+async function executeIntradayReset() {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); setGammaStatus('intradayStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('intradayStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  const { data, error } = await supabaseClient.from('gammapace_intraday').select('*');
+  if (error) { log(`GammaPace IntraDay Reset select error: ${error.message}`, 'error'); setGammaStatus('intradayStatus', `❌ Reset failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  if (data && data.length > 0) {
+    const archiveRows = data.map(r => ({ symbol: r.symbol, load_date_utc: r.load_date_utc }));
+    const { error: insErr } = await supabaseClient.from('gammapace_intraday_hist').insert(archiveRows);
+    if (insErr) { log(`GammaPace IntraDay Reset archive error: ${insErr.message}`, 'error'); setGammaStatus('intradayStatus', `❌ Reset failed during archive: ${insErr.message}`, 'error'); return; }
+    const { error: delErr } = await supabaseClient.from('gammapace_intraday').delete().neq('symbol', '');
+    if (delErr) { log(`GammaPace IntraDay Reset delete error: ${delErr.message}`, 'error'); setGammaStatus('intradayStatus', `❌ Reset failed during delete: ${delErr.message}`, 'error'); return; }
+    log(`GammaPace IntraDay: ${data.length} rows archived to gammapace_intraday_hist and table truncated`, 'success');
+    setGammaStatus('intradayStatus', `✅ Table truncated/reset — ${data.length} ticker(s) archived to gammapace_intraday_hist`, 'success');
+  } else {
+    log('GammaPace IntraDay: Table already empty.', 'info');
+    setGammaStatus('intradayStatus', 'ℹ️ Table already empty — nothing to reset', 'info');
+  }
+}
+
+// ── LongTerm ────────────────────────────────────────────────
+
+async function gammaLongTermRefresh() {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); setGammaStatus('longTermStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('longTermStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  const { data, error } = await supabaseClient.from('gammapace_longterm').select('symbol').order('symbol');
+  if (error) { log(`GammaPace LongTerm Refresh error: ${error.message}`, 'error'); setGammaStatus('longTermStatus', `❌ Refresh failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  const symbols = (data || []).map(r => r.symbol);
+  document.getElementById('longTermSymbols').value = symbols.join(', ');
+  log(`GammaPace LongTerm: ${symbols.length} symbols loaded into text area`, 'success');
+  setGammaStatus('longTermStatus', `✅ Text space refreshed — ${symbols.length} symbol(s) pulled from gammapace_longterm`, 'success');
+}
+
+async function gammaLongTermLoad() {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); setGammaStatus('longTermStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('longTermStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  const symbols = parseSymbolList(document.getElementById('longTermSymbols').value);
+  if (symbols.length === 0) { log('GammaPace LongTerm: No symbols to load.', 'warn'); setGammaStatus('longTermStatus', '⚠️ No symbols to load — text area is empty', 'info'); return; }
+  const now = getUTCTimestamp();
+  const rows = symbols.map(symbol => ({ symbol, load_date_utc: now }));
+  const { error } = await supabaseClient.from('gammapace_longterm').upsert(rows, { onConflict: 'symbol' });
+  if (error) { log(`GammaPace LongTerm Load error: ${error.message}`, 'error'); setGammaStatus('longTermStatus', `❌ Load failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  log(`GammaPace LongTerm: ${symbols.length} symbols upserted (UTC ${now})`, 'success');
+  setGammaStatus('longTermStatus', `✅ Table updated — ${symbols.length} symbol(s) upserted to gammapace_longterm (UTC ${now})`, 'success');
+}
+
+// ⚙️ Gamma_engine_hist (v1.0.18): fetches the engine SQL from gammapace_internal_mapping
+// (title='Gamma_engine_hist in Longterm symbols list update from SQL_Anlysis', sno=5),
+// executes it, then reloads the LongTerm watchlist into the text area like 🔄 Active does.
+const LONGTERM_ENGINE_SQL_SOURCE = {
+  table: 'gammapace_internal_mapping',
+  title: 'Gamma_engine_hist in Longterm symbols list update from SQL_Anlysis',
+  sno: 5
+};
+
+async function gammaLongTermEngine() {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); setGammaStatus('longTermStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('longTermStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+
+  // Step 1 — read the engine SQL from the mapping table
+  setGammaStatus('longTermStatus', '⚙️ Fetching Gamma_engine_hist SQL from gammapace_internal_mapping...', 'info');
+  const { data: sqlRows, error: sqlError } = await supabaseClient
+    .from(LONGTERM_ENGINE_SQL_SOURCE.table)
+    .select('sql')
+    .eq('title', LONGTERM_ENGINE_SQL_SOURCE.title)
+    .eq('sno', LONGTERM_ENGINE_SQL_SOURCE.sno)
+    .limit(1);
+  if (sqlError) { log(`GammaPace LongTerm Engine mapping error: ${sqlError.message}`, 'error'); setGammaStatus('longTermStatus', `❌ Engine SQL lookup failed: ${sqlError.message}${gammaErrorHint(sqlError.message)}`, 'error'); return; }
+  const sqlText = sqlRows && sqlRows[0] && sqlRows[0].sql ? sqlRows[0].sql.trim() : null;
+  if (!sqlText) {
+    log(`GammaPace LongTerm Engine: no SQL found for "${LONGTERM_ENGINE_SQL_SOURCE.title}" (sno=${LONGTERM_ENGINE_SQL_SOURCE.sno})`, 'warn');
+    setGammaStatus('longTermStatus', `⚠️ No engine SQL found in ${LONGTERM_ENGINE_SQL_SOURCE.table} for that title/sno`, 'info');
+    return;
+  }
+  log(`GammaPace LongTerm Engine: executing SQL (${sqlText.length} chars) from ${LONGTERM_ENGINE_SQL_SOURCE.table} [sno=${LONGTERM_ENGINE_SQL_SOURCE.sno}]...`, 'info');
+  setGammaStatus('longTermStatus', '⚙️ Executing Gamma_engine_hist SQL...', 'info');
+
+  // Step 2 — execute it via the execute_dynamic_sql Postgres function
+  let execResult = null;
+  try {
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_sql', { query: sqlText });
+    if (error) throw error;
+    execResult = typeof data === 'string' ? data : 'OK';
+  } catch (execError) {
+    log(`GammaPace LongTerm Engine execution error: ${execError.message}`, 'error');
+    const hint = /PGRST202|Could not find the function|schema cache/i.test(execError.message)
+      ? ' · Hint: run supabase_gamma_engine.sql once in the Supabase SQL Editor to create execute_dynamic_sql()'
+      : '';
+    setGammaStatus('longTermStatus', `❌ Engine SQL execution failed: ${execError.message}${hint || gammaErrorHint(execError.message)}`, 'error');
+    return;
+  }
+  if (execResult && /^ERROR/i.test(execResult)) {
+    log(`GammaPace LongTerm Engine SQL failed inside Postgres: ${execResult}`, 'error');
+    setGammaStatus('longTermStatus', `❌ Engine SQL failed: ${execResult}`, 'error');
+    return;
+  }
+  log('GammaPace LongTerm Engine: SQL executed successfully.', 'success');
+
+  // Step 3 — populate the text area with the resulting symbols from gammapace_longterm
+  const { data: symRows, error: symError } = await supabaseClient.from('gammapace_longterm').select('symbol').order('symbol');
+  if (symError) { log(`GammaPace LongTerm Engine refresh error: ${symError.message}`, 'error'); setGammaStatus('longTermStatus', `✅ SQL executed, but symbol refresh failed: ${symError.message}${gammaErrorHint(symError.message)}`, 'error'); return; }
+  const symbols = (symRows || []).map(r => r.symbol);
+  document.getElementById('longTermSymbols').value = symbols.join(', ');
+  log(`GammaPace LongTerm Engine: ${symbols.length} symbol(s) loaded into text area`, 'success');
+  setGammaStatus('longTermStatus', `✅ Gamma_engine_hist executed — symbols list updated — ${symbols.length} symbol(s) pulled from gammapace_longterm`, 'success');
+}
+
+async function gammaLongTermReset() {
+  requestGammaReset('longterm');
+}
+
+async function executeLongTermReset() {
+  if (!isAdminUnlocked) { log('Admin lock engaged. Unlock in Settings to use GammaPace.', 'warn'); setGammaStatus('longTermStatus', '🔒 Admin locked — click the 🔒 icon in Settings and enter the password', 'error'); return; }
+  if (!gammaRequireSupabase()) { setGammaStatus('longTermStatus', '❌ Supabase not connected — configure Bridge and Security Key in Settings', 'error'); return; }
+  const { data, error } = await supabaseClient.from('gammapace_longterm').select('*');
+  if (error) { log(`GammaPace LongTerm Reset select error: ${error.message}`, 'error'); setGammaStatus('longTermStatus', `❌ Reset failed: ${error.message}${gammaErrorHint(error.message)}`, 'error'); return; }
+  if (data && data.length > 0) {
+    const archiveRows = data.map(r => ({ symbol: r.symbol, load_date_utc: r.load_date_utc }));
+    const { error: insErr } = await supabaseClient.from('gammapace_longterm_hist').insert(archiveRows);
+    if (insErr) { log(`GammaPace LongTerm Reset archive error: ${insErr.message}`, 'error'); setGammaStatus('longTermStatus', `❌ Reset failed during archive: ${insErr.message}`, 'error'); return; }
+    const { error: delErr } = await supabaseClient.from('gammapace_longterm').delete().neq('symbol', '');
+    if (delErr) { log(`GammaPace LongTerm Reset delete error: ${delErr.message}`, 'error'); setGammaStatus('longTermStatus', `❌ Reset failed during delete: ${delErr.message}`, 'error'); return; }
+    log(`GammaPace LongTerm: ${data.length} rows archived to gammapace_longterm_hist and table truncated`, 'success');
+    setGammaStatus('longTermStatus', `✅ Table truncated/reset — ${data.length} ticker(s) archived to gammapace_longterm_hist`, 'success');
+  } else {
+    log('GammaPace LongTerm: Table already empty.', 'info');
+    setGammaStatus('longTermStatus', 'ℹ️ Table already empty — nothing to reset', 'info');
+  }
+}
+
+// ============================================================
+// Data Preview
+// ============================================================
+
+function showPreview(title, rows) {
+  if (!isAdminUnlocked) return;
+  const card = document.getElementById('previewCard');
+  const container = document.getElementById('previewTable');
+  if (!rows || rows.length === 0) return;
+  const keys = Object.keys(rows[0]);
+  let html = '<table><thead><tr>';
+  keys.forEach(k => html += `<th>${k}</th>`);
+  html += '</tr></thead><tbody>';
+  rows.forEach(row => {
+    html += '<tr>';
+    keys.forEach(k => { const val = row[k] != null ? String(row[k]).substring(0, 60) : ''; html += `<td>${val}</td>`; });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+  card.style.display = 'block';
+}
+
+function clearPreview() {
+  document.getElementById('previewCard').style.display = 'none';
+  document.getElementById('previewTable').innerHTML = '';
+}
+
+// ============================================================
+// Navigation
+// ============================================================
+
+function selectHome() {
+  // Placeholder — user will wire functionality later
+  log('Home selected', 'info');
+}
+
+// ============================================================
+// Mobile Menu
+// ============================================================
+
+function toggleMobileMenu() {
+  const navMenu = document.getElementById('navMenu');
+  const toggleBtn = document.querySelector('.mobile-menu-toggle');
+  navMenu.classList.toggle('active');
+  const icon = toggleBtn.querySelector('i');
+  if (navMenu.classList.contains('active')) {
+    icon.className = 'fas fa-times';
+    toggleBtn.setAttribute('aria-expanded', 'true');
+  } else {
+    icon.className = 'fas fa-bars';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+  }
+}
+
+document.addEventListener('click', function(event) {
+  const navMenu = document.getElementById('navMenu');
+  const toggleBtn = document.querySelector('.mobile-menu-toggle');
+  const navbar = document.querySelector('.navbar');
+  if (!navbar.contains(event.target) && navMenu.classList.contains('active')) {
+    navMenu.classList.remove('active');
+    const icon = toggleBtn.querySelector('i');
+    icon.className = 'fas fa-bars';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+  }
+});
+
+// ============================================================
+// Init
+// ============================================================
+
+discoverAPIs();
+document.getElementById('loadDateBadge').textContent = `📅 Load Date: ${getUSLoadDateDisplay()}`;
+const toggleInit = document.getElementById('autoReloadToggle');
+if (toggleInit) toggleInit.classList.add('locked');
+log('NASDAQ Analysis AI — Market & Trading Data initialized. Full record fetch enabled.', 'success');
+log('NASDAQ: 4,121 | NYSE: 2,717 | AMEX: 292 | ALL: 7,131 | Historical: new | Summary: new | Option Chain: new', 'info');
+</script>
+
+</body>
+</html>

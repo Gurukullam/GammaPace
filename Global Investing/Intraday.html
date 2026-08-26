@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intraday Stocks to BUY | Gammapace</title>
+
+    <!-- Font Awesome CSS -->
+    <style>
+        /* Font Awesome 6.4.0 - Core icons embedded for self-contained operation */
+        .fas, .far, .fab {
+            font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands";
+            font-weight: 900;
+            font-style: normal;
+            text-rendering: auto;
+            -webkit-font-smoothing: antialiased;
+        }
+        .fa-home:before { content: "\f015"; }
+        .fa-graduation-cap:before { content: "\f19d"; }
+        .fa-clipboard-check:before { content: "\f46c"; }
+        .fa-chevron-down:before { content: "\f078"; }
+        .fa-headphones:before { content: "\f025"; }
+        .fa-book-open:before { content: "\f518"; }
+        .fa-edit:before { content: "\f044"; }
+        .fa-microphone:before { content: "\f130"; }
+        .fa-clipboard-list:before { content: "\f46d"; }
+        .fa-bars:before { content: "\f0c9"; }
+        .fa-times:before { content: "\f00d"; }
+        .fa-users:before { content: "\f0c0"; }
+        .fa-clock:before { content: "\f017"; }
+        .fa-certificate:before { content: "\f0a3"; }
+        .fa-mobile-alt:before { content: "\f3cd"; }
+        .fa-headset:before { content: "\f590"; }
+        .fa-globe:before { content: "\f0ac"; }
+        .fa-lightbulb:before { content: "\f0eb"; }
+        .fa-rocket:before { content: "\f135"; }
+        .fa-heart:before { content: "\f004"; }
+        .fa-star:before { content: "\f005"; }
+        .fa-check:before { content: "\f00c"; }
+        .fa-language:before { content: "\f1ab"; }
+        .fa-flag:before { content: "\f024"; }
+        .fa-crown:before { content: "\f521"; }
+        .fa-sign-in-alt:before { content: "\f2f6"; }
+        .fa-user-plus:before { content: "\f234"; }
+        .fa-user:before { content: "\f007"; }
+        .fa-cog:before { content: "\f013"; }
+        .fa-sign-out-alt:before { content: "\f2f5"; }
+        .fa-shield-alt:before { content: "\f3ed"; }
+        .fa-calendar-alt:before { content: "\f073"; }
+        .fa-calendar-day:before { content: "\f783"; }
+        .fa-calendar-week:before { content: "\f784"; }
+        .fa-lock:before { content: "\f023"; }
+        .fa-arrow-up:before { content: "\f062"; }
+        .fa-sync:before { content: "\f021"; }
+        .fa-sync-alt:before { content: "\f021"; }
+        .fa-check-circle:before { content: "\f058"; }
+        .fa-exclamation-triangle:before { content: "\f071"; }
+        .fa-exclamation-circle:before { content: "\f06a"; }
+        .fa-arrow-down:before { content: "\f077"; }
+        .fa-info-circle:before { content: "\f059"; }
+        .fa-cubes:before { content: "\f0c0"; }
+        .fa-chart-bar:before { content: "\f0b4"; }
+        .fa-table:before { content: "\f0ce"; }
+        .fa-spinner:before { content: "\f1ce"; }
+        .fa-download:before { content: "\f019"; }
+        .fa-external-link-alt:before { content: "\f08e"; }
+    </style>
+
+    <!-- Font Awesome (CDN - fallback) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- No external Supabase JS client needed — using native fetch() to call Supabase REST API -->
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            touch-action: manipulation;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #3c2d1f;
+            background: linear-gradient(135deg, #d4af37 0%, #b8860b 50%, #cd853f 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        button, a, input, select, textarea { touch-action: manipulation; }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            color: #3c2d1f;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1001;
+            width: 100%;
+            min-height: 80px;
+        }
+
+        .navbar {
+            display: flex;
+            flex-direction: column;
+            padding: 0.5rem 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 0.5rem;
+        }
+
+        .nav-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            min-height: 45px;
+        }
+
+        .nav-bottom-row {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            width: 100%;
+            padding-top: 0.3rem;
+        }
+
+        .logo { text-decoration: none; color: inherit; }
+
+        /* Master Gammapace Logo */
+        .master-guruvammal-logo {
+            position: relative !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 40px !important;
+            height: 40px !important;
+            box-sizing: border-box !important;
+            font-family: 'Century Gothic', sans-serif !important;
+            font-size: 24px !important;
+            font-weight: 900 !important;
+            letter-spacing: -0.5px !important;
+            line-height: 1 !important;
+            color: #5d3a0a !important;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3) !important;
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(139, 69, 19, 0.25) 50%, rgba(205, 133, 63, 0.2) 100%) !important;
+            backdrop-filter: blur(10px) !important;
+            border-radius: 4px !important;
+            padding: 8px !important;
+            box-shadow: 0 4px 12px rgba(139, 69, 19, 0.2), 0 0 20px rgba(212, 175, 55, 0.1) !important;
+            z-index: 10000 !important;
+            transition: all 0.3s ease !important;
+        }
+
+        .master-guruvammal-logo .musical-corner {
+            position: absolute !important;
+            top: 2px !important;
+            right: 3px !important;
+            width: 8px !important;
+            height: 8px !important;
+            border-radius: 50% !important;
+            background-color: transparent !important;
+            border: 0.8px solid #5d3a0a !important;
+            color: #5d3a0a !important;
+            font-family: 'Century Gothic', sans-serif !important;
+            font-size: 4.5px !important;
+            font-weight: 900 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3) !important;
+            box-shadow: none !important;
+        }
+
+        .master-guruvammal-logo:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(139, 69, 19, 0.4), 0 0 50px rgba(212, 175, 55, 0.3);
+        }
+
+        .logo .master-guruvammal-logo { margin-right: 0.5rem; }
+
+        .mobile-menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #8b4513;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            align-items: center;
+            gap: 1.2rem;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-menu li { position: relative; }
+
+        .nav-menu a {
+            color: #3c2d1f;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .nav-menu a:hover, .nav-menu a.active {
+            color: #8b4513;
+            background: rgba(139, 69, 19, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .main-content {
+            margin-top: 120px;
+            padding: 1rem 1.5rem;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Refresh Info Bar */
+        .refresh-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 0.8rem 1.2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            font-size: 0.85rem;
+        }
+
+        .refresh-info .refresh-label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-weight: 500;
+        }
+
+        .spinner-small {
+            width: 14px;
+            height: 14px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #8b4513;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        .refresh-info .last-updated {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container h2 {
+            font-size: 1.2rem;
+            color: #8b4513;
+            margin-bottom: 1rem;
+            font-family: 'Century Gothic', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            height: 500px;
+        }
+
+        .chart-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 500px;
+            gap: 1rem;
+            color: #999;
+            font-size: 1rem;
+        }
+
+        .chart-placeholder .spinner-large {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #8b4513;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Table Container */
+        .table-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 3rem;
+            overflow-x: auto;
+        }
+
+        .table-container h2 {
+            font-size: 1.2rem;
+            color: #8b4513;
+            margin-bottom: 1rem;
+            font-family: 'Century Gothic', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+
+        .data-table th {
+            background: linear-gradient(135deg, #8b4513, #d4af37);
+            color: white;
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+            font-weight: 500;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .data-table td {
+            padding: 0.45rem 0.8rem;
+            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+        }
+
+        .data-table tbody tr:nth-child(even) {
+            background: rgba(212, 175, 55, 0.03);
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(139, 69, 19, 0.05);
+        }
+
+        .positive { color: #27ae60; font-weight: 600; }
+        .negative { color: #e74c3c; font-weight: 600; }
+
+        .table-placeholder {
+            text-align: center;
+            padding: 2rem;
+            color: #999;
+            font-size: 1rem;
+        }
+
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 0.8rem;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .legend-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 2px;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .mobile-menu-toggle { display: block; }
+
+            .nav-menu {
+                display: none;
+                position: absolute;
+                top: 100%; left: 0; right: 0;
+                background: rgba(255, 255, 255, 0.98);
+                backdrop-filter: blur(10px);
+                flex-direction: column;
+                padding: 1rem;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+                border-radius: 0 0 8px 8px;
+            }
+
+            .nav-menu.active { display: flex; }
+            .nav-menu li { width: 100%; }
+            .nav-menu a {
+                width: 100%;
+                justify-content: flex-start;
+                padding: 0.8rem;
+            }
+
+            .main-content { margin-top: 100px; }
+            .chart-container, .table-container { padding: 1rem; }
+            .chart-wrapper { height: 350px; }
+            .data-table { font-size: 0.72rem; }
+            .data-table th, .data-table td { padding: 0.3rem 0.5rem; }
+            .refresh-info { font-size: 0.78rem; }
+            .legend { gap: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="navbar">
+            <!-- Top Row: Logo & Title -->
+            <div class="nav-top-row">
+                <a href="index.html" class="logo">
+                    <div class="master-guruvammal-logo">
+                        Ga<span class="musical-corner">P</span>
+                    </div>
+                </a>
+                <span style="font-size: 1.3rem; font-weight: 600; color: #8b4513;">
+                    <i class="fas fa-chart-bar" style="margin-right:0.5rem;"></i>
+                    Intraday Stocks to BUY
+                </span>
+
+                <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle mobile menu" aria-expanded="false">
+                    <i class="fas fa-bars" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <!-- Bottom Row: Navigation Menu -->
+            <div class="nav-bottom-row">
+                <ul class="nav-menu" id="navMenu">
+                    <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Refresh Info Bar -->
+        <div class="refresh-info">
+            <span class="refresh-label">
+                <span class="spinner-small" id="refreshSpinner" style="display:none;"></span>
+                <i class="fas fa-sync-alt" style="color: #8b4513;"></i>
+                Auto-refresh every 3s
+            </span>
+            <span class="last-updated">
+                <span id="lastUpdatedText">
+                    <i class="fas fa-info-circle" style="color: #8b4513;"></i> Initializing...
+                </span>
+            </span>
+        </div>
+
+        <!-- Bar Chart Section -->
+        <section class="chart-container">
+            <h2><i class="fas fa-chart-bar"></i> Intraday Stocks to BUY — Price Increases ($)</h2>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-swatch" style="background: rgba(39,174,96,0.8);"></div>
+                    Price increase: Split Price → Price (current)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-swatch" style="background: rgba(52,152,219,0.8);"></div>
+                    Price increase: 180-min Avg → Split Price
+                </div>
+            </div>
+            <div class="chart-wrapper" id="chartWrapper">
+                <div class="chart-placeholder" id="chartPlaceholder">
+                    <div class="spinner-large"></div>
+                    <span>Loading market data...</span>
+                </div>
+                <canvas id="marketMoversChart" style="display:none;"></canvas>
+            </div>
+        </section>
+
+        <!-- Data Table Section -->
+        <section class="table-container">
+            <h2><i class="fas fa-table"></i> Intraday Stocks to BUY — Full Data Table</h2>
+            <table class="data-table" id="marketMoversTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Symbol</th>
+                        <th>Shares</th>
+                        <th>Last Trade Time (ET)</th>
+                        <th>Price</th>
+                        <th>Split Price Avg</th>
+                        <th>180-min Avg</th>
+                        <th>Split → Price ($)</th>
+                        <th>180-min → Split ($)</th>
+                        <th>Time Range</th>
+                        <th>Count</th>
+                    </tr>
+                </thead>
+                <tbody id="marketMoversTableBody">
+                    <tr><td colspan="9" class="table-placeholder">Loading data...</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <!-- ============================================================= -->
+    <!-- MARKETMOVERS.JS — Self-contained logic                       -->
+    <!-- Embedding: API Keys, Data Fetching, Chart, Table,             -->
+    <!--            Auto-Refresh (3s). NO SQL is embedded in this      -->
+    <!--            file — the canonical SQL is fetched dynamically    -->
+    <!--            from gammapace_internal_mapping at runtime.        -->
+    <!-- ============================================================= -->
+    <script>
+        // ┌──────────────────────────────────────────────────────────┐
+        // │  CONFIG — API Keys & Mapping Source                      │
+        // └──────────────────────────────────────────────────────────┘
+        const SUPABASE_URL = 'https://mushchoxbywxcpfmgavj.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_woqRTM1AEtpbM5AVVNT0KA_7eAbe0BS';
+
+        // Source of truth for the canonical SQL query text (fetched at runtime).
+        // NOTE: table & column names are lowercase, exactly as defined in Postgres.
+        const SUPABASE_SQL_MAPPING_TABLE = 'gammapace_internal_mapping';
+        const SQL_MAPPING_TITLE = 'Intraday Stocks to BUY';
+        const SQL_MAPPING_SNO = 3;
+
+        // The DATA SOURCE TABLE is NOT hard-coded — it is extracted at runtime
+        // from the "from <table>" clause of the dynamically fetched SQL.
+        let DATA_SOURCE_TABLE = null;
+
+        const REFRESH_INTERVAL_MS = 3000; // 3 seconds
+
+        // Canonical SQL Query — NOT hard-coded and NOT embedded anywhere in
+        // this file. It is fetched at startup from the gammapace_internal_mapping
+        // table:
+        //     select sql from gammapace_internal_mapping
+        //     where title = 'Intraday Stocks to BUY' and sno = 3;
+        //
+        // The Supabase REST API does NOT support executing raw SQL, so the
+        // aggregation logic remains faithfully replicated in processData()
+        // below. The fetched SQL text is held ONLY in this runtime variable
+        // for reference & traceability (inspectable via console).
+        let CANONICAL_SQL_QUERY = null;
+
+        // ┌─────────────────────────────────────────────────────────┐
+        // │  SUPABASE REST API CONFIGURATION                       │
+        // └─────────────────────────────────────────────────────────┘
+        // Using native fetch() to call Supabase REST API directly — no external JS client needed.
+        // This ensures the page works reliably even with file:// protocol (no CORS issues with scripts).
+        const SUPABASE_HEADERS = {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'Accept': 'application/json'
+        };
+
+        // ┌──────────────────────────────────────────────────────────┐
+        // │  CANONICAL SQL FETCH (gammapace_internal_mapping)        │
+        // │  Retrieves the authoritative SQL query text at runtime:  │
+        // │    select sql from gammapace_internal_mapping            │
+        // │    where title = 'Intraday Stocks to BUY'                │
+        // │      and sno = 3;                                        │
+        // └──────────────────────────────────────────────────────────┘
+        async function fetchCanonicalSql() {
+            var url = SUPABASE_URL + '/rest/v1/' + SUPABASE_SQL_MAPPING_TABLE +
+                '?select=sql' +
+                '&title=eq.' + encodeURIComponent(SQL_MAPPING_TITLE) +
+                '&sno=eq.' + encodeURIComponent(SQL_MAPPING_SNO);
+
+            var response = await fetch(url, { method: 'GET', headers: SUPABASE_HEADERS });
+
+            if (!response.ok) {
+                var errorBody = await response.text();
+                throw new Error('Supabase REST API error (SQL mapping): ' +
+                    response.status + ' ' + response.statusText + ' - ' + errorBody);
+            }
+
+            var rows = await response.json();
+            if (!rows || rows.length === 0 || !rows[0].sql) {
+                throw new Error('No sql found in ' + SUPABASE_SQL_MAPPING_TABLE +
+                    " for title='" + SQL_MAPPING_TITLE + "', sno=" + SQL_MAPPING_SNO);
+            }
+            return rows[0].sql;
+        }
+
+        /** Extract the source data table name from the fetched SQL text.
+         *  Matches the first "FROM <identifier>" whose target is a real
+         *  table name (not a parenthesised subquery). */
+        function extractSourceTable(sqlText) {
+            var m = String(sqlText || '').match(
+                /\bfrom\s+([A-Za-z_][A-Za-z0-9_$]*(?:\.[A-Za-z_][A-Za-z0-9_$]*)?)\b/i
+            );
+            return m ? m[1] : null;
+        }
+
+        /** Load the canonical SQL once at startup.
+         *  - Stores the SQL text ONLY in CANONICAL_SQL_QUERY (never rendered).
+         *  - Extracts the source data table from its FROM clause into
+         *    DATA_SOURCE_TABLE — all report data is then read from THAT table,
+         *    so results always follow the database-maintained query. */
+        async function loadCanonicalSql() {
+            try {
+                CANONICAL_SQL_QUERY = await fetchCanonicalSql();
+                DATA_SOURCE_TABLE = extractSourceTable(CANONICAL_SQL_QUERY);
+                if (!DATA_SOURCE_TABLE) {
+                    console.warn('[MarketMovers] Canonical SQL loaded, but no source table could be detected in its FROM clause.');
+                } else {
+                    console.info('[MarketMovers] Canonical SQL loaded from ' +
+                        SUPABASE_SQL_MAPPING_TABLE + " (Title='" + SQL_MAPPING_TITLE +
+                        "', Sno=" + SQL_MAPPING_SNO + '). Data source table: ' + DATA_SOURCE_TABLE);
+                }
+            } catch (err) {
+                console.warn('[MarketMovers] Could not load canonical SQL:', err.message);
+            }
+        }
+
+        // ┌─────────────────────────────────────────────────────────┐
+        // │  DATA FETCHING & PROCESSING                             │
+        // │  Replicates the SQL query's aggregation logic in JS      │
+        // └─────────────────────────────────────────────────────────┘
+
+        // Rolling in-memory window of raw nasdaq_chart rows covering the
+        // last WINDOW_MINUTES of trading data. The canonical SQL scans the
+        // whole table server-side; since Supabase REST cannot run raw SQL
+        // and pages are capped at 1000 rows, we:
+        //   1. On startup, load the full window once (parallel page fetches).
+        //   2. On each 3s refresh, incrementally fetch only NEW rows
+        //      (timestamp > last seen) — a tiny request.
+        //   3. Prune rows older than the window, then re-aggregate locally.
+        const WINDOW_MINUTES = 185;          // slight buffer beyond the SQL's 180
+        const PAGE_SIZE = 1000;              // Supabase REST per-page cap
+        const PARALLEL_PAGES = 10;           // concurrent page requests on bulk load
+
+        let windowRows = [];                 // rolling buffer of raw rows
+        let lastFetchedTs = null;            // max epoch-ms seen so far
+        let initialLoadDone = false;
+
+        /** Fetch one page (Range offset..offset+limit-1) of nasdaq_chart rows.
+         *  Returns { rows, total } where total is the exact match count when
+         *  the server reports it (Prefer: count=exact), else null. */
+        async function fetchWindowPage(urlBase, offset) {
+            var pageHeaders = Object.assign({}, SUPABASE_HEADERS, {
+                'Range': offset + '-' + (offset + PAGE_SIZE - 1)
+            });
+            var response = await fetch(urlBase, { method: 'GET', headers: pageHeaders });
+            if (!response.ok) {
+                var errorBody = await response.text();
+                throw new Error('Supabase REST API error: ' + response.status + ' ' +
+                    response.statusText + ' - ' + errorBody);
+            }
+            var rows = await response.json();
+            var contentRange = response.headers.get('content-range') || '';
+            var totalPart = contentRange.split('/')[1];
+            var total = (totalPart && totalPart !== '*') ? parseInt(totalPart, 10) : null;
+            return { rows: rows, total: total };
+        }
+
+        /** Fetch all rows matching urlBase by paging through them with
+         *  parallel requests (PARALLEL_PAGES at a time). Falls back to
+         *  "page until a short page arrives" when the server does not
+         *  report an exact total. */
+        async function fetchAllPages(urlBase) {
+            var all = [];
+            var offset = 0;
+            var total = null;
+
+            while (total === null || offset < total) {
+                if (total !== null && total - offset <= PARALLEL_PAGES * PAGE_SIZE) {
+                    // Remaining span known and small — request it in parallel.
+                    var offsets2 = [];
+                    for (var j = 0; j < PARALLEL_PAGES && offset < total; j++, offset += PAGE_SIZE) {
+                        offsets2.push(offset);
+                    }
+                    var pages2 = await Promise.all(offsets2.map(o => fetchWindowPage(urlBase, o)));
+                    pages2.forEach(p => { all = all.concat(p.rows); });
+                    return all;
+                }
+
+                // Fetch the next batch sequentially until the server reports
+                // an exact total or we receive a short (final) page.
+                var page = await fetchWindowPage(urlBase, offset);
+                all = all.concat(page.rows);
+                offset += page.rows.length;
+                if (page.total !== null) {
+                    total = page.total;
+                } else if (page.rows.length < PAGE_SIZE) {
+                    return all;
+                }
+            }
+            return all;
+        }
+
+        /** Build the REST URL for the source table restricted to the needed
+         *  columns and an optional timestamp lower bound. */
+        function buildDataUrl(sinceTsExclusive) {
+            var url = SUPABASE_URL + '/rest/v1/' + DATA_SOURCE_TABLE +
+                '?select=symbol,price,shares,time_text,timestamp' +
+                '&order=timestamp.asc';
+            if (sinceTsExclusive !== undefined && sinceTsExclusive !== null) {
+                url += '&timestamp=gt.' + sinceTsExclusive;
+            } else {
+                url += '&timestamp=gte.' + (getNyFakeEpochMs() - WINDOW_MINUTES * 60000);
+            }
+            return url;
+        }
+
+        /** Refresh the rolling window and return the freshly aggregated
+         *  result set replicating the canonical SQL output structure. */
+        async function fetchMarketMoversData() {
+            if (!DATA_SOURCE_TABLE) {
+                throw new Error('Data source table not resolved yet — canonical SQL has not been loaded.');
+            }
+
+            var newRows = await fetchAllPages(buildDataUrl(initialLoadDone ? lastFetchedTs : null));
+
+            if (newRows.length > 0) {
+                windowRows = windowRows.concat(newRows);
+                for (var i = 0; i < newRows.length; i++) {
+                    var ts = parseFloat(newRows[i].timestamp);
+                    if (!isNaN(ts) && (lastFetchedTs === null || ts > lastFetchedTs)) {
+                        lastFetchedTs = ts;
+                    }
+                }
+            }
+            initialLoadDone = true;
+
+            // Prune rows that fell out of the rolling window.
+            var cutoff = getNyFakeEpochMs() - WINDOW_MINUTES * 60000;
+            if (windowRows.length > 0 && parseFloat(windowRows[0].timestamp) < cutoff) {
+                windowRows = windowRows.filter(r => parseFloat(r.timestamp) >= cutoff);
+            }
+
+            return processData(windowRows);
+        }
+
+        /** Round a number to 2 decimal places (matching SQL ROUND(x, 2)). */
+        function round2(num) {
+            if (num === null || num === undefined || isNaN(num)) return 0;
+            return Math.round((num + Number.EPSILON) * 100) / 100;
+        }
+
+        /** Current New York (America/New_York) calendar date as YYYY-MM-DD.
+         *  Used to server-side filter nasdaq_chart.load_date so only today's
+         *  rows are fetched (the canonical SQL operates on today's trades). */
+        function getNyDate() {
+            return new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/New_York',
+                year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(new Date());
+        }
+
+        /** Current New York time-of-day expressed as minutes since midnight.
+         *  Mirrors the SQL: (NOW() AT TIME ZONE 'America/New_York')::time */
+        function getNyMinutes() {
+            var parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/New_York',
+                hour12: false, hour: '2-digit', minute: '2-digit'
+            }).formatToParts(new Date());
+            var get = function(t) {
+                var p = parts.find(function(x) { return x.type === t; });
+                return p ? parseInt(p.value, 10) : 0;
+            };
+            var h = get('hour');
+            if (h === 24) h = 0; // some engines render midnight as "24"
+            return h * 60 + get('minute');
+        }
+
+        /** Parse stored time_text (e.g. "5:22 PM", "09:30", "15:45") into
+         *  minutes since midnight — mirrors SQL (time_text)::time. */
+        function parseTimeText(txt) {
+            if (!txt) return null;
+            var str = String(txt).trim();
+            var m = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+            if (!m) return null;
+            var hour = parseInt(m[1], 10);
+            var min = parseInt(m[2], 10);
+            var ampm = m[4] ? m[4].toUpperCase() : null;
+            if (ampm === 'PM' && hour !== 12) hour += 12;
+            if (ampm === 'AM' && hour === 12) hour = 0;
+            if (hour < 0 || hour > 23 || min < 0 || min > 59) return null;
+            return hour * 60 + min;
+        }
+
+        /** Assign a trade's age-in-minutes to a time_range bucket,
+         *  replicating the SQL CASE exactly (first matching branch wins):
+         *    0-5→5_min, 5-10→10_min, 10-15→15_min, 15-30→30_min,
+         *    30-45→45_min, 45-60→60_min, 60-90→90_min, 90-120→120_min,
+         *    >120→more_than_120_min_past_range */
+        function timeRangeBucket(diffMin) {
+            if (diffMin >= 0 && diffMin <= 5)   return '5_min_past_range';
+            if (diffMin >= 5 && diffMin <= 10)  return '10_min_past_range';
+            if (diffMin >= 10 && diffMin <= 15) return '15_min_past_range';
+            if (diffMin >= 15 && diffMin <= 30) return '30_min_past_range';
+            if (diffMin >= 30 && diffMin <= 45) return '45_min_past_range';
+            if (diffMin >= 45 && diffMin <= 60) return '60_min_past_range';
+            if (diffMin >= 60 && diffMin <= 90) return '90_min_past_range';
+            if (diffMin >= 90 && diffMin <= 120) return '120_min_past_range';
+            if (diffMin > 120) return 'more_than_120_min_past_range';
+            return null;
+        }
+
+        /** Ordering priority of each time_range bucket (SQL Time_range_priority). */
+        const TIME_RANGE_PRIORITY = {
+            '5_min_past_range': 1,
+            '10_min_past_range': 2,
+            '15_min_past_range': 3,
+            '30_min_past_range': 4,
+            '45_min_past_range': 5,
+            '60_min_past_range': 6,
+            '90_min_past_range': 7,
+            '120_min_past_range': 8,
+            'more_than_120_min_past_range': 9
+        };
+
+        /** Current New York wall-clock time encoded as a "fake" epoch-ms
+         *  value. The nasdaq_chart.timestamp column stores the ET local
+         *  time-of-day AS IF it were UTC (e.g. 5:22 PM ET → 17:22:00Z),
+         *  so server-side timestamp filters must use this same encoding:
+         *  take today's NY date/time components and build them with
+         *  Date.UTC() without any zone shift. */
+        function getNyFakeEpochMs() {
+            var parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/New_York',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            }).formatToParts(new Date());
+            var get = function(t) {
+                var p = parts.find(function(x) { return x.type === t; });
+                return p ? parseInt(p.value, 10) : 0;
+            };
+            var h = get('hour');
+            if (h === 24) h = 0; // some engines render midnight as "24"
+            return Date.UTC(get('year'), get('month') - 1, get('day'), h, get('minute'), get('second'));
+        }
+
+        /** Render minutes-since-midnight back as "h:MM AM/PM" (ET display). */
+        function formatMinutes(min) {
+            if (min === null || min === undefined || isNaN(min)) return '-';
+            var h24 = Math.floor(min / 60) % 24;
+            var mm = min % 60;
+            var ampm = h24 >= 12 ? 'PM' : 'AM';
+            var h12 = h24 % 12; if (h12 === 0) h12 = 12;
+            return h12 + ':' + (mm < 10 ? '0' : '') + mm + ' ' + ampm;
+        }
+
+        /** Process raw nasdaq_chart rows into the result set,
+         *  faithfully replicating the canonical SQL (gammapace_internal_mapping
+         *  — title='Intraday Stocks to BUY', sno=3 — fetched at runtime):
+         *
+         *  1. Window: keep trades where NY-now minus trade time is between
+         *     0 and 180 minutes (the SQL's "latest 3 hrs" WHERE clause).
+         *  2. Nasdaq_chart_grp_180min: AVG(price) per symbol over that window.
+         *  3. Nasdaq_chart_grp: per symbol + time_range bucket — AVG(price)
+         *     (=AVG_Price_min_split / "Split Price"), COUNT(time_range),
+         *     MAX(Trade_time), plus Time_range_priority.
+         *  4. JOIN back to chart rows whose trade time equals each bucket's
+         *     MAX(Trade_time) → supplies `price` and `shares`.
+         *  5. Derived columns:
+         *       Price_increase_180min_Price_to_SplitPrice = SplitAvg - Avg180
+         *       Price_increase_SplitPrice_to_Price        = Price   - SplitAvg
+         *  6. WHERE both increases > $1.
+         *  7. ORDER BY priority ASC, SplitToPrice DESC, 180minToSplit DESC. */
+        function processData(rows) {
+            if (!rows || rows.length === 0) return [];
+
+            var nyMin = getNyMinutes();
+
+            // --- Step 1: enrich & apply the 180-minute window ---
+            const windowed = rows.map(r => ({
+                symbol: r.symbol,
+                price: parseFloat(r.price),
+                shares: parseFloat(r.shares),
+                tradeMin: parseTimeText(r.time_text)
+            })).filter(r =>
+                r.symbol && !isNaN(r.price) && r.tradeMin !== null &&
+                (nyMin - r.tradeMin) <= 180 && (nyMin - r.tradeMin) >= 0
+            );
+            if (windowed.length === 0) return [];
+
+            // --- Step 2: overall 180-min average per symbol ---
+            const symStats = {};
+            windowed.forEach(r => {
+                if (!symStats[r.symbol]) symStats[r.symbol] = { sum: 0, cnt: 0 };
+                symStats[r.symbol].sum += r.price;
+                symStats[r.symbol].cnt++;
+            });
+
+            // --- Step 3: per-symbol, per-time_range bucket aggregates ---
+            const buckets = {};
+            windowed.forEach(r => {
+                const tr = timeRangeBucket(nyMin - r.tradeMin);
+                if (!tr) return;
+                const key = r.symbol + '|' + tr;
+                if (!buckets[key]) {
+                    buckets[key] = { symbol: r.symbol, time_range: tr, sum: 0, cnt: 0, maxTradeMin: -1 };
+                }
+                buckets[key].sum += r.price;
+                buckets[key].cnt++;
+                if (r.tradeMin > buckets[key].maxTradeMin) buckets[key].maxTradeMin = r.tradeMin;
+            });
+
+            // --- Step 4: join each bucket to its MAX(Trade_time) chart row ---
+            // (chart.time_text::time = Trade_time_max); if several trades share
+            // that exact minute, use the last one (SQL would emit one row per
+            // matching chart row — we surface the latest occurrence).
+            const results = [];
+            Object.values(buckets).forEach(b => {
+                let match = null;
+                windowed.forEach(r => {
+                    if (r.symbol === b.symbol && r.tradeMin === b.maxTradeMin) match = r;
+                });
+                if (!match) return; // no chart row at Trade_time_max
+
+                const avgSplit = b.sum / b.cnt;                       // AVG_Price_min_split
+                const avg180 = symStats[b.symbol].sum / symStats[b.symbol].cnt; // AVG_Price_180min
+                const inc180toSplit = avgSplit - avg180;
+                const incSplitToPrice = match.price - avgSplit;
+
+                // --- Step 6: WHERE filters (> 1 on both increases) ---
+                if (incSplitToPrice > 1 && inc180toSplit > 1) {
+                    results.push({
+                        symbol: b.symbol,
+                        shares: match.shares,
+                        price: match.price,
+                        avgSplit: avgSplit,
+                        avg180: avg180,
+                        incSplitToPrice: incSplitToPrice,
+                        inc180toSplit: inc180toSplit,
+                        time_range: b.time_range,
+                        countHit: b.cnt,
+                        lastTradeMin: b.maxTradeMin,
+                        lastTradeTimestamp: formatMinutes(b.maxTradeMin)
+                    });
+                }
+            });
+
+            // --- Step 7: ORDER BY ---
+            results.sort((a, b) => {
+                const pa = TIME_RANGE_PRIORITY[a.time_range] || 99;
+                const pb = TIME_RANGE_PRIORITY[b.time_range] || 99;
+                if (pa !== pb) return pa - pb;                      // priority ASC
+                if (b.incSplitToPrice !== a.incSplitToPrice) {
+                    return b.incSplitToPrice - a.incSplitToPrice;    // DESC
+                }
+                return b.inc180toSplit - a.inc180toSplit;            // DESC
+            });
+
+            return results;
+        }
+
+
+        // ┌─────────────────────────────────────────────────────────┐
+        // │  CHART.JS — Horizontal Bar Chart                        │
+        // └─────────────────────────────────────────────────────────┘
+        let chartInstance = null;
+
+        function initChart() {
+            const ctx = document.getElementById('marketMoversChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Split Price → Price ($)',
+                            data: [],
+                            backgroundColor: 'rgba(39, 174, 96, 0.8)',
+                            borderColor: 'rgba(39, 174, 96, 1)',
+                            borderWidth: 0.5,
+                            barPercentage: 0.8,
+                            categoryPercentage: 0.85
+                        },
+                        {
+                            label: '180-min Avg → Split Price ($)',
+                            data: [],
+                            backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 0.5,
+                            barPercentage: 0.8,
+                            categoryPercentage: 0.85
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: '#3c2d1f', font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: $${ctx.raw.toFixed(2)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: {
+                                color: '#3c2d1f',
+                                font: { size: 11 },
+                                callback: v => '$' + v
+                            }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#3c2d1f',
+                                font: { size: 11, weight: 'bold' }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        /** Shorten a time_range value for compact chart axis labels,
+         *  e.g. "15_min_past_range" → "15m". */
+        function shortTimeRange(tr) {
+            if (!tr) return '';
+            if (tr === 'more_than_120_min_past_range') return '>120m';
+            var m = tr.match(/^(\d+)_min_past_range$/);
+            return m ? m[1] + 'm' : tr;
+        }
+
+        function updateChart(processed) {
+            // Display top 20 for chart readability
+            const topN = 20;
+            const displayData = processed.slice(0, topN);
+
+            if (chartInstance) {
+                chartInstance.data.labels = displayData.map(r =>
+                    r.symbol + ' (' + shortTimeRange(r.time_range) + ')');
+                chartInstance.data.datasets[0].data = displayData.map(r => r.incSplitToPrice);
+                chartInstance.data.datasets[1].data = displayData.map(r => r.inc180toSplit);
+                chartInstance.update();
+            }
+
+            // Show chart, hide placeholder
+            const placeholder = document.getElementById('chartPlaceholder');
+            const canvas = document.getElementById('marketMoversChart');
+            if (placeholder) placeholder.style.display = 'none';
+            if (canvas) canvas.style.display = 'block';
+        }
+
+        // ┌─────────────────────────────────────────────────────────┐
+        // │  DATA TABLE                                             │
+        // └─────────────────────────────────────────────────────────┘
+        function updateTable(processed) {
+            const tbody = document.getElementById('marketMoversTableBody');
+
+            if (!processed || processed.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="table-placeholder">No data available</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            processed.forEach((r, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${i + 1}</td>
+                    <td><strong>${r.symbol || '-'}</strong></td>
+                    <td>${!isNaN(r.shares) ? r.shares.toFixed(2) : '-'}</td>
+                    <td>${r.lastTradeTimestamp || '-'}</td>
+                    <td>$${(!isNaN(r.price) ? r.price : 0).toFixed(2)}</td>
+                    <td>${r.avgSplit.toFixed(2)}</td>
+                    <td>${r.avg180.toFixed(2)}</td>
+                    <td class="positive">
+                        <i class="fas fa-arrow-up"></i>
+                        +$${r.incSplitToPrice.toFixed(2)}
+                    </td>
+                    <td class="positive">
+                        <i class="fas fa-arrow-up"></i>
+                        +$${r.inc180toSplit.toFixed(2)}
+                    </td>
+                    <td>${r.time_range || '-'}</td>
+                    <td>${r.countHit}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ┌─────────────────────────────────────────────────────────┐
+        // │  AUTO-REFRESH LOGIC (every 3 seconds)                 │
+        // └─────────────────────────────────────────────────────────┘
+        let isRefreshing = false;
+        let refreshTimer = null;
+
+        function setRefreshingState(refreshing) {
+            isRefreshing = refreshing;
+            const spinner = document.getElementById('refreshSpinner');
+            if (spinner) spinner.style.display = refreshing ? 'block' : 'none';
+        }
+
+        async function refreshData() {
+            if (isRefreshing) return;
+            setRefreshingState(true);
+
+            try {
+                const processed = await fetchMarketMoversData();
+
+                if (chartInstance) {
+                    updateChart(processed);
+                } else {
+                    initChart();
+                    updateChart(processed);
+                }
+
+                updateTable(processed);
+
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString();
+                document.getElementById('lastUpdatedText').innerHTML =
+                    '<i class="fas fa-check-circle" style="color:green;"></i> Updated: ' + timeStr;
+            } catch (err) {
+                console.error('MarketMovers refresh error:', err);
+                document.getElementById('lastUpdatedText').innerHTML =
+                    '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> ' +
+                    'Error: ' + err.message +
+                    ' <span style="cursor:pointer;color:#8b4513;" onclick="refreshData()">Retry</span>';
+            } finally {
+                setRefreshingState(false);
+            }
+        }
+
+        // ┌─────────────────────────────────────────────────────────┐
+        // │  INITIALIZATION                                         │
+        // └─────────────────────────────────────────────────────────┘
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Initialize chart on first load
+            initChart();
+
+            // Load the canonical SQL FIRST — it determines which table the
+            // data is fetched from (no SQL and no table name are hard-coded).
+            await loadCanonicalSql();
+
+            // First data fetch (from the dynamically resolved source table)
+            refreshData();
+
+            // Set up recurring 3-second refresh
+            refreshTimer = setInterval(refreshData, REFRESH_INTERVAL_MS);
+        });
+
+        // ┌─────────────────────────────────────────────────────────┐
+        // │  TEMPLATE FUNCTIONS (from NEWtemplate.html, cleaned)    │
+        // └─────────────────────────────────────────────────────────┘
+
+        function toggleMobileMenu() {
+            const navMenu = document.getElementById('navMenu');
+            const toggleBtn = document.querySelector('.mobile-menu-toggle');
+
+            if (!navMenu) return;
+            navMenu.classList.toggle('active');
+
+            if (toggleBtn) {
+                const icon = toggleBtn.querySelector('i');
+                if (navMenu.classList.contains('active')) {
+                    icon.className = 'fas fa-times';
+                    toggleBtn.setAttribute('aria-expanded', 'true');
+                } else {
+                    icon.className = 'fas fa-bars';
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+                }
+            }
+        }
+
+        function selectHome() {
+            // Scroll to top — this is a single-page dashboard
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function showDefaultContent() {
+            // No default/about content in this dashboard — home = refresh
+            refreshData();
+        }
+
+        function hideDefaultContent() {
+            // No default content to hide
+        }
+
+        // Close mobile menu when clicking outside the navbar
+        document.addEventListener('click', function(event) {
+            const navMenu = document.getElementById('navMenu');
+            const toggleBtn = document.querySelector('.mobile-menu-toggle');
+            const navbar = document.querySelector('.navbar');
+
+            if (!navbar || !navMenu) return;
+            if (!navbar.contains(event.target) && navMenu.classList.contains('active')) {
+                navMenu.classList.remove('active');
+                if (toggleBtn) {
+                    const icon = toggleBtn.querySelector('i');
+                    if (icon) icon.className = 'fas fa-bars';
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+                }
+            }
+        });
+
+        // Keyboard accessibility for mobile menu toggle
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const navMenu = document.getElementById('navMenu');
+                const toggleBtn = document.querySelector('.mobile-menu-toggle');
+                if (navMenu && navMenu.classList.contains('active')) {
+                    navMenu.classList.remove('active');
+                    if (toggleBtn) {
+                        const icon = toggleBtn.querySelector('i');
+                        if (icon) icon.className = 'fas fa-bars';
+                        toggleBtn.setAttribute('aria-expanded', 'false');
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

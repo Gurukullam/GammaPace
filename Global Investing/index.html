@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GammaPace NASDAQ Analytics</title>
+    
+    <!-- Font Awesome CSS (Embedded icons) -->
+    <style>
+        /* Font Awesome 6.4.0 - Core icons embedded for self-contained operation */
+        .fas, .far, .fab {
+            font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands";
+            font-weight: 900;
+            font-style: normal;
+            text-rendering: auto;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Core icons used in application */
+        .fa-home:before { content: "\f015"; }
+        .fa-graduation-cap:before { content: "\f19d"; }
+        .fa-clipboard-check:before { content: "\f46c"; }
+        .fa-chevron-down:before { content: "\f078"; }
+        .fa-headphones:before { content: "\f025"; }
+        .fa-book-open:before { content: "\f518"; }
+        .fa-edit:before { content: "\f044"; }
+        .fa-microphone:before { content: "\f130"; }
+        .fa-clipboard-list:before { content: "\f46d"; }
+        .fa-bars:before { content: "\f0c9"; }
+        .fa-times:before { content: "\f00d"; }
+        .fa-users:before { content: "\f0c0"; }
+        .fa-clock:before { content: "\f017"; }
+        .fa-certificate:before { content: "\f0a3"; }
+        .fa-mobile-alt:before { content: "\f3cd"; }
+        .fa-headset:before { content: "\f590"; }
+        .fa-globe:before { content: "\f0ac"; }
+        .fa-lightbulb:before { content: "\f0eb"; }
+        .fa-rocket:before { content: "\f135"; }
+        .fa-heart:before { content: "\f004"; }
+        .fa-star:before { content: "\f005"; }
+        .fa-check:before { content: "\f00c"; }
+        .fa-language:before { content: "\f1ab"; }
+        .fa-flag:before { content: "\f024"; }
+        .fa-crown:before { content: "\f521"; }
+        .fa-sign-in-alt:before { content: "\f2f6"; }
+        .fa-user-plus:before { content: "\f234"; }
+        .fa-user:before { content: "\f007"; }
+        .fa-cog:before { content: "\f013"; }
+        .fa-sign-out-alt:before { content: "\f2f5"; }
+        .fa-shield-alt:before { content: "\f3ed"; }
+        .fa-calendar-alt:before { content: "\f073"; }
+        .fa-calendar-day:before { content: "\f783"; }
+        .fa-calendar-week:before { content: "\f784"; }
+        .fa-lock:before { content: "\f023"; }
+        .fa-arrow-up:before { content: "\f062"; }
+    </style>
+
+    <!-- Font Awesome (CDN - fallback) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        /* Mobile-optimized root styles */
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+        }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            touch-action: manipulation;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #3c2d1f;
+            background: linear-gradient(135deg, #d4af37 0%, #b8860b 50%, #cd853f 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Improve tap targets and touch response */
+        button, a, input, select, textarea {
+            touch-action: manipulation;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            color: #3c2d1f;
+            padding: 0;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1001;
+            width: 100%;
+            min-height: 80px;
+        }
+
+        .navbar {
+            display: flex;
+            flex-direction: column;
+            padding: 0.5rem 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 0.5rem;
+        }
+
+        .nav-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            min-height: 45px;
+        }
+
+        .nav-bottom-row {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            width: 100%;
+            padding-top: 0.3rem;
+        }
+
+        .logo {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* Master Gammapace Logo for header */
+        .master-guruvammal-logo {
+            /* Layout & Structure */
+            position: relative !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 40px !important;
+            height: 40px !important;
+            box-sizing: border-box !important;
+            
+            /* Typography */
+            font-family: 'Century Gothic', sans-serif !important;
+            font-size: 24px !important;
+            font-weight: 900 !important;
+            letter-spacing: -0.5px !important;
+            line-height: 1 !important;
+            color: #5d3a0a !important;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3) !important;
+            
+            /* Golden Square Background */
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(139, 69, 19, 0.25) 50%, rgba(205, 133, 63, 0.2) 100%) !important;
+            backdrop-filter: blur(10px) !important;
+            border-radius: 4px !important;
+            padding: 8px !important;
+            
+            /* Visual Effects */
+            box-shadow: 0 4px 12px rgba(139, 69, 19, 0.2), 0 0 20px rgba(212, 175, 55, 0.1) !important;
+            z-index: 10000 !important;
+            
+            /* Interaction */
+            transition: all 0.3s ease !important;
+        }
+
+        /* Letter P with circle corner element within Master Gammapace Logo */
+        .master-guruvammal-logo .musical-corner {
+            position: absolute !important;
+            top: 2px !important;
+            right: 3px !important;
+            width: 8px !important;
+            height: 8px !important;
+            border-radius: 50% !important;
+            background-color: transparent !important;
+            border: 0.8px solid #5d3a0a !important;
+            color: #5d3a0a !important;
+            font-family: 'Century Gothic', sans-serif !important;
+            font-size: 4.5px !important;
+            font-weight: 900 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3) !important;
+            box-shadow: none !important;
+        }
+
+        /* Optional hover effect for Master Gammapace Logo */
+        .master-guruvammal-logo:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(139, 69, 19, 0.4), 0 0 50px rgba(212, 175, 55, 0.3);
+        }
+
+        /* Ensure logo container fits Master Logo properly */
+        .logo .master-guruvammal-logo {
+            margin-right: 0.5rem;
+        }
+
+        .mobile-menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #8b4513;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .auth-section {
+            display: flex;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            border: none;
+            white-space: nowrap;
+        }
+
+        .btn-premium {
+            background: linear-gradient(135deg, #d4af37, #b8860b);
+            color: white;
+        }
+
+        .btn-premium:hover {
+            background: linear-gradient(135deg, #b8860b, #d4af37);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #8b4513;
+            border: 1px solid #8b4513;
+        }
+
+        .btn-secondary:hover {
+            background: #8b4513;
+            color: white;
+        }
+
+        .btn-primary {
+            background: #8b4513;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #a0522d;
+            transform: translateY(-1px);
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            align-items: center;
+            gap: 1.2rem;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-menu li {
+            position: relative;
+        }
+
+        .nav-menu a {
+            color: #3c2d1f;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .nav-menu a:hover,
+        .nav-menu a.active {
+            color: #8b4513;
+            background: rgba(139, 69, 19, 0.1);
+            transform: translateY(-1px);
+        }
+
+        /* Submenu styles */
+        .nasdaq-intelligence-submenu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 0.5rem 0;
+            min-width: 200px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .nasdaq-intelligence-submenu.show,
+        .nasdaq-intelligence-submenu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nasdaq-intelligence-submenu a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            color: #3c2d1f;
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            border-radius: 0;
+        }
+
+        .nasdaq-intelligence-submenu a:hover {
+            background: rgba(139, 69, 19, 0.1);
+            color: #8b4513;
+            transform: translateX(5px);
+        }
+
+        .nasdaq-intelligence-arrow {
+            transition: transform 0.3s ease;
+        }
+
+        .nasdaq-intelligence-menu.active .nasdaq-intelligence-arrow {
+            transform: rotate(180deg);
+        }
+
+        /* Gamma Report Submenu styles */
+        .gamma-report-submenu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 0.5rem 0;
+            min-width: 200px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .gamma-report-submenu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .gamma-report-submenu a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            color: #3c2d1f;
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            border-radius: 0;
+        }
+
+        .gamma-report-submenu a:hover {
+            background: rgba(139, 69, 19, 0.1);
+            color: #8b4513;
+            transform: translateX(5px);
+        }
+
+        .gamma-report-arrow {
+            transition: transform 0.3s ease;
+        }
+
+        .gamma-report-menu.active .gamma-report-arrow {
+            transform: rotate(180deg);
+        }
+
+        /* Main content area */
+        .main-content {
+            margin-top: 120px;
+            padding: 1rem 1.5rem;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: flex-start;
+            justify-content: center;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            max-width: 750px;
+            width: 95%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            margin: 0 auto;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .signin-image-section img,
+        .signup-image-section img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .signup-form-section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 0.6rem;
+            margin-top: 0;
+        }
+
+        .signup-form-section .form-group {
+            margin-bottom: 0.5rem;
+        }
+
+        .signup-form-section .form-group label {
+            font-size: 0.8rem;
+            margin-bottom: 0.2rem;
+            font-weight: 500;
+        }
+
+        .signup-form-section .form-group input,
+        .signup-form-section .form-group select {
+            padding: 0.4rem;
+            font-size: 0.85rem;
+            border-width: 1px;
+        }
+
+        .signup-form-section .form-group small {
+            font-size: 0.7rem;
+            margin-top: 0.15rem;
+        }
+
+        .signup-form-section .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            margin-top: 0.4rem;
+        }
+
+        .signup-form-section .modal-transition {
+            margin-top: 0.8rem;
+            padding-top: 0.6rem;
+        }
+
+        .signup-form-section .modal-transition p {
+            font-size: 0.8rem;
+        }
+
+        .close-modal {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #aaa;
+            margin-top: -10px;
+        }
+
+        .close-modal:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.7rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #8b4513;
+        }
+
+        .alert {
+            display: none;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            border: 1px solid transparent;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        /* Premium Modal Styles */
+        /* Highlight effect when payment section becomes visible */
+        /* Modal transition links */
+        .modal-transition {
+            margin-top: 1.5rem;
+            text-align: center;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .modal-transition p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .modal-transition a {
+            color: #8b4513;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .modal-transition a:hover {
+            color: #d4af37;
+            text-decoration: underline;
+        }
+
+        .modal-spinner-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #8b4513;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            box-shadow: 0 2px 10px rgba(139, 69, 19, 0.2);
+        }
+
+        .modal-content.transitioning {
+            opacity: 0.3;
+            transform: scale(0.98);
+        }
+
+        .empty-content h1 {
+            font-size: 2.5rem;
+            color: #8b4513;
+            margin-bottom: 1rem;
+        }
+
+        .empty-content p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .mobile-menu-toggle {
+                display: block;
+            }
+
+            .nav-menu {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: rgba(255, 255, 255, 0.98);
+                backdrop-filter: blur(10px);
+                flex-direction: column;
+                padding: 1rem;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+                border-radius: 0 0 8px 8px;
+            }
+
+            .nav-menu.active {
+                display: flex;
+            }
+
+            .nav-menu li {
+                width: 100%;
+            }
+
+            .nav-menu a {
+                width: 100%;
+                justify-content: flex-start;
+                padding: 0.8rem;
+            }
+
+            .auth-section #guestButtons,
+            .auth-section #authenticatedButtons {
+                gap: 0.2rem;
+            }
+            
+            /* Welcome message mobile adjustments */
+            #welcomeMessage {
+                margin-right: 0.8rem !important; /* Override dynamic spacing on mobile */
+            }
+            
+            #welcomeText {
+                font-size: 0.7rem !important; /* Smaller text on mobile */
+            }
+
+            .btn {
+                font-size: 0.7rem;
+                padding: 0.25rem 0.6rem;
+            }
+
+            
+
+            .signin-image-section,
+            .signup-image-section {
+                min-height: 250px;
+                order: 1;
+            }
+
+            .signin-form-section,
+            .signup-form-section {
+                order: 2;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="navbar">
+            <!-- Top Row: Logo -->
+            <div class="nav-top-row">
+                <a href="../index.html" class="logo">
+                    <div class="master-guruvammal-logo">
+                        Ga<span class="musical-corner">P</span>
+                    </div>
+                </a>
+                
+                <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle mobile menu" aria-expanded="false">
+                    <i class="fas fa-bars" aria-hidden="true"></i>
+                </button>
+                
+                </div>
+            
+            <!-- Bottom Row: Navigation Menu -->
+            <div class="nav-bottom-row">
+                <ul class="nav-menu" id="navMenu">
+                    <li><a href="../index.html"><i class="fas fa-home"></i> Home</a></li>
+                    <li class="nasdaq-intelligence-menu" onmouseenter="cancelSubmenuTimeout('nasdaqIntelligence')" onmouseleave="startSubmenuTimeout('nasdaqIntelligence')">
+                        <a href="#nasdaq-intelligence" onclick="toggleNasdaqIntelligenceSubmenu(event)"><i class="fas fa-chart-line"></i> US NASDAQ Intelligence <i class="fas fa-chevron-down nasdaq-intelligence-arrow"></i></a>
+                                                <div class="nasdaq-intelligence-submenu" id="nasdaqIntelligenceSubmenu" onmouseenter="cancelSubmenuTimeout('nasdaqIntelligence')" onmouseleave="startSubmenuTimeout('nasdaqIntelligence')">
+                            <a href="MarketTradingData.html" target="_blank" rel="noopener" onclick="selectNasdaqIntelligenceOption('MarketTradingData')"><i class="fas fa-exchange-alt"></i> Market & Trading Data</a>
+                            <a href="CompanyFundamentalData.html" target="_blank" rel="noopener" onclick="selectNasdaqIntelligenceOption('CompanyFundamental')"><i class="fas fa-building"></i> Company & Fundamental Data</a>
+                            <a href="#funds-indices-crypto" onclick="selectNasdaqIntelligenceOption('FundsIndicesCrypto'); return false;"><i class="fas fa-coins"></i> Funds, Indices & Crypto</a>
+                            <a href="#events-ownership-news" onclick="selectNasdaqIntelligenceOption('EventsOwnershipNews'); return false;"><i class="fas fa-newspaper"></i> Events, Ownership & News</a>
+                        </div>
+                    </li>
+                    <li class="gamma-report-menu" onmouseenter="cancelSubmenuTimeout('gammaReport')" onmouseleave="startSubmenuTimeout('gammaReport')">
+                        <a href="#gamma-report" onclick="toggleGammaReportSubmenu(event)"><i class="fas fa-file-alt"></i> Gamma Report <i class="fas fa-chevron-down gamma-report-arrow"></i></a>
+                        <div class="gamma-report-submenu" id="gammaReportSubmenu" onmouseenter="cancelSubmenuTimeout('gammaReport')" onmouseleave="startSubmenuTimeout('gammaReport')">
+                            <a href="MarketMoversDollarVol.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('DollarVolumeMovers')"><i class="fas fa-dollar-sign"></i> Dollar Volume Movers</a>
+                            <a href="MarketMoversAdvanced.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('AdvanceMovers')"><i class="fas fa-arrow-up"></i> Advance Movers</a>
+                            <a href="Intraday.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradayReport')"><i class="fas fa-clock"></i> Intraday Report</a>
+                        </div>
+                    </li>
+                    <li><a href="#about" onclick="selectAbout()"><i class="fas fa-lightbulb"></i> About</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Default IELTS Content (Initially Shown) -->
+        <div id="defaultContent">
+        <!-- NASDAQ Hero Section -->
+        <section class="hero-section fade-in" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); padding: 4rem 2rem; text-align: center; margin-bottom: 3rem; position: relative; overflow: hidden; max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <h1 style="font-size: 3rem; font-weight: bold; color: #8b4513; margin-bottom: 1rem; font-family: 'Century Gothic', sans-serif;">GammaPace NASDAQ Analytics</h1>
+            <h2 style="font-size: 1.5rem; color: #3c2d1f; margin-bottom: 2rem; font-family: 'Century Gothic', sans-serif;">Global Investment Intelligence Platform</h2>
+            <p style="font-size: 1.1rem; color: #666; max-width: 900px; margin: 0 auto 2rem; line-height: 1.6; text-align: justify; font-family: 'Century Gothic', sans-serif;">
+                GammaPace NASDAQ Analytics delivers comprehensive, data-driven investment intelligence for every company listed on the NASDAQ stock exchange. Our platform empowers investors with real-time financial analytics, historical trend analysis, market sentiment indicators, and deep-dive company reports. Whether you are a retail investor building your first portfolio or a seasoned trader seeking alpha, GammaPace provides the insights, timing signals, and risk assessments needed to make informed buy and sell decisions in the world's most dynamic technology-driven marketplace.
+            </p>
+            <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 2rem;">
+                <div style="background: linear-gradient(135deg, #8b4513, #d4af37); color: white; padding: 1rem 2rem; border-radius: 10px; font-weight: bold; font-size: 1.1rem;">
+                    <i class="fas fa-chart-line" style="margin-right: 0.5rem;"></i> 3,700+ Listed Companies
+                </div>
+                <div style="background: linear-gradient(135deg, #8b4513, #d4af37); color: white; padding: 1rem 2rem; border-radius: 10px; font-weight: bold; font-size: 1.1rem;">
+                    <i class="fas fa-database" style="margin-right: 0.5rem;"></i> Real-Time Market Data
+                </div>
+                <div style="background: linear-gradient(135deg, #8b4513, #d4af37); color: white; padding: 1rem 2rem; border-radius: 10px; font-weight: bold; font-size: 1.1rem;">
+                    <i class="fas fa-brain" style="margin-right: 0.5rem;"></i> AI-Powered Analytics
+                </div>
+            </div>
+        </section>
+
+        <!-- Market Overview Stats -->
+        <section style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 3rem 2rem; margin-bottom: 3rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <h2 style="text-align: center; font-size: 2.5rem; color: #8b4513; margin-bottom: 3rem; font-weight: bold;"><i class="fas fa-globe-americas"></i> NASDAQ Market Overview</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <div style="background: linear-gradient(135deg, #8b4513, #d4af37); color: white; border-radius: 12px; padding: 2rem; text-align: center;">
+                    <i class="fas fa-building" style="font-size: 2.5rem; margin-bottom: 1rem; display: block;"></i>
+                    <h3 style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">3,700+</h3>
+                    <p style="opacity: 0.9;">Listed Companies</p>
+                </div>
+                <div style="background: linear-gradient(135deg, #28a745, #20c997); color: white; border-radius: 12px; padding: 2rem; text-align: center;">
+                    <i class="fas fa-dollar-sign" style="font-size: 2.5rem; margin-bottom: 1rem; display: block;"></i>
+                    <h3 style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">$25T+</h3>
+                    <p style="opacity: 0.9;">Total Market Cap</p>
+                </div>
+                <div style="background: linear-gradient(135deg, #dc3545, #fd7e14); color: white; border-radius: 12px; padding: 2rem; text-align: center;">
+                    <i class="fas fa-exchange-alt" style="font-size: 2.5rem; margin-bottom: 1rem; display: block;"></i>
+                    <h3 style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">$200B+</h3>
+                    <p style="opacity: 0.9;">Daily Trading Volume</p>
+                </div>
+                <div style="background: linear-gradient(135deg, #6f42c1, #e83e8c); color: white; border-radius: 12px; padding: 2rem; text-align: center;">
+                    <i class="fas fa-microchip" style="font-size: 2.5rem; margin-bottom: 1rem; display: block;"></i>
+                    <h3 style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">50%+</h3>
+                    <p style="opacity: 0.9;">Tech Sector Weight</p>
+                </div>
+            </div>
+            <div style="background: rgba(139, 69, 19, 0.05); border-radius: 10px; padding: 1.5rem; border-left: 4px solid #d4af37; margin-top: 1rem;">
+                <p style="margin: 0; color: #666; font-size: 0.95rem; text-align: center;">
+                    <i class="fas fa-info-circle" style="color: #8b4513; margin-right: 0.5rem;"></i>
+                    The NASDAQ Composite Index tracks over 3,700 stocks, making it one of the most closely watched equity indices globally. It is heavily weighted toward technology, biotechnology, and growth companies.
+                </p>
+            </div>
+        </section>
+
+        <!-- Platform Features -->
+        <section style="margin-bottom: 3rem; max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <h2 style="text-align: center; font-size: 2.5rem; color: #8b4513; margin-bottom: 3rem; font-weight: bold;"><i class="fas fa-cogs"></i> Platform Capabilities</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 3rem;">
+                <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1);">
+                    <i class="fas fa-chart-bar" style="font-size: 3rem; color: #8b4513; margin-bottom: 1rem; display: block; text-align: center;"></i>
+                    <h3 style="font-size: 1.5rem; font-weight: bold; color: #8b4513; margin-bottom: 1rem; text-align: center;">Financial Analytics</h3>
+                    <p style="color: #666; text-align: center; line-height: 1.8;">
+                        Deep-dive financial statement analysis including P/E ratios, EBITDA, revenue growth, profit margins, debt-to-equity, free cash flow, and return on equity for every NASDAQ-listed company.
+                    </p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1);">
+                    <i class="fas fa-history" style="font-size: 3rem; color: #8b4513; margin-bottom: 1rem; display: block; text-align: center;"></i>
+                    <h3 style="font-size: 1.5rem; font-weight: bold; color: #8b4513; margin-bottom: 1rem; text-align: center;">Historical Trends</h3>
+                    <p style="color: #666; text-align: center; line-height: 1.8;">
+                        Multi-year price history, volume analysis, moving averages, Bollinger Bands, RSI, MACD, and Fibonacci retracements to identify long-term patterns and optimal entry/exit points.
+                    </p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1);">
+                    <i class="fas fa-bullseye" style="font-size: 3rem; color: #8b4513; margin-bottom: 1rem; display: block; text-align: center;"></i>
+                    <h3 style="font-size: 1.5rem; font-weight: bold; color: #8b4513; margin-bottom: 1rem; text-align: center;">Market Intelligence</h3>
+                    <p style="color: #666; text-align: center; line-height: 1.8;">
+                        Real-time news sentiment analysis, earnings call transcripts, SEC filing alerts, insider trading activity, institutional ownership changes, and analyst rating consensus.
+                    </p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1);">
+                    <i class="fas fa-shield-alt" style="font-size: 3rem; color: #8b4513; margin-bottom: 1rem; display: block; text-align: center;"></i>
+                    <h3 style="font-size: 1.5rem; font-weight: bold; color: #8b4513; margin-bottom: 1rem; text-align: center;">Risk Assessment</h3>
+                    <p style="color: #666; text-align: center; line-height: 1.8;">
+                        Volatility scoring, beta analysis, sector correlation matrices, drawdown history, liquidity assessment, and portfolio stress-testing to quantify and manage investment risk.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works -->
+        <section style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 3rem 2rem; margin-bottom: 3rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <h2 style="text-align: center; font-size: 2.5rem; color: #8b4513; margin-bottom: 3rem; font-weight: bold;"><i class="fas fa-tasks"></i> How GammaPace Analytics Works</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem;">
+                <div style="text-align: center; padding: 1.5rem;">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #d4af37, #8b4513); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: white; font-size: 1.5rem; font-weight: bold;">1</div>
+                    <h4 style="color: #8b4513; font-weight: bold; margin-bottom: 0.5rem;">Data Aggregation</h4>
+                    <p style="color: #666; font-size: 0.95rem;">We continuously ingest market data, financial reports, news feeds, and SEC filings for every NASDAQ-listed company.</p>
+                </div>
+                <div style="text-align: center; padding: 1.5rem;">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #d4af37, #8b4513); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: white; font-size: 1.5rem; font-weight: bold;">2</div>
+                    <h4 style="color: #8b4513; font-weight: bold; margin-bottom: 0.5rem;">AI Processing</h4>
+                    <p style="color: #666; font-size: 0.95rem;">Our algorithms process millions of data points to identify trends, anomalies, and predictive signals across the market.</p>
+                </div>
+                <div style="text-align: center; padding: 1.5rem;">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #d4af37, #8b4513); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: white; font-size: 1.5rem; font-weight: bold;">3</div>
+                    <h4 style="color: #8b4513; font-weight: bold; margin-bottom: 0.5rem;">Insight Generation</h4>
+                    <p style="color: #666; font-size: 0.95rem;">Comprehensive reports, buy/sell signals, price targets, and risk scores are generated for each company.</p>
+                </div>
+                <div style="text-align: center; padding: 1.5rem;">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #d4af37, #8b4513); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: white; font-size: 1.5rem; font-weight: bold;">4</div>
+                    <h4 style="color: #8b4513; font-weight: bold; margin-bottom: 0.5rem;">Decision Support</h4>
+                    <p style="color: #666; font-size: 0.95rem;">Investors receive actionable intelligence with optimal timing recommendations and portfolio allocation guidance.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Company Analysis Categories -->
+        <section style="margin-bottom: 3rem; max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <h2 style="text-align: center; font-size: 2.5rem; color: #8b4513; margin-bottom: 3rem; font-weight: bold;"><i class="fas fa-layer-group"></i> Sector Coverage</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <div style="background: rgba(139, 69, 19, 0.05); border-radius: 12px; padding: 1.5rem; text-align: center; border-left: 4px solid #d4af37;">
+                    <i class="fas fa-laptop-code" style="font-size: 2rem; color: #8b4513; margin-bottom: 0.5rem;"></i>
+                    <h3 style="font-size: 1.2rem; font-weight: bold; color: #8b4513; margin-bottom: 0.5rem;">Technology</h3>
+                    <p style="color: #666; font-size: 0.9rem;">Software, semiconductors, cloud computing, AI/ML, cybersecurity, and enterprise IT.</p>
+                </div>
+                <div style="background: rgba(139, 69, 19, 0.05); border-radius: 12px; padding: 1.5rem; text-align: center; border-left: 4px solid #d4af37;">
+                    <i class="fas fa-dna" style="font-size: 2rem; color: #8b4513; margin-bottom: 0.5rem;"></i>
+                    <h3 style="font-size: 1.2rem; font-weight: bold; color: #8b4513; margin-bottom: 0.5rem;">Biotechnology</h3>
+                    <p style="color: #666; font-size: 0.9rem;">Pharmaceuticals, genomics, medical devices, clinical trials, and FDA pipeline tracking.</p>
+                </div>
+                <div style="background: rgba(139, 69, 19, 0.05); border-radius: 12px; padding: 1.5rem; text-align: center; border-left: 4px solid #d4af37;">
+                    <i class="fas fa-shopping-cart" style="font-size: 2rem; color: #8b4513; margin-bottom: 0.5rem;"></i>
+                    <h3 style="font-size: 1.2rem; font-weight: bold; color: #8b4513; margin-bottom: 0.5rem;">Consumer & Retail</h3>
+                    <p style="color: #666; font-size: 0.9rem;">E-commerce, consumer electronics, digital media, streaming, and retail analytics.</p>
+                </div>
+                <div style="background: rgba(139, 69, 19, 0.05); border-radius: 12px; padding: 1.5rem; text-align: center; border-left: 4px solid #d4af37;">
+                    <i class="fas fa-rocket" style="font-size: 2rem; color: #8b4513; margin-bottom: 0.5rem;"></i>
+                    <h3 style="font-size: 1.2rem; font-weight: bold; color: #8b4513; margin-bottom: 0.5rem;">Fintech & Crypto</h3>
+                    <p style="color: #666; font-size: 0.9rem;">Digital payments, blockchain, neobanks, trading platforms, and DeFi infrastructure.</p>
+                </div>
+                <div style="background: rgba(139, 69, 19, 0.05); border-radius: 12px; padding: 1.5rem; text-align: center; border-left: 4px solid #d4af37;">
+                    <i class="fas fa-car" style="font-size: 2rem; color: #8b4513; margin-bottom: 0.5rem;"></i>
+                    <h3 style="font-size: 1.2rem; font-weight: bold; color: #8b4513; margin-bottom: 0.5rem;">Electric Vehicles</h3>
+                    <p style="color: #666; font-size: 0.9rem;">EV manufacturers, battery tech, autonomous driving, charging infrastructure, and supply chain.</p>
+                </div>
+                <div style="background: rgba(139, 69, 19, 0.05); border-radius: 12px; padding: 1.5rem; text-align: center; border-left: 4px solid #d4af37;">
+                    <i class="fas fa-solar-panel" style="font-size: 2rem; color: #8b4513; margin-bottom: 0.5rem;"></i>
+                    <h3 style="font-size: 1.2rem; font-weight: bold; color: #8b4513; margin-bottom: 0.5rem;">Clean Energy</h3>
+                    <p style="color: #666; font-size: 0.9rem;">Solar, wind, energy storage, hydrogen, carbon capture, and grid modernization technologies.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sample Analysis Report -->
+        <section style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 3rem 2rem; margin-bottom: 3rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <h2 style="text-align: center; font-size: 2.5rem; color: #8b4513; margin-bottom: 3rem; font-weight: bold;"><i class="fas fa-file-alt"></i> Sample Company Analysis Report</h2>
+            <div style="background: linear-gradient(135deg, rgba(139,69,19,0.05), rgba(212,175,55,0.1)); border-radius: 12px; padding: 2rem; border: 2px solid #d4af37; margin-bottom: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h3 style="font-size: 1.8rem; color: #8b4513; margin: 0;">Example Corp (EXMP)</h3>
+                        <p style="color: #666; margin: 0.3rem 0 0 0;">Technology — Cloud Infrastructure</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #28a745;">$185.42 <span style="font-size: 1rem; color: #28a745;">▲ 2.4%</span></div>
+                        <div style="color: #666; font-size: 0.9rem;">Market Cap: $42.8B</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div style="background: white; border-radius: 8px; padding: 1rem; text-align: center;">
+                        <div style="font-size: 0.85rem; color: #666;">P/E Ratio</div>
+                        <div style="font-size: 1.4rem; font-weight: bold; color: #8b4513;">28.5x</div>
+                        <div style="font-size: 0.8rem; color: #28a745;">Below Sector Avg</div>
+                    </div>
+                    <div style="background: white; border-radius: 8px; padding: 1rem; text-align: center;">
+                        <div style="font-size: 0.85rem; color: #666;">Revenue Growth (YoY)</div>
+                        <div style="font-size: 1.4rem; font-weight: bold; color: #8b4513;">+34.2%</div>
+                        <div style="font-size: 0.8rem; color: #28a745;">Accelerating</div>
+                    </div>
+                    <div style="background: white; border-radius: 8px; padding: 1rem; text-align: center;">
+                        <div style="font-size: 0.85rem; color: #666;">Free Cash Flow</div>
+                        <div style="font-size: 1.4rem; font-weight: bold; color: #8b4513;">$3.2B</div>
+                        <div style="font-size: 0.8rem; color: #28a745;">Strong</div>
+                    </div>
+                    <div style="background: white; border-radius: 8px; padding: 1rem; text-align: center;">
+                        <div style="font-size: 0.85rem; color: #666;">Debt/Equity</div>
+                        <div style="font-size: 1.4rem; font-weight: bold; color: #8b4513;">0.18</div>
+                        <div style="font-size: 0.8rem; color: #28a745;">Very Low</div>
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #eee;">
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <span style="background: #28a745; color: white; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: bold;"><i class="fas fa-arrow-up"></i> BUY Signal</span>
+                        <span style="background: #8b4513; color: white; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: bold;">Price Target: $210</span>
+                        <span style="background: #17a2b8; color: white; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: bold;">Risk Score: Low (3/10)</span>
+                        <span style="background: #ffc107; color: #3c2d1f; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: bold;">Analyst Consensus: Strong Buy</span>
+                    </div>
+                </div>
+            </div>
+            <p style="text-align: center; color: #666; font-size: 0.95rem; margin-top: 1rem;">
+                <i class="fas fa-info-circle" style="color: #8b4513; margin-right: 0.5rem;"></i>
+                This is a representative sample. GammaPace generates detailed reports with 50+ metrics for every NASDAQ-listed company.
+            </p>
+        </section>
+
+        <!-- Investment Strategies -->
+        <section style="margin-bottom: 3rem; max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <h2 style="text-align: center; font-size: 2.5rem; color: #8b4513; margin-bottom: 3rem; font-weight: bold;"><i class="fas fa-chess"></i> Investment Strategies Supported</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                <div style="background: rgba(255, 255, 255, 0.95); border-radius: 12px; padding: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-top: 4px solid #28a745;">
+                    <h4 style="color: #28a745; font-weight: bold; margin-bottom: 1rem;"><i class="fas fa-seedling"></i> Growth Investing</h4>
+                    <p style="color: #666; font-size: 0.95rem; line-height: 1.7;">Identify high-growth companies with strong revenue acceleration, expanding margins, and disruptive market positioning. Our platform flags emerging leaders before they hit mainstream radar.</p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.95); border-radius: 12px; padding: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-top: 4px solid #8b4513;">
+                    <h4 style="color: #8b4513; font-weight: bold; margin-bottom: 1rem;"><i class="fas fa-balance-scale"></i> Value Investing</h4>
+                    <p style="color: #666; font-size: 0.95rem; line-height: 1.7;">Discover undervalued gems trading below intrinsic value. We analyze book value, discounted cash flow, and comparative valuation metrics to find hidden opportunities in the NASDAQ ecosystem.</p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.95); border-radius: 12px; padding: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-top: 4px solid #dc3545;">
+                    <h4 style="color: #dc3545; font-weight: bold; margin-bottom: 1rem;"><i class="fas fa-bolt"></i> Momentum Trading</h4>
+                    <p style="color: #666; font-size: 0.95rem; line-height: 1.7;">Capitalize on price trends and volume surges. Our momentum indicators track relative strength, breakout patterns, and institutional flow to time entries and exits with precision.</p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.95); border-radius: 12px; padding: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-top: 4px solid #6f42c1;">
+                    <h4 style="color: #6f42c1; font-weight: bold; margin-bottom: 1rem;"><i class="fas fa-coins"></i> Dividend Income</h4>
+                    <p style="color: #666; font-size: 0.95rem; line-height: 1.7;">Build a steady income stream with dividend-paying tech and healthcare stocks. We screen for yield sustainability, payout ratios, and dividend growth history across the NASDAQ universe.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Sources & Methodology -->
+        <section style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 3rem 2rem; margin-bottom: 3rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <h2 style="text-align: center; font-size: 2.5rem; color: #8b4513; margin-bottom: 3rem; font-weight: bold;"><i class="fas fa-database"></i> Data Sources & Methodology</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                <div style="text-align: center; padding: 1rem;">
+                    <i class="fas fa-landmark" style="font-size: 2.5rem; color: #d4af37; margin-bottom: 0.5rem;"></i>
+                    <h4 style="color: #8b4513; font-weight: bold;">SEC EDGAR Filings</h4>
+                    <p style="color: #666; font-size: 0.9rem;">10-K, 10-Q, 8-K, and proxy statements parsed in real-time for fundamental analysis.</p>
+                </div>
+                <div style="text-align: center; padding: 1rem;">
+                    <i class="fas fa-chart-line" style="font-size: 2.5rem; color: #d4af37; margin-bottom: 0.5rem;"></i>
+                    <h4 style="color: #8b4513; font-weight: bold;">Market Data Feeds</h4>
+                    <p style="color: #666; font-size: 0.9rem;">Level 1 and Level 2 quotes, tick-by-tick volume, and order book dynamics.</p>
+                </div>
+                <div style="text-align: center; padding: 1rem;">
+                    <i class="fas fa-newspaper" style="font-size: 2.5rem; color: #d4af37; margin-bottom: 0.5rem;"></i>
+                    <h4 style="color: #8b4513; font-weight: bold;">News & Sentiment</h4>
+                    <p style="color: #666; font-size: 0.9rem;">Natural language processing across 500+ financial news sources and social channels.</p>
+                </div>
+                <div style="text-align: center; padding: 1rem;">
+                    <i class="fas fa-users" style="font-size: 2.5rem; color: #d4af37; margin-bottom: 0.5rem;"></i>
+                    <h4 style="color: #8b4513; font-weight: bold;">Analyst Consensus</h4>
+                    <p style="color: #666; font-size: 0.9rem;">Aggregated ratings, price targets, and earnings estimates from top-tier research firms.</p>
+                </div>
+                <div style="text-align: center; padding: 1rem;">
+                    <i class="fas fa-briefcase" style="font-size: 2.5rem; color: #d4af37; margin-bottom: 0.5rem;"></i>
+                    <h4 style="color: #8b4513; font-weight: bold;">Insider Activity</h4>
+                    <p style="color: #666; font-size: 0.9rem;">Form 4 filings tracking executive and director transactions as they happen.</p>
+                </div>
+                <div style="text-align: center; padding: 1rem;">
+                    <i class="fas fa-university" style="font-size: 2.5rem; color: #d4af37; margin-bottom: 0.5rem;"></i>
+                    <h4 style="color: #8b4513; font-weight: bold;">Institutional Flow</h4>
+                    <p style="color: #666; font-size: 0.9rem;">13F filings revealing hedge fund and institutional investor position changes quarterly.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact / CTA -->
+        <section style="background: linear-gradient(135deg, #8b4513, #d4af37); color: white; border-radius: 15px; padding: 3rem 2rem; margin-bottom: 3rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); max-width: 1200px; margin-left: auto; margin-right: auto; text-align: center;">
+            <h2 style="font-size: 2.2rem; font-weight: bold; margin-bottom: 1rem;"><i class="fas fa-rocket"></i> Start Your Investment Journey</h2>
+            <p style="font-size: 1.1rem; max-width: 700px; margin: 0 auto 2rem; opacity: 0.95; line-height: 1.6;">
+                GammaPace NASDAQ Analytics provides institutional-grade tools for every investor. Explore our comprehensive company reports, leverage AI-driven insights, and make data-backed decisions with confidence.
+            </p>
+            <div style="display: flex; justify-content: center; gap: 1.5rem; flex-wrap: wrap;">
+                <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 1rem 2rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3);">
+                    <i class="fas fa-envelope" style="margin-right: 0.5rem;"></i> GammaPace@outlook.com
+                </div>
+                <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 1rem 2rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3);">
+                    <i class="fas fa-globe" style="margin-right: 0.5rem;"></i> Global Market Coverage
+                </div>
+            </div>
+        </section>
+        </div>
+
+        <!-- About Section (Initially Hidden) -->
+        <section id="aboutSection" style="display: none;">
+            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 15px; padding: 3rem 2rem; margin-bottom: 3rem; box-shadow: 0 5px 20px rgba(0,0,0,0.1); max-width: 1200px; margin-left: auto; margin-right: auto;">
+                <h2 style="text-align: center; font-size: 2.5rem; color: #8b4513; margin-bottom: 3rem; font-weight: bold;"><i class="fas fa-lightbulb"></i> About US NASDAQ Intelligence</h2>
+                <div style="font-size: 1.1rem; color: #666; line-height: 1.8; text-align: justify; font-family: 'Century Gothic', sans-serif;">
+                    <p style="margin-bottom: 1.5rem;">
+                        <strong>GammaPace NASDAQ Intelligence</strong> is a next-generation investment analytics platform engineered to decode the world's most dynamic technology-driven marketplace. Our mission is to democratize institutional-grade financial intelligence, giving every investor—from first-time traders to seasoned portfolio managers—unparalleled visibility into the 3,700+ companies that power the NASDAQ Composite Index.
+                    </p>
+                    <p style="margin-bottom: 1.5rem;">
+                        The platform aggregates and processes millions of data points daily, spanning real-time market feeds, SEC EDGAR filings, earnings transcripts, analyst consensus, insider trading activity, and alternative data sources such as news sentiment and social-media signals. Our proprietary AI engine transforms this raw data into actionable insights: buy/sell signals, price-target projections, volatility scoring, and sector-rotation alerts.
+                    </p>
+                    <p style="margin-bottom: 1.5rem;">
+                        <strong>Four Pillars of Intelligence:</strong> <em>Market & Trading Data</em> delivers live quotes, depth-of-book analytics, and volume-profile studies. <em>Company & Fundamental Data</em> offers deep-dive financial statement analysis, valuation modeling, and peer benchmarking. <em>Funds, Indices & Crypto</em> tracks ETF flows, index rebalancing, and digital-asset correlations. <em>Events, Ownership & News</em> monitors earnings calendars, insider Form 4 filings, 13F institutional disclosures, and breaking news sentiment.
+                    </p>
+                    <p style="margin-bottom: 1.5rem;">
+                        Whether you pursue growth, value, momentum, or income strategies, GammaPace adapts its analytics to your framework. Our risk-assessment layer quantifies drawdown potential, beta exposure, and liquidity constraints so you can allocate capital with confidence. All data is refreshed continuously, and alerts are pushed in real time to ensure you never miss a market-moving event.
+                    </p>
+                    <p style="margin-bottom: 1.5rem;">
+                        For enterprise licensing, API access, or institutional partnerships, please contact <strong>GammaPace@outlook.com</strong>. We also offer tailored onboarding and training for financial advisory firms, family offices, and educational institutions.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    
+    
+    
+    <!-- JavaScript for functionality -->
+    <script>
+        // Mobile menu toggle with accessibility support
+        function toggleMobileMenu() {
+            const navMenu = document.getElementById('navMenu');
+            const toggleBtn = document.querySelector('.mobile-menu-toggle');
+
+            navMenu.classList.toggle('active');
+
+            // Update button icon
+            const icon = toggleBtn.querySelector('i');
+            if (navMenu.classList.contains('active')) {
+                icon.className = 'fas fa-times';
+                toggleBtn.setAttribute('aria-expanded', 'true');
+            } else {
+                icon.className = 'fas fa-bars';
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        }
+
+        // US NASDAQ Intelligence Submenu Functions
+        function toggleNasdaqIntelligenceSubmenu(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const submenu = document.getElementById('nasdaqIntelligenceSubmenu');
+            const menuParent = submenu.closest('.nasdaq-intelligence-menu');
+            const isCurrentlyOpen = submenu.classList.contains('show');
+
+            // Cancel any pending timeout for this menu
+            if (window.cancelSubmenuTimeout) {
+                window.cancelSubmenuTimeout('nasdaqIntelligence');
+            }
+
+            if (isCurrentlyOpen) {
+                submenu.classList.remove('show');
+                menuParent.classList.remove('active');
+            } else {
+                closeAllSubmenusGlobally('nasdaqIntelligenceSubmenu');
+                submenu.classList.add('show');
+                menuParent.classList.add('active');
+            }
+        }
+
+        // Close all submenus globally except the specified one
+        function closeAllSubmenusGlobally(exceptSubmenuId) {
+            const allSubmenus = ['nasdaqIntelligenceSubmenu', 'gammaReportSubmenu'];
+
+            allSubmenus.forEach(submenuId => {
+                if (submenuId !== exceptSubmenuId) {
+                    const submenu = document.getElementById(submenuId);
+                    const menuParent = submenu?.closest('.nasdaq-intelligence-menu');
+
+                    if (submenu) submenu.classList.remove('show');
+                    if (menuParent) menuParent.classList.remove('active');
+                }
+            });
+        }
+
+        // US NASDAQ Intelligence Option Selection Function
+        function selectNasdaqIntelligenceOption(option) {
+
+            // Hide about content and show default content
+            hideAboutContent();
+            showDefaultContent();
+
+            // Close the submenu first
+            const submenu = document.getElementById('nasdaqIntelligenceSubmenu');
+            const menuParent = submenu.closest('.nasdaq-intelligence-menu');
+            submenu.classList.remove('show');
+            menuParent.classList.remove('active');
+
+            // Handle specific navigation for NASDAQ Intelligence options
+            // NOTE: relative filenames only — works both locally and on
+            // GitHub Pages (https://gurukullam.github.io/nasdaq-analysis-frontend/)
+            if (option === 'MarketTradingData') {
+                window.location.href = 'MarketTradingData.html';
+                return;
+            }
+
+            if (option === 'CompanyFundamental') {
+                window.location.href = 'CompanyFundamentalData.html';
+                return;
+            }
+
+            if (option === 'FundsIndicesCrypto') {
+                showComingSoon('Funds, Indices & Crypto');
+                return;
+            }
+
+            if (option === 'EventsOwnershipNews') {
+                showComingSoon('Events, Ownership & News');
+                return;
+            }
+        }
+
+        // Gamma Report Submenu Functions
+        function toggleGammaReportSubmenu(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const submenu = document.getElementById('gammaReportSubmenu');
+            const menuParent = submenu.closest('.gamma-report-menu');
+            const isCurrentlyOpen = submenu.classList.contains('show');
+
+            // Cancel any pending timeout for this menu
+            if (window.cancelSubmenuTimeout) {
+                window.cancelSubmenuTimeout('gammaReport');
+            }
+
+            if (isCurrentlyOpen) {
+                submenu.classList.remove('show');
+                menuParent.classList.remove('active');
+            } else {
+                closeAllSubmenusGlobally('gammaReportSubmenu');
+                submenu.classList.add('show');
+                menuParent.classList.add('active');
+            }
+        }
+
+        // Gamma Report Option Selection Function
+        function selectGammaReportOption(option) {
+
+            // Hide about content and show default content
+            hideAboutContent();
+            showDefaultContent();
+
+            // Close the submenu first
+            const submenu = document.getElementById('gammaReportSubmenu');
+            const menuParent = submenu.closest('.gamma-report-menu');
+            submenu.classList.remove('show');
+            menuParent.classList.remove('active');
+
+            // Handle specific navigation for Gamma Report options
+            // NOTE: relative filenames only — works both locally and on
+            // GitHub Pages (https://gurukullam.github.io/nasdaq-analysis-frontend/)
+            if (option === 'DollarVolumeMovers') {
+                window.location.href = 'MarketMoversDollarVol.html';
+                return;
+            }
+
+            if (option === 'AdvanceMovers') {
+                window.location.href = 'MarketMoversAdvanced.html';
+                return;
+            }
+
+            if (option === 'IntradayReport') {
+                window.location.href = 'Intraday.html';
+                return;
+            }
+        }
+
+        // Coming Soon placeholder for unassigned submenus.
+        // Replace the showComingSoon() calls above with real page navigation
+        // once those pages are implemented.
+        function showComingSoon(title) {
+            const modalTitle = document.getElementById('comingSoonTitle');
+            modalTitle.textContent = title;
+            document.getElementById('comingSoonModal').classList.add('active');
+        }
+
+        function hideComingSoon() {
+            document.getElementById('comingSoonModal').classList.remove('active');
+        }
+
+
+        // Navigation functions
+        function selectHome() {
+            // Hide about content and show default content
+            hideAboutContent();
+            showDefaultContent();
+        }
+
+        function selectAbout() {
+            // Hide default content and show about content
+            hideDefaultContent();
+            showAboutContent();
+        }
+
+        // Content visibility functions
+        function showDefaultContent() {
+            const defaultContent = document.getElementById('defaultContent');
+            if (defaultContent) {
+                defaultContent.style.display = 'block';
+            }
+        }
+
+        function hideDefaultContent() {
+            const defaultContent = document.getElementById('defaultContent');
+            if (defaultContent) {
+                defaultContent.style.display = 'none';
+            }
+        }
+
+        function showAboutContent() {
+            const aboutSection = document.getElementById('aboutSection');
+            if (aboutSection) {
+                aboutSection.style.display = 'block';
+            }
+        }
+
+        function hideAboutContent() {
+            const aboutSection = document.getElementById('aboutSection');
+            if (aboutSection) {
+                aboutSection.style.display = 'none';
+            }
+        }
+
+        // Submenu timeout handling
+        let submenuTimeouts = {};
+
+        function startSubmenuTimeout(menuType) {
+            submenuTimeouts[menuType] = setTimeout(() => {
+                const submenu = document.getElementById(menuType + 'Submenu');
+                const menuItem = submenu ? submenu.closest('li') : null;
+                if (submenu && menuItem) {
+                    submenu.classList.remove('show');
+                    menuItem.classList.remove('active');
+                }
+            }, 300);
+        }
+
+        function cancelSubmenuTimeout(menuType) {
+            if (submenuTimeouts[menuType]) {
+                clearTimeout(submenuTimeouts[menuType]);
+                delete submenuTimeouts[menuType];
+            }
+        }
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const navMenu = document.getElementById('navMenu');
+            const toggleBtn = document.querySelector('.mobile-menu-toggle');
+            const navbar = document.querySelector('.navbar');
+
+            if (!navbar.contains(event.target) && navMenu.classList.contains('active')) {
+                navMenu.classList.remove('active');
+                const icon = toggleBtn.querySelector('i');
+                icon.className = 'fas fa-bars';
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        // Close submenus when clicking outside
+        document.addEventListener('click', function(event) {
+            const navbar = document.querySelector('.navbar');
+            if (!navbar.contains(event.target)) {
+                // Close all submenus
+                closeAllSubmenusGlobally();
+            }
+        });
+
+        // Authentication State Management Functions
+        // ========================================
+    </script>
+
+    <!-- Coming Soon Modal (placeholder for unassigned submenus) -->
+    <div id="comingSoonModal" onclick="if (event.target === this) hideComingSoon();" style="display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(60, 45, 31, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 1rem;">
+        <div style="background: linear-gradient(135deg, #fdf9f0, #f8f5f0); border: 2px solid #d4af37; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); max-width: 420px; width: 100%; padding: 2rem; text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">&#128640;</div>
+            <h2 id="comingSoonTitle" style="color: #8b4513; font-size: 1.4rem; margin-bottom: 0.5rem;">Coming Soon</h2>
+            <p style="color: #8b7355; font-size: 0.95rem; margin-bottom: 1.5rem;">This section is under construction and will be available soon.</p>
+            <button onclick="hideComingSoon()" style="background: linear-gradient(135deg, #d4af37, #b8860b); color: #fff; border: none; border-radius: 20px; padding: 10px 28px; font-size: 0.95rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);">OK</button>
+        </div>
+    </div>
+    <script>
+        // Toggle display via .active so the flex layout centers the dialog
+        (function () {
+            const modal = document.getElementById('comingSoonModal');
+            const observer = new MutationObserver(function () {
+                modal.style.display = modal.classList.contains('active') ? 'flex' : 'none';
+            });
+            observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+        })();
+    </script>
+
+</body>
+</html>
