@@ -1,0 +1,8 @@
+{
+  "name": "nasdaq-analysis-backend",
+  "version": "1.0.0",
+  "description": "NASDAQ Analysis AI — Backend API Proxy",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
