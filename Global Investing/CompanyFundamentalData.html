@@ -871,7 +871,7 @@
     <div class="settings-grid">
       <div class="input-group">
         <label>Backend key</label>
-        <input type="text" id="backendUrl" placeholder="https://nasdaq-historical-api.vercel.app" value="https://nasdaq-historical-api.vercel.app">
+        <input type="text" id="backendUrl" placeholder="https://workers-playground-summer-field-8601.emailtochand.workers.dev" value="https://workers-playground-summer-field-8601.emailtochand.workers.dev">
       </div>
       <div class="input-group">
         <label>Bridge</label>
@@ -1414,7 +1414,12 @@ function toggleAPI(id, element) {
   else { selectedAPIs.add(id); element.classList.add('selected'); }
 }
 
-function getBackendUrl() { return document.getElementById('backendUrl').value.trim().replace(/\/$/, ''); }
+// Hardcoded free backend (Cloudflare Worker proxy) — no Settings copy-paste needed.
+const DEFAULT_BACKEND_URL = 'https://workers-playground-summer-field-8601.emailtochand.workers.dev';
+function getBackendUrl() {
+  const v = document.getElementById('backendUrl').value.trim().replace(/\/$/, '');
+  return v || DEFAULT_BACKEND_URL;
+}
 
 function initSupabase() {
   const url = document.getElementById('sbUrl').value.trim();
@@ -1446,7 +1451,33 @@ async function fetchNasdaq(path, timeoutMs = 20000) {
   } catch (e) {
     clearTimeout(timeout);
     if (e.name === 'AbortError') throw new Error(`Request timeout after ${timeoutMs}ms for ${path}`);
+    if (e instanceof TypeError) {
+      // Network/CORS-level failure — the request never completed. Most common
+      // cause: the backend proxy is DOWN or DISABLED (e.g. Vercel answers
+      // suspended deployments with HTTP 402 without CORS headers, so the
+      // browser reports a generic "Failed to fetch" instead of the status).
+      throw new Error(`Backend unreachable (${backend}) — blocked at network/CORS level. Open ${backend} in a browser tab to verify the deployment is live.`);
+    }
     throw e;
+  }
+}
+
+// One-time backend health probe (run at page init). Surfaces a down/disabled
+// proxy up front with an actionable message instead of per-symbol failures.
+async function checkBackendHealth() {
+  const backend = getBackendUrl();
+  if (!backend) return;
+  try {
+    const res = await fetch(backend, { method: 'GET' });
+    if (res.status === 402) {
+      log('⚠️ Backend DISABLED: HTTP 402 DEPLOYMENT_DISABLED for ' + backend + '. Resolve the suspension (billing/usage) in the hosting dashboard, then redeploy. All NASDAQ loads will fail until then.', 'error');
+    } else if (res.status === 503 || res.status === 507) {
+      log(`⚠️ Backend issue: ${backend} returned HTTP ${res.status}. Check the deployment status.`, 'warn');
+    } else {
+      log(`Backend probe OK: ${backend} is reachable (HTTP ${res.status}).`, 'success');
+    }
+  } catch (e) {
+    log(`⚠️ Backend probe failed for ${backend}: unreachable (network/DNS/CORS). NASDAQ loads will fail.`, 'warn');
   }
 }
 
@@ -3565,6 +3596,10 @@ const toggleInit = document.getElementById('autoReloadToggle');
 if (toggleInit) toggleInit.classList.add('locked');
 log('NASDAQ Analysis AI — Company Fundamental Data initialized. Full record fetch enabled.', 'success');
 log('Endpoints: Symbol Dividends | Dividend Calendar | Earnings Forecast | Earnings Surprise | Yearly Financials | Quarterly Financials | Insider Trades | Institutional Holdings | IPO Calendar | Company News', 'info');
+// Hardcoded backend: assert the free Cloudflare Worker URL on every load.
+const backendUrlEl = document.getElementById('backendUrl');
+if (backendUrlEl) backendUrlEl.value = DEFAULT_BACKEND_URL;
+checkBackendHealth(); // fire-and-forget: warn immediately if the backend proxy is down/disabled
 </script>
 
 </body>

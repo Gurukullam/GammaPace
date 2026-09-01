@@ -871,7 +871,7 @@
     <div class="settings-grid">
       <div class="input-group">
         <label>Backend key</label>
-        <input type="text" id="backendUrl" placeholder="https://nasdaq-historical-api.vercel.app" value="https://nasdaq-historical-api.vercel.app">
+        <input type="text" id="backendUrl" placeholder="https://workers-playground-summer-field-8601.emailtochand.workers.dev" value="https://workers-playground-summer-field-8601.emailtochand.workers.dev">
       </div>
       <div class="input-group">
         <label>Bridge</label>
@@ -1409,7 +1409,12 @@ function toggleAPI(id, element) {
   else { selectedAPIs.add(id); element.classList.add('selected'); }
 }
 
-function getBackendUrl() { return document.getElementById('backendUrl').value.trim().replace(/\/$/, ''); }
+// Hardcoded free backend (Cloudflare Worker proxy) — no Settings copy-paste needed.
+const DEFAULT_BACKEND_URL = 'https://workers-playground-summer-field-8601.emailtochand.workers.dev';
+function getBackendUrl() {
+  const v = document.getElementById('backendUrl').value.trim().replace(/\/$/, '');
+  return v || DEFAULT_BACKEND_URL;
+}
 
 function initSupabase() {
   const url = document.getElementById('sbUrl').value.trim();
@@ -1441,7 +1446,35 @@ async function fetchNasdaq(path, timeoutMs = 20000) {
   } catch (e) {
     clearTimeout(timeout);
     if (e.name === 'AbortError') throw new Error(`Request timeout after ${timeoutMs}ms for ${path}`);
+    if (e instanceof TypeError) {
+      // Network/CORS-level failure — the request never completed. Most common
+      // cause: the Vercel backend is DOWN or DISABLED. Vercel answers suspended
+      // deployments with HTTP 402 "DEPLOYMENT_DISABLED" WITHOUT CORS headers, so
+      // the browser reports a generic "Failed to fetch" instead of the status.
+      throw new Error(`Backend unreachable (${backend}) — blocked at network/CORS level. Open ${backend} in a browser tab: a disabled project shows "DEPLOYMENT_DISABLED / 402 Payment Required".`);
+    }
     throw e;
+  }
+}
+
+// One-time backend health probe (run at page init). Vercel answers suspended /
+// over-limit accounts with HTTP 402 "DEPLOYMENT_DISABLED" and no CORS headers,
+// which makes every NASDAQ request fail as a generic "Failed to fetch". This
+// probe surfaces the real backend state up front instead of per-symbol errors.
+async function checkBackendHealth() {
+  const backend = getBackendUrl();
+  if (!backend) return;
+  try {
+    const res = await fetch(backend, { method: 'GET' });
+    if (res.status === 402) {
+      log('⚠️ Backend DISABLED: Vercel returned HTTP 402 DEPLOYMENT_DISABLED for ' + backend + '. The project is suspended (billing/usage limits). Go to vercel.com → Dashboard, resolve the suspension notice (payment/upgrade), then redeploy. All NASDAQ loads will fail until then.', 'error');
+    } else if (res.status === 503 || res.status === 507) {
+      log(`⚠️ Backend issue: ${backend} returned HTTP ${res.status}. Check the deployment status in the Vercel dashboard.`, 'warn');
+    } else {
+      log(`Backend probe OK: ${backend} is reachable (HTTP ${res.status}).`, 'success');
+    }
+  } catch (e) {
+    log(`⚠️ Backend probe failed for ${backend}: unreachable (network/DNS/CORS). NASDAQ loads will fail. Verify the deployment is live and the Backend key in Settings is correct.`, 'warn');
   }
 }
 
@@ -3870,6 +3903,11 @@ const toggleInit = document.getElementById('autoReloadToggle');
 if (toggleInit) toggleInit.classList.add('locked');
 log('NASDAQ Analysis AI — Market & Trading Data initialized. Full record fetch enabled.', 'success');
 log('NASDAQ: 4,121 | NYSE: 2,717 | AMEX: 292 | ALL: 7,131 | Historical: new | Summary: new | Option Chain: new', 'info');
+// Hardcoded backend: re-assert the free Cloudflare Worker URL on every load so
+// no stale localStorage value or empty field can ever override it.
+const backendUrlEl = document.getElementById('backendUrl');
+if (backendUrlEl) backendUrlEl.value = DEFAULT_BACKEND_URL;
+checkBackendHealth(); // fire-and-forget: warn immediately if the backend proxy is down/disabled
 </script>
 
 </body>
