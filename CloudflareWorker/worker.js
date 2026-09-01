@@ -53,22 +53,40 @@ function jsonResponse(request, obj, status) {
   });
 }
 
+// Retry wrapper: NASDAQ/Akamai intermittently answers 403/429/503 to
+// datacenter IPs (verified live 2026-09-01: the SAME screener call returned
+// 403 once and 200 on the next attempt). Retrying with backoff masks the
+// transient blocks; only a persistent block is surfaced to the caller.
 async function proxyNasdaq(request, path) {
   const target = NASDAQ_ORIGIN + path;
-  let upstream;
-  try {
-    upstream = await fetch(target, { headers: UPSTREAM_HEADERS });
-  } catch (e) {
-    return jsonResponse(request, { error: 'Upstream fetch failed: ' + (e && e.message ? e.message : String(e)) }, 502);
+  const MAX_ATTEMPTS = 4;
+  let lastStatus = 502;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let upstream;
+    try {
+      upstream = await fetch(target, { headers: UPSTREAM_HEADERS });
+    } catch (e) {
+      if (attempt === MAX_ATTEMPTS) {
+        return jsonResponse(request, { error: 'Upstream fetch failed after ' + MAX_ATTEMPTS + ' attempts: ' + (e && e.message ? e.message : String(e)) }, 502);
+      }
+      await new Promise(r => setTimeout(r, 600 * attempt));
+      continue;
+    }
+    if ((upstream.status === 403 || upstream.status === 429 || upstream.status === 503) && attempt < MAX_ATTEMPTS) {
+      lastStatus = upstream.status;
+      await new Promise(r => setTimeout(r, 700 * attempt));
+      continue;
+    }
+    const text = await upstream.text();
+    return new Response(text, {
+      status: upstream.status,
+      headers: Object.assign(
+        { 'Content-Type': upstream.headers.get('Content-Type') || 'application/json; charset=utf-8', 'X-Retried-Attempts': String(attempt) },
+        buildCorsHeaders(request)
+      )
+    });
   }
-  const text = await upstream.text();
-  return new Response(text, {
-    status: upstream.status,
-    headers: Object.assign(
-      { 'Content-Type': upstream.headers.get('Content-Type') || 'application/json; charset=utf-8' },
-      buildCorsHeaders(request)
-    )
-  });
+  return jsonResponse(request, { error: 'NASDAQ kept returning HTTP ' + lastStatus + ' after ' + MAX_ATTEMPTS + ' attempts (transient Akamai block). Retry shortly.' }, lastStatus);
 }
 
 export default {

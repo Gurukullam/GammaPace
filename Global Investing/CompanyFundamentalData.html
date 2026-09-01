@@ -1483,12 +1483,27 @@ async function checkBackendHealth() {
 
 async function getScreenerSymbols() {
   if (screenerSymbolsCache) return screenerSymbolsCache;
-  log('Fetching NASDAQ symbol list...');
-  const data = await fetchNasdaq('/api/screener/stocks?tableonly=true&limit=500000&exchange=nasdaq');
-  const rows = data?.data?.table?.rows || [];
-  screenerSymbolsCache = rows.map(r => r.symbol).filter(s => s);
-  log(`${screenerSymbolsCache.length} NASDAQ symbols cached for session`, 'success');
-  return screenerSymbolsCache;
+  // Retry: NASDAQ/Akamai intermittently 403s the proxy's datacenter IP
+  // (verified 2026-09-01 — the IDENTICAL screener call returned 403 once,
+  // then 200 on the next attempt). Backoff retries mask the transient
+  // blocks; 3 consecutive failures indicate a real outage (which the
+  // page-init health probe would have flagged).
+  const MAX = 3;
+  for (let attempt = 1; attempt <= MAX; attempt++) {
+    try {
+      log('Fetching NASDAQ symbol list...' + (attempt > 1 ? ' (retry ' + attempt + '/' + MAX + ')' : ''));
+      const data = await fetchNasdaq('/api/screener/stocks?tableonly=true&limit=500000&exchange=nasdaq');
+      const rows = data?.data?.table?.rows || [];
+      screenerSymbolsCache = rows.map(r => r.symbol).filter(s => s);
+      log(`${screenerSymbolsCache.length} NASDAQ symbols cached for session`, 'success');
+      return screenerSymbolsCache;
+    } catch (e) {
+      if (attempt === MAX) { log(`Failed to fetch symbol list after ${MAX} attempts — ${e.message}`, 'error'); return []; }
+      log(`Symbol list fetch blocked (transient HTTP 403?) — retrying in ${1.5 * attempt}s...`, 'warn');
+      await new Promise(r => setTimeout(r, 1500 * attempt));
+    }
+  }
+  return [];
 }
 
 // GammaPace watchlist symbol source — reads the public gammapace_* tables.
