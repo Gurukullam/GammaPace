@@ -3,7 +3,7 @@
 ## 1. Executive Summary
 
 **Project:** NASDAQ Analysis AI — MVP3 (Market & Trading Data focus)  
-**Current Version:** Alpha One **v1.0.18** (2026-08-24)  
+**Current Version:** Alpha One **v1.0.19** (2026-09-01)  
 **Status:** Implementation complete — 9 Market & Trading Data endpoints active, 22 Supabase tables (8 data + 10 movers + 4 GammaPace), frontend UI fully operational, CSV export active, admin lock active, 2-second Loop auto-reload active, GammaPace IntraDay/LongTerm watchlists fully functional (standalone, with inline status feedback and reset confirmation). All 7 per-symbol endpoints now support the full 4-mode system (ALL NASDAQ / Single Symbol / Gamma IntraDay / Gamma LongTerm).  
 **Purpose:** Resume document. Read this file to understand the complete current state and the standard patterns to follow for all future work.  
 **Supersedes:** MVP1 Alpha Seventeen — this is a slimmed-down variant that keeps only Market & Trading Data endpoints while preserving all Alpha Seventeen infrastructure (admin lock, Getting Started card, admin panel, 2-second Loop, admin-only Data Preview).
@@ -46,6 +46,7 @@
 | v1.0.16 | 2026-08-24 | DEPLOYMENT FIX: stale GitHub Pages build was the real "gamma not working" cause; both pages synced + end-to-end verified |
 | v1.0.17 | 2026-08-24 | Gamma_engine button live: executes the sno=4 SQL from gammapace_internal_mapping via execute_dynamic_sql() + auto-refreshes symbols list |
 | v1.0.18 | 2026-08-24 | Gamma_engine_hist button live: executes the sno=5 SQL from gammapace_internal_mapping + auto-refreshes LongTerm symbols list — both engines now table-driven |
+| v1.0.19 | 2026-09-01 | BACKEND MIGRATED: Vercel (suspended, HTTP 402) → FREE Cloudflare Worker; backend + publishable key hardcoded (zero-config MTD); health probe + clear diagnostics; 19/19 endpoints verified |
 
 ---
 
@@ -63,11 +64,14 @@ USER BROWSER
          |
          | POST (CORS-enabled)
          v
-  Vercel Backend (Serverless Function)
-  https://nasdaq-historical-api.vercel.app
-    - Receives { path: "/api/..." }
-    - Forwards to api.nasdaq.com (server-to-server, no CORS)
-    - Returns JSON to frontend
+  Cloudflare Worker Backend (FREE tier — v1.0.19)
+  https://workers-playground-summer-field-8601.emailtochand.workers.dev
+    - POST /api/nasdaq-proxy receives { path: "/api/..." }
+    - Forwards to api.nasdaq.com WITH browser-like User-Agent/Accept/
+      Referer (NASDAQ rejects bare/datacenter requests) + CORS: *
+    - GET / returns health JSON (consumed by page-init probe)
+    - LEGACY FALLBACK: Vercel nasdaq-historical-api — currently DISABLED
+      (HTTP 402 DEPLOYMENT_DISABLED, account suspended) — do not use
          |
          | fetch() (no CORS issues)
          v
@@ -88,7 +92,8 @@ USER BROWSER
 |-----------|-----|---------|
 | **Frontend (index)** | `https://gurukullam.github.io/nasdaq-analysis-frontend/` | Golden-theme UI — user-facing app |
 | **Frontend (standalone)** | `https://gurukullam.github.io/nasdaq-analysis-frontend/MarketTradingData.html` | Same app served under its working filename — kept in sync with `index.html` (v1.0.16) |
-| **Backend** | `https://nasdaq-historical-api.vercel.app` | API proxy — handles NASDAQ requests |
+| **Backend (active)** | `https://workers-playground-summer-field-8601.emailtochand.workers.dev` | FREE Cloudflare Worker CORS proxy (v1.0.19) — hardcoded in both pages |
+| **Backend (legacy)** | `https://nasdaq-historical-api.vercel.app` | Vercel proxy — DISABLED (HTTP 402 DEPLOYMENT_DISABLED); kept only as fallback reference |
 | **Supabase (Bridge)** | User-configured in Settings | PostgreSQL database |
 | **NASDAQ API** | `https://api.nasdaq.com` | Free data source (no auth) |
 
@@ -115,6 +120,23 @@ NASDAQ_API_KEY=NOT REQUIRED
 | Backend | `https://vercel.com/sivachandran-ramachandrans-projects/nasdaq-historical-api` | Vercel project (not a Git repo) |
 
 > Local working copy of the frontend is `MarketTradingData.html` in the MVP3 folder; it is copied/renamed to `index.html` in the frontend repo for deployment.
+### 2.4 Cloudflare Worker Backend (v1.0.19 — replaces Vercel)
+
+The original Vercel backend (`nasdaq-historical-api.vercel.app`) was suspended by Vercel (HTTP 402 `DEPLOYMENT_DISABLED`), which silently broke every NASDAQ call with generic "Failed to fetch" errors (Vercel serves the error page without CORS headers). It was replaced by a **free Cloudflare Worker** — no billing, 100,000 requests/day (all endpoints combined; resets 00:00 UTC).
+
+| Aspect | Detail |
+|--------|--------|
+| **Worker URL** | `https://workers-playground-summer-field-8601.emailtochand.workers.dev` — HARDCODED as `DEFAULT_BACKEND_URL` in BOTH pages |
+| **Source (backup)** | `CloudflareWorker/worker.js` + `wrangler.toml` + `README.md` in the GammaPace repo |
+| **Contract** | Identical to the old Vercel backend: `POST /api/nasdaq-proxy` body `{"path":"/api/..."}` → api.nasdaq.com (with browser-like User-Agent — NASDAQ rejects bare requests) → JSON response with `Access-Control-Allow-Origin: *` |
+| **Health endpoint** | `GET /` → `{"status":"healthy","service":"gammapace-nasdaq-proxy",...}` — consumed by `checkBackendHealth()` at page init |
+| **Security lock (optional)** | `ALLOWED_ORIGIN` constant in worker.js — `'*'` by default; set to `https://gurukullam.github.io` to restrict, then redeploy |
+| **Quota** | ~7,000 requests per ALL-NASDAQ endpoint load; a full 9-endpoint sweep ≈ 30-40k. AVOID Loop mode in ALL-NASDAQ size (exhausts quota in minutes); Loop is fine for Gamma watchlist sizes. Over quota → requests rejected until UTC reset, nothing breaks permanently |
+| **Deploy (dashboard)** | workers.cloudflare.com (free, no card) → Create Worker → paste worker.js → Deploy. CLI: `npm i -g wrangler` → `wrangler deploy` from the CloudflareWorker folder |
+| **Frontend wiring** | `DEFAULT_BACKEND_URL` + fallback in `getBackendUrl()`, `checkBackendHealth()` probe at init, clear TypeError diagnostics in `fetchNasdaq()` — Backend key field pre-filled and re-asserted on every load (no copy-paste) |
+| **Verification (2026-09-01)** | 19/19 endpoints HTTP 200 through the worker (9 MTD + 10 CFD); full download chain live-tested (worker fetch → Supabase insert with publishable key → same-day query). One transient Akamai 403 on institutional-holdings — retry succeeds; page logs per-symbol warning and continues |
+
+> **CFD page caveat:** CompanyFundamentalData.html uses the same worker, but its Supabase project `ppdmhmrmmwnbvnfilcdh` is DNS-dead (paused/deleted on Supabase free tier). CFD downloads stay blocked until that project is RESTORED in the Supabase dashboard. Its service key is intentionally NOT hardcoded (user-entered in Settings). ROTATE any service key that has been shared outside the project.
 
 ---
 
@@ -585,7 +607,7 @@ WHERE last_sale_price IS NULL AND net_change IS NULL
 ## 9. Troubleshooting Guide
 
 ### 9.1 General
-- Vercel dashboard for backend errors · Supabase Table Editor for data · browser console for frontend errors
+- Cloudflare dashboard (Workers & Pages → worker → Logs/Metrics) for backend errors · Supabase Table Editor for data · browser console for frontend errors
 
 ### 9.2 Admin Lock
 - Cannot toggle Loop / no Data Preview / no panels → unlock (🔒 → `191`). Lock state resets on refresh (by design). Password hardcoded — modify source to change.
@@ -618,6 +640,14 @@ WHERE last_sale_price IS NULL AND net_change IS NULL
 - **Check:** view-source the live URL and search for a known marker string (`getGammaPaceSymbols`, `getActiveModeForAPI`). Missing → stale build.
 - **Fix:** copy local `MarketTradingData.html` → repo **both** `index.html` AND `MarketTradingData.html`; commit + push; wait ~60-90s for Pages rebuild; **hard-refresh (Ctrl+Shift+R)** — browsers cache Pages aggressively.
 - **Prevention:** always deploy both filenames together (Section 12.1); consider adding a visible version badge to the page.
+### 9.9 Backend Unreachable / "Failed to fetch" everywhere (v1.0.19)
+- **Symptom:** every endpoint logs `Failed to fetch` / `Backend unreachable (...)` per symbol; page-init log shows `⚠️ Backend probe failed` or `⚠️ Backend DISABLED: ... 402 DEPLOYMENT_DISABLED`.
+- **Meaning:** the page cannot reach the Cloudflare Worker at all (network/DNS/CORS) — OR the hosting account behind a backend is suspended (the original Vercel incident: HTTP 402 with NO CORS headers, so the browser hides the real status).
+- **Checks (in order):**
+  1. Open `https://workers-playground-summer-field-8601.emailtochand.workers.dev/` in a browser tab — expect the health JSON. Error page → worker deleted/disabled → redeploy from `CloudflareWorker/worker.js` (Section 2.4).
+  2. `GET /api/nasdaq-proxy` via the page → per-endpoint 200s. Isolated `403` on a single call → transient Akamai rate-limit on datacenter IPs; retry succeeds, page logs a warning and continues. Persistent 403 → set the browser-like headers in worker.js (they are already present) and reduce concurrency.
+  3. Settings → Backend key shows the hardcoded `DEFAULT_BACKEND_URL`; the init code re-asserts it on every load — if it was manually cleared, it restores itself on refresh.
+- **History:** v1.0.16-era pages pointed at the Vercel backend, which went dark with HTTP 402 on 2026-09-01 — the incident that motivated this migration. Any future hosting suspension now announces itself in the page log at startup instead of thousands of per-symbol errors.
 
 ---
 
@@ -646,7 +676,9 @@ WHERE last_sale_price IS NULL AND net_change IS NULL
 18. **GammaPace Engine buttons are placeholders** until `INTRADAY_ENGINE_SQLS` / `LONGTERM_ENGINE_SQLS` are populated with Postgres function names
 19. **Bridge URL ambiguity** — multiple historical URLs exist in docs; the Settings value is authoritative (see Section 2.1 warning)
 20. **Historical ALL mode with wide date ranges** can produce very large datasets (limit=5000/symbol)
-21. **Quote Info ALL mode still sources symbols from `nasdaq_stocks`** (requires Stock Screener first) — Gamma modes are the recommended lightweight path
+21. **Quote Info ALL mode still sources symbols from `nasdaq_stocks`** (requires Stock Screener first) — Gamma modes are the recommended lightweight path22. **Cloudflare Worker free tier = 100,000 requests/day (combined)** — an ALL-NASDAQ Loop cycle (~7k symbols/2s) exhausts it in minutes; Loop is safe for Gamma watchlist sizes; over-quota requests are rejected until the 00:00 UTC reset
+23. **Worker URL is a playground-style name** (`workers-playground-summer-field-8601`) — renaming it in the Cloudflare dashboard changes the URL; both pages must then be updated (one `DEFAULT_BACKEND_URL` constant each) and redeployed
+24. **CDF Supabase project `ppdmhmrmmwnbvnfilcdh` DNS-dead (paused/deleted)** — CompanyFundamentalData downloads blocked until restored; MTD project (`mushchoxbywxcpfmgavj`) verified healthy
 
 ---
 
@@ -690,9 +722,16 @@ git commit -m "Your commit message - Alpha One v1.0.16 update"
 git push origin main
 ```
 Wait ~60-90s for the Pages rebuild, then **hard-refresh (Ctrl+Shift+R)**. Verify by searching the served page source for `getActiveModeForAPI` (v1.0.16 lesson: deploying only one filename leaves the other URL stale).
+> **CURRENT PRODUCTION (v1.0.19):** the GammaPace repo (`Gurukullam/GammaPace`) — deploy via `deploy-global-investing.ps1` in the repo root (dry-run by default; add `-Commit` to push). It clones the repo, overlays `Global Investing/` + `CloudflareWorker/` + `index.html` + `GammaPace.MD`, and pushes to `main`; Pages rebuilds in ~60-90s. Live URLs: `https://gurukullam.github.io/GammaPace/Global%20Investing/MarketTradingData.html` and `.../CompanyFundamentalData.html`.
 
-### 12.2 Backend (Vercel)
-Deploy `nasdaq-historical-api` project; ensure frontend Backend key matches; Supabase credentials configured.
+### 12.2 Backend (Cloudflare Worker — v1.0.19)
+**One-time setup (already done — the worker is LIVE):** workers.cloudflare.com (free, no credit card) → Workers & Pages → Create Worker → Edit code → paste the full contents of `CloudflareWorker/worker.js` → Deploy. URL format: `https://<name>.<subdomain>.workers.dev`.
+
+**Redeploy after code changes:** Edit code → paste updated worker.js → Deploy; or CLI: `npm i -g wrangler` → `wrangler login` → `wrangler deploy` from the `CloudflareWorker/` folder.
+
+**Verify:** `GET https://<worker-url>/` must return `{"status":"healthy","service":"gammapace-nasdaq-proxy"}`; every page load then logs `Backend probe OK ... HTTP 200` at startup.
+
+**Legacy (Vercel):** `nasdaq-historical-api` is DISABLED (HTTP 402 DEPLOYMENT_DISABLED — account suspended 2026-09-01). Only revisit if the Cloudflare path is abandoned: resolve the Vercel billing/usage notice and redeploy — but prefer the free Worker (nothing to suspend).
 
 ### 12.3 Supabase Setup (Run Once)
 1. Run `supabase_all_tables.sql` (8 data tables)
@@ -715,7 +754,7 @@ Unlock admin → type tickers (comma-separated) → 💾 Load → verify ✅ sta
 
 | Date | Version | Change |
 |------|---------|--------|
-| 2026-08-24 | v1.0.18 | **GAMMA_ENGINE_HIST BUTTON IS NOW FUNCTIONAL — both engines table-driven** — User request: ⚙️ Gamma_engine_hist must execute the SQL stored in GammaPace_Internal_Mapping for title='Gamma_engine_hist in Longterm symbols list update from SQL_Anlysis' and sno=5, then repopulate the LongTerm textarea. Mirrors v1.0.17 exactly: new LONGTERM_ENGINE_SQL_SOURCE constant (table/title/sno), gammaLongTermEngine() rewritten as fetch-SQL → rpc('execute_dynamic_sql') → re-select gammapace_longterm symbols into #longTermSymbols; status line reports each step ("✅ Gamma_engine_hist executed — symbols list updated — N symbol(s)"); same actionable hints (missing function → run supabase_gamma_engine.sql; empty row → warning; Postgres errors surfaced verbatim). Verified live: sno=5 row present (SQL = INSERT INTO gammapace_longterm SELECT DISTINCT symbol FROM nasdaq_movers_stock_nasdaq100 ON CONFLICT DO NOTHING); user confirmed execute_dynamic_sql() created (rpc ping returns "OK"); SYNTAX_OK; deployed both pages (commit b4d32b9). MD Sections 1, 13, 15.5 updated. |
+| 2026-09-01 | v1.0.19 | **BACKEND MIGRATED: Vercel → free Cloudflare Worker — pages are now ZERO-CONFIG** — User report: every endpoint returned "Failed to fetch". Root cause: the Vercel backend `nasdaq-historical-api.vercel.app` was DISABLED — HTTP 402 `DEPLOYMENT_DISABLED` (account suspended; billing/usage) — and Vercel serves that error WITHOUT CORS headers, so every browser request died as a generic TypeError before the page could read the status. NASDAQ itself was fine (direct `api.nasdaq.com` verified 200). Direct browser→NASDAQ is impossible: `api.nasdaq.com` sends no `Access-Control-Allow-Origin` (verified live), so a CORS proxy is mandatory. FIX — new `CloudflareWorker/worker.js` (committed to the GammaPace repo as code backup): free-tier Cloudflare Worker (100,000 requests/day, no credit card) speaking the EXACT old contract — `POST /api/nasdaq-proxy` with `{path}` → forwards to `api.nasdaq.com` with browser-like User-Agent/Accept/Accept-Language/Referer (NASDAQ rejects bare requests) + `Access-Control-Allow-Origin: *`; `GET /` → health JSON (consumed by the page-init probe); optional `ALLOWED_ORIGIN` lock to `https://gurukullam.github.io`. Frontend hardening in BOTH pages (MarketTradingData + CompanyFundamentalData): `DEFAULT_BACKEND_URL` constant (`https://workers-playground-summer-field-8601.emailtochand.workers.dev`) + fallback in `getBackendUrl()`; `checkBackendHealth()` probe at page init (402 → explicit DISABLED error; unreachable → clear warning); `fetchNasdaq` TypeError branch surfaces "Backend unreachable — verify deployment" instead of per-symbol noise; Settings Backend field pre-filled and re-asserted on every load. MTD page additionally ships the Supabase publishable key hardcoded (publishable = browser-safe) → fully ZERO-CONFIG; end-to-end chain verified LIVE: worker fetch (10 Market Mover rows) → Supabase insert with publishable key (write access confirmed) → same-day query returned all 10 rows (the exact CSV download flow). 19/19 endpoints verified HTTP 200 through the worker; institutional-holdings showed ONE transient Akamai 403 (retry OK — page logs a per-symbol warning and continues). CFD page: backend migrated identically, but its Supabase project `ppdmhmrmmwnbvnfilcdh` is DNS-dead (paused/deleted on Supabase) — CFD downloads remain blocked until the project is restored; its service key is intentionally NOT hardcoded (user-entered per owner request; ROTATE the shared secret). Deployed commits 78d8498 + f8ca807; live GitHub Pages verified serving the hardcoded worker URL (x3 occurrences in both pages). Sections 2, 2.1, 2.4 (new), 9.1, 9.9 (new), 10, 12.1, 12.2, 13, 14.1 updated. || 2026-08-24 | v1.0.18 | **GAMMA_ENGINE_HIST BUTTON IS NOW FUNCTIONAL — both engines table-driven** — User request: ⚙️ Gamma_engine_hist must execute the SQL stored in GammaPace_Internal_Mapping for title='Gamma_engine_hist in Longterm symbols list update from SQL_Anlysis' and sno=5, then repopulate the LongTerm textarea. Mirrors v1.0.17 exactly: new LONGTERM_ENGINE_SQL_SOURCE constant (table/title/sno), gammaLongTermEngine() rewritten as fetch-SQL → rpc('execute_dynamic_sql') → re-select gammapace_longterm symbols into #longTermSymbols; status line reports each step ("✅ Gamma_engine_hist executed — symbols list updated — N symbol(s)"); same actionable hints (missing function → run supabase_gamma_engine.sql; empty row → warning; Postgres errors surfaced verbatim). Verified live: sno=5 row present (SQL = INSERT INTO gammapace_longterm SELECT DISTINCT symbol FROM nasdaq_movers_stock_nasdaq100 ON CONFLICT DO NOTHING); user confirmed execute_dynamic_sql() created (rpc ping returns "OK"); SYNTAX_OK; deployed both pages (commit b4d32b9). MD Sections 1, 13, 15.5 updated. |
 | 2026-08-24 | v1.0.17 | **GAMMA_ENGINE BUTTON IS NOW FUNCTIONAL** — User request: ⚙️ Gamma_engine must execute the SQL stored in `GammaPace_Internal_Mapping` for title='Gamma_engine in Intraday symbols list update from SQL_Anlysis' and sno=4, then repopulate the symbols textarea from `gammapace_intraday`. Implementation: (1) new `supabase_gamma_engine.sql` — creates `execute_dynamic_sql(query TEXT)` SECURITY DEFINER function returning 'OK' or 'ERROR: <msg>', GRANT EXECUTE to anon+authenticated, disables RLS on the mapping table, NOTIFY pgrst (browsers cannot run raw SQL; rpc is the only path); (2) rewrote `gammaIntradayEngine()` as a 3-step flow — fetch `sql` via `.eq('title',...).eq('sno',4).limit(1)`, execute via rpc, then re-select `gammapace_intraday` symbols into `#intradaySymbols` like 🔄 Active; status line reports each step (✅ Gamma engine executed — symbols list updated — N symbol(s)); (3) actionable hints: missing function → run supabase_gamma_engine.sql; empty mapping row → warning with title/sno echoed; Postgres errors surfaced verbatim; (4) replaced the old placeholder INTRADAY_ENGINE_SQLS loop for IntraDay (LONGTERM_ENGINE_SQLS remains placeholder); verified mapping row live (sno=4 SQL = INSERT INTO gammapace_intraday SELECT DISTINCT symbol FROM nasdaq_movers_stock_dollarvol UNION nasdaq_movers_stock_nasdaq100 ON CONFLICT DO NOTHING) + SYNTAX_OK + deployed both pages (commit 92fe0c4, includes supabase_gamma_engine.sql in repo). Requires ONE-TIME manual step: run supabase_gamma_engine.sql in the Supabase SQL Editor. Sections 1, 9.8 n/a, 13, 15.4, 15.5 updated. |
 | 2026-08-24 | v1.0.16 | **DEPLOYMENT FIXED — Gamma IntraDay end-to-end verified live** — User report: "Gamma IntraDay should load/download only symbols in `gammapace_intraday` across all applicable endpoints — not working." Root cause was NOT code: the deployed GitHub Pages build (`index.html`, "Phase 2.9") predated ALL gamma work, while local `MarketTradingData.html` (v1.0.15) was correct. Diagnosis steps: (1) REST-verified Supabase project `mushchoxbywxcpfmgavj` — `gammapace_intraday` reachable (SKHY at test time; NVDA+SKHY later), all 8 `nasdaq_*` tables present, RLS off; (2) Vercel proxy healthy (SKHY resolves as "SK hynix Inc. ADS"); (3) built a Node VM harness that runs the page's actual inline script with stubbed DOM/Supabase against the REAL backend + REAL credentials — all 7 per-symbol endpoints in `gamma_intraday` mode fetched ONLY watchlist symbols (SKHY: 950 chart rows etc.; with NVDA+SKHY: 1,920/2/2/2/40/2/322 rows across chart/trades/basic/quotes/historical/summary/options ≈2,290 rows in <4s) — fetch scoping 100% correct; (4) compared LIVE page vs local — live lacked every gamma marker (`getGammaPaceSymbols`, `getActiveModeForAPI`, mode chips). Fixes/deployments: commit `795eb8d` (local v1.0.15 → repo `index.html`) and commit `89f605f` (local v1.0.15 → repo **both** `MarketTradingData.html` AND `index.html` — the standalone URL `https://gurukullam.github.io/nasdaq-analysis-frontend/MarketTradingData.html` is now the canonical user-facing page and is kept byte-identical to local modulo git line-ending normalization; verified content-identical post-rebuild). Local MVP3 copy remains the single source of truth. New troubleshooting entry 9.8 (stale deployment). Sections 1, 2.1, 12.1, 13 updated. |
 | 2026-08-23 | v1.0.15 | **Quote Info 4-MODE SUPPORT — all per-symbol endpoints now have Gamma modes** — User request: choosing Gamma LongTerm on ANY endpoint must pull `SELECT DISTINCT symbol FROM gammapace_longterm` and run the full end-to-end flow (CSV button, Load Data button, and Loop auto-reload all respect the chosen filter). Quote Info (`quotes`) was the last per-symbol endpoint without mode chips. Fixes: (1) new `quotesMode` state variable (default `'single'`) + `selectQuotesMode()` selector; (2) 4 mode chips + symbol input rendered in `discoverAPIs()` (`#quotes-symbol`, default AAPL); (3) `loadQuotes()` rewritten with the canonical 4-mode template — Single fetches one symbol, ALL preserves the legacy nasdaq_stocks-sourced + resume path, Gamma IntraDay/LongTerm use `getGammaPaceSymbols()`; (4) `getActiveModeForAPI()` gained `case 'quotes'` so CSV downloads scope to the watchlist; (5) `getGammaPaceSymbols()` now returns `[...new Set(...)]` — JS-level DISTINCT safety guarantee (equivalent to `SELECT DISTINCT symbol`; the active tables already use symbol as PRIMARY KEY). Verified via Node syntax check — SYNTAX_OK. Sections 1, 3.1, 3.3, 5.2, 5.4, 5.5, 10, 11, 13, 15.7 updated. |
@@ -741,8 +780,8 @@ Unlock admin → type tickers (comma-separated) → 💾 Load → verify ✅ sta
 
 ### 14.1 If Starting Fresh in a New Chat
 1. Read this file (`MVP3_Alpha_One.md`) — it is the single source of truth
-2. Verify live: Vercel backend, GitHub Pages frontend, Supabase project (match Bridge URL!)
-3. Open the frontend → Settings → confirm Backend key / Bridge / Security Key
+2. Verify live: Cloudflare Worker health (`GET https://workers-playground-summer-field-8601.emailtochand.workers.dev/` → healthy JSON), GitHub Pages frontend, Supabase project (match Bridge URL!)
+3. Open the frontend → Settings: Backend key + publishable key are HARDCODED (v1.0.19 — MTD is zero-config); page log must show `Backend probe OK ... HTTP 200` at startup
 4. Unlock admin (191) → test GammaPace 💾 Load with one ticker → expect ✅ status + row in `gammapace_intraday`
 5. If any tables are missing, run in Supabase SQL Editor: `supabase_all_tables.sql`, `supabase_market_movers.sql`, `supabase_gammapace.sql` (all safe/re-runnable)
 6. Run one ⬇️ CSV download to confirm the full fetch→upsert→download pipeline
