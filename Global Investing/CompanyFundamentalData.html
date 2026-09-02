@@ -1543,58 +1543,87 @@ function getActiveModeForAPI(apiId) {
   }
 }
 
-// Generic parallel fetch worker for ALL-mode endpoints
+// Generic ADAPTIVE parallel fetch worker for ALL-mode endpoints — SUPERSONIC v2
 // fetchFn: async (symbol) => data   — should throw on failure
-// options: { concurrency, delayMs, label, onBatch, onProgress }
+// options: { concurrency, delayMs, label, onBatch, onProgress, maxRounds, logEvery }
+//
+// SPEED: starts at `concurrency` and keeps it while symbols resolve cleanly;
+// on a 403/429/503 rate-limit block it halves concurrency (min 2) and doubles
+// the gap to ride out the throttle, then re-ramps after 40 clean symbols.
+// INTEGRITY: a symbol that fails is QUEUED for the next retry round (up to
+// maxRounds extra passes) and re-fetched — only symbols that fail every round
+// are counted as failures, so no data is ever dropped silently.
 async function parallelFetchAll(symbols, fetchFn, options = {}) {
-  const { concurrency = 4, delayMs = 150, label = 'Fetch', onBatch, onProgress, logEvery = 20 } = options;
+  const { concurrency = 8, delayMs = 150, label = 'Fetch', onBatch, onProgress, maxRounds = 2, logEvery = 20 } = options;
   const results = [];
   let successCount = 0;
   let failCount = 0;
   const total = symbols.length;
+  let curCon = Math.max(2, concurrency);
+  let curDelay = delayMs;
+  let cleanSeen = 0;
+  let warned = 0;
+  let todo = symbols.slice();
 
-  for (let i = 0; i < total; i += concurrency) {
-    if (cancelRequested) {
-      log(`${label}: Cancelled by user at ${i}/${total}`, 'warn');
-      break;
-    }
+  for (let round = 0; round <= maxRounds && todo.length > 0; round++) {
+    const batchSymbols = todo;
+    todo = [];
+    const roundTotal = batchSymbols.length;
+    const doneBefore = successCount;
+    let cursor = 0;
 
-    const batch = symbols.slice(i, i + concurrency);
-    const batchResults = await Promise.allSettled(batch.map(sym => fetchFn(sym)));
+    while (cursor < roundTotal) {
+      if (cancelRequested) { log(`${label}: Cancelled by user at ${cursor}/${roundTotal} (round ${round + 1})`, 'warn'); break; }
+      const size = Math.min(curCon, roundTotal - cursor);
+      const batch = batchSymbols.slice(cursor, cursor + size);
+      const batchResults = await Promise.allSettled(batch.map(sym => fetchFn(sym)));
+      cursor += batch.length; // advance by ACTUAL count — every symbol processed exactly once
 
-    batchResults.forEach((res, idx) => {
-      const symbol = batch[idx];
-      if (res.status === 'fulfilled') {
-        results.push({ symbol, data: res.value, success: true });
-        successCount++;
-      } else {
-        results.push({ symbol, error: res.reason, success: false });
-        failCount++;
-        if (failCount <= 5 || i === total - 1) {
-          log(`${label} [${symbol}]: ${res.reason?.message || res.reason}`, 'warn');
+      batchResults.forEach((res, idx) => {
+        const symbol = batch[idx];
+        if (res.status === 'fulfilled') {
+          results.push({ symbol, data: res.value, success: true });
+          successCount++;
+          cleanSeen++;
+        } else {
+          const msg = res.reason?.message || String(res.reason || 'unknown error');
+          if (warned < 8) { log(`${label} [${symbol}]: ${msg}`, 'warn'); warned++; }
+          todo.push(symbol); // DATA SAFETY: retried next round
+          if (/403|429|503|rate|limit|block/i.test(msg)) {
+            curCon = Math.max(2, Math.floor(curCon / 2));
+            curDelay = Math.min(1200, curDelay * 2);
+            cleanSeen = 0;
+          }
         }
+      });
+
+      if (cleanSeen >= 40 && curCon < concurrency) {
+        curCon = Math.min(concurrency, curCon + Math.max(2, Math.floor(concurrency / 8)));
+        curDelay = Math.max(delayMs, Math.floor(curDelay / 2));
+        cleanSeen = 0;
       }
-    });
 
-    if (onBatch) onBatch(batchResults, batch, i);
+      if (onBatch) onBatch(batchResults, batch, doneBefore + cursor - batch.length);
+      const processed = Math.min(doneBefore + cursor, total);
+      if (onProgress) onProgress(processed, total, successCount, todo.length);
+      if (processed % logEvery === 0 || processed >= total) {
+        const pct = Math.min(100, Math.round((successCount / total) * 100));
+        setProgress(pct, `${label} ${successCount}/${total} · ${todo.length} retry`);
+        log(`${label}: ${successCount}/${total} ok · ${todo.length} queued for retry`);
+      }
 
-    const processed = Math.min(i + concurrency, total);
-    if (onProgress) onProgress(processed, total, successCount, failCount);
-    if ((processed) % logEvery === 0 || processed === total) {
-      const pct = Math.round((processed / total) * 100);
-      setProgress(pct, `${label} ${processed}/${total} · ${successCount} ok · ${failCount} fail`);
-      log(`${label}: ${processed}/${total} symbols · ${successCount} ok · ${failCount} fail`);
+      if (cursor < roundTotal && !cancelRequested) await new Promise(r => setTimeout(r, curDelay));
     }
 
-    if (i + concurrency < total && !cancelRequested) {
-      await new Promise(r => setTimeout(r, delayMs));
+    if (todo.length > 0 && round < maxRounds) {
+      log(`${label}: retry round ${round + 2}/${maxRounds + 1} — ${todo.length} symbol(s)`, 'warn');
     }
   }
 
-  log(`${label}: ${successCount} succeeded · ${failCount} failed · ${results.length} total`);
+  failCount = todo.length;
+  log(`${label}: ${successCount} succeeded · ${failCount} failed after retries · ${results.length} total`);
   return { results, successCount, failCount };
 }
-
 // ============================================================
 // Data Loading Orchestrator
 // ============================================================
@@ -2020,8 +2049,8 @@ async function loadFinancials() {
       return data;
     },
     {
-      concurrency: 4,
-      delayMs: 150,
+      concurrency: 12,
+      delayMs: 30,
       label: 'Yearly Financials',
       onProgress: (processed, total, ok, fail) => {
         const totalRows = result.income_statement.length + result.balance_sheet.length + result.cash_flow.length + result.financial_ratios.length;
@@ -2176,8 +2205,8 @@ async function loadQuarterlyFinancials() {
       return data;
     },
     {
-      concurrency: 4,
-      delayMs: 150,
+      concurrency: 12,
+      delayMs: 30,
       label: 'Quarterly Financials',
       onProgress: (processed, total, ok, fail) => {
         const totalRows = result.income_statement.length + result.balance_sheet.length + result.cash_flow.length + result.financial_ratios.length;
@@ -2296,8 +2325,8 @@ async function loadInstitutionalHoldings() {
       return [];
     },
     {
-      concurrency: 4,
-      delayMs: 150,
+      concurrency: 16,
+      delayMs: 25,
       label: 'Institutional Holdings',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
@@ -2397,8 +2426,8 @@ async function loadEarnings() {
       return null;
     },
     {
-      concurrency: 4,
-      delayMs: 150,
+      concurrency: 16,
+      delayMs: 25,
       label: 'Earnings Forecast',
       onProgress: (processed, total, ok, fail) => {
         const totalRows = result.quarterly.length + result.yearly.length;
@@ -2508,8 +2537,8 @@ async function loadEarningsSurprise() {
       return [];
     },
     {
-      concurrency: 4,
-      delayMs: 150,
+      concurrency: 16,
+      delayMs: 25,
       label: 'Earnings Surprise',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
@@ -2616,8 +2645,8 @@ async function loadNews() {
       return [];
     },
     {
-      concurrency: 4,
-      delayMs: 150,
+      concurrency: 16,
+      delayMs: 25,
       label: 'Company News',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
@@ -2732,8 +2761,8 @@ async function loadSymbolDividends() {
       return [];
     },
     {
-      concurrency: 4,
-      delayMs: 150,
+      concurrency: 16,
+      delayMs: 25,
       label: 'Symbol Dividends',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
@@ -2860,8 +2889,8 @@ async function loadInsiderTrades() {
       return [];
     },
     {
-      concurrency: 4,
-      delayMs: 150,
+      concurrency: 16,
+      delayMs: 25,
       label: 'Insider Trades',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
@@ -2959,7 +2988,7 @@ async function insertToSupabase(table, rows) {
 
   // Financial data = millions of rows → bigger batches + parallel concurrency
   const batchSize = isFinancial ? 1500 : 500;
-  const concurrency = isFinancial ? 10 : 5;
+  const concurrency = isFinancial ? 16 : 10;
   const total = rowsWithDate.length;
   let inserted = 0;
   let failed = 0;
