@@ -53,7 +53,10 @@
         .fa-calendar-week:before { content: "\f784"; }
         .fa-lock:before { content: "\f023"; }
         .fa-arrow-up:before { content: "\f062"; }
-    </style>
+            .fa-dollar-sign:before { content: "\f155"; }
+        .fa-chart-line:before { content: "\f201"; }
+        .fa-wave-square:before { content: "\f83e"; }
+</style>
 
     <!-- Font Awesome (CDN - fallback) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -721,6 +724,7 @@
                             <a href="MarketMoversAdvanced.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('AdvanceMovers')"><i class="fas fa-arrow-up"></i> Advance Movers</a>
                             <a href="Intraday.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradayReport')"><i class="fas fa-clock"></i> Intraday Report</a>
                             <a href="Intraday_Steady_Growth_Stocks.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradaySteadyGrowth')"><i class="fas fa-chart-line"></i> Intraday Steady Growth</a>
+                            <a href="Intraday_Trend.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradayTrend')"><i class="fas fa-wave-square"></i> Intraday Trend</a>
                         </div>
                     </li>
                     <li><a href="#about" onclick="selectAbout()"><i class="fas fa-lightbulb"></i> About</a></li>
@@ -1194,6 +1198,11 @@
 
             if (option === 'IntradaySteadyGrowth') {
                 window.location.href = 'Intraday_Steady_Growth_Stocks.html';
+                return;
+            }
+
+            if (option === 'IntradayTrend') {
+                window.location.href = 'Intraday_Trend.html';
                 return;
             }
         }
