@@ -1100,8 +1100,19 @@ function getUSLoadTimestamp() {
   const ms = String(now.getMilliseconds()).padStart(3, '0');
   const date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   const time = `${hh}:${mm}:${ss}.${ms}`;
-  const tzName = now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' }).split(' ').pop();
-  const offset = tzName === 'EDT' ? '-04:00' : '-05:00';
+  // Dynamic NY UTC offset via Intl longOffset — correct on every date incl. DST boundaries
+  let offset = null;
+  try {
+    const tzPart = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', timeZoneName: 'longOffset' })
+      .formatToParts(now).find(p => p.type === 'timeZoneName');
+    const m = tzPart && tzPart.value ? tzPart.value.match(/GMT([+-])(\d{2}):?(\d{2})/) : null;
+    if (m) offset = `${m[1]}${m[2]}:${m[3]}`;
+    else if (tzPart && /GMT/i.test(tzPart.value)) offset = '+00:00';
+  } catch (e) { /* Intl longOffset unsupported — fall through to legacy */ }
+  if (!offset) {
+    const tzName = now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' }).split(' ').pop();
+    offset = tzName === 'EDT' ? '-04:00' : '-05:00';
+  }
   return `${date}T${time}${offset}`;
 }
 
