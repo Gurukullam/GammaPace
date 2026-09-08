@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intraday Trend Analysis | Gammapace</title>
+    <title>Intraday Inception Analysis | Gammapace</title>
 
     <!-- Font Awesome CSS -->
     <style>
@@ -65,9 +65,7 @@
             .fa-dollar-sign:before { content: "\f155"; }
         .fa-chart-line:before { content: "\f201"; }
         .fa-wave-square:before { content: "\f83e"; }
-</style>
-
-    <!-- Font Awesome (CDN - fallback) -->
+</style><!-- Font Awesome (CDN - fallback) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Chart.js -->
@@ -187,9 +185,7 @@
             max-width: 1400px;
             margin-left: auto;
             margin-right: auto;
-        }
-
-        /* Refresh Info Bar */
+        }/* Refresh Info Bar */
         .refresh-info {
             display: flex;
             justify-content: space-between;
@@ -338,8 +334,7 @@
         }
     </style>
 </head>
-<body>
-    <!-- Header -->
+<body><!-- Header -->
     <header class="header">
         <nav class="navbar">
             <!-- Top Row: Logo & Title -->
@@ -350,8 +345,8 @@
                     </div>
                 </a>
                 <span style="font-size: 1.3rem; font-weight: 600; color: #8b4513;">
-                    <i class="fas fa-chart-line" style="margin-right:0.5rem;"></i>
-                    Intraday Trend Analysis
+                    <i class="fas fa-rocket" style="margin-right:0.5rem;"></i>
+                    Intraday Inception Analysis
                 </span>
 
                 <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle mobile menu" aria-expanded="false">
@@ -367,8 +362,8 @@
                     <li><a href="MarketMoversAdvanced.html"><i class="fas fa-arrow-up"></i> Advance Movers</a></li>
                     <li><a href="Intraday.html"><i class="fas fa-chart-bar"></i> Intraday Spikers</a></li>
                     <li><a href="Intraday_Steady_Growth_Stocks.html"><i class="fas fa-chart-line"></i> Steady Growth</a></li>
-                    <li><a href="Intraday_Trend.html" class="active"><i class="fas fa-wave-square"></i> Intraday Trend</a></li>
-                    <li><a href="Intraday_Inception.html"><i class="fas fa-rocket"></i> Inception</a></li>
+                    <li><a href="Intraday_Trend.html"><i class="fas fa-wave-square"></i> Intraday Trend</a></li>
+                    <li><a href="Intraday_Inception.html" class="active"><i class="fas fa-rocket"></i> Inception</a></li>
                 </ul>
             </div>
         </nav>
@@ -390,17 +385,17 @@
             </span>
         </div>
 
-        <!-- Line Chart Section -->
+        <!-- Bar Chart Section -->
         <section class="chart-container">
-            <h2><i class="fas fa-chart-line"></i> Intraday Trend Analysis — Avg % Momentum over Time (per Symbol)</h2>
+            <h2><i class="fas fa-chart-bar"></i> Intraday Inception Analysis — Percentage Gain by Symbol</h2>
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-swatch" style="background: linear-gradient(90deg, #27ae60, #3498db);"></div>
-                    Each line = one symbol's rolling avg % gain, from 180 min ago to Now (top 10 ranked symbols)
+                    <div class="legend-swatch" style="background: linear-gradient(90deg, #27ae60, #e74c3c);"></div>
+                    Each bar = one symbol's percentage gain — ordered by rank from #1 (left) to last (right)
                 </div>
                 <div class="legend-item">
                     <div class="legend-swatch" style="background: #d4af37;"></div>
-                    X-axis: momentum window · Y-axis: Avg % increase — compare lines to spot the smoothest climbers
+                    X-axis: symbol · Y-axis: Percentage Gain (%) — green = positive, red = negative
                 </div>
             </div>
             <div class="chart-wrapper" id="chartWrapper">
@@ -408,20 +403,20 @@
                     <div class="spinner-large"></div>
                     <span>Loading market data...</span>
                 </div>
-                <canvas id="trendChart" style="display:none;"></canvas>
+                <canvas id="inceptionChart" style="display:none;"></canvas>
             </div>
         </section>
 
         <!-- Data Table Section -->
         <section class="table-container">
-            <h2><i class="fas fa-table"></i> Intraday Trend Analysis — Full Data Table (all SQL fields)</h2>
-            <table class="data-table" id="trendTable">
+            <h2><i class="fas fa-table"></i> Intraday Inception Analysis — Full Data Table (all SQL fields)</h2>
+            <table class="data-table" id="inceptionTable">
                 <thead>
                     <tr>
                         <th>Loading data...</th>
                     </tr>
                 </thead>
-                <tbody id="trendTableBody">
+                <tbody id="inceptionTableBody">
                     <tr><td class="table-placeholder">Loading data...</td></tr>
                 </tbody>
             </table>
@@ -429,21 +424,23 @@
     </main>
 
     <!-- ============================================================= -->
-    <!-- INTRADAY TREND ANALYSIS — SQL-driven dashboard                -->
+    <!-- INTRADAY INCEPTION ANALYSIS — SQL-driven dashboard            -->
     <!--                                                               -->
     <!-- Every 3 seconds this page:                                    -->
     <!--   1. POSTs to the RPC run_mapping_sql(p_title, p_sno), which  -->
     <!--      fetches the SQL script stored in gammapace_internal_     -->
-    <!--      mapping (title='Intraday Trend Analyis', sno=6),         -->
-    <!--      executes EVERY statement in sequence (truncate ->        -->
-    <!--      insert -> ...) and returns the rows of the FINAL         -->
-    <!--      SELECT as JSON.                                          -->
-    <!--   2. Renders a line chart (avg % momentum per symbol) and     -->
-    <!--      the full data table from that response.                  -->
+    <!--      mapping (sno=10), executes EVERY statement in sequence   -->
+    <!--      (truncate -> insert -> ...) and returns the rows of the  -->
+    <!--      FINAL SELECT as JSON.                                    -->
+    <!--   2. Renders a vertical bar chart (x = symbol, y = percentage -->
+    <!--      gain, ranked #1 leftmost -> last rightmost) and the full -->
+    <!--      data table from that response.                           -->
     <!--                                                               -->
     <!-- No SQL text, table names or column lists are hard-coded —     -->
     <!-- everything is derived at runtime from the stored script and   -->
-    <!-- the returned rows.                                            -->
+    <!-- the returned rows.  The source row is looked up by Sno = 10   -->
+    <!-- per the requirement "get the data Using select SQL from       -->
+    <!-- GammaPace_Internal_Mapping where Sno = 10".                   -->
     <!-- ============================================================= -->
     <script>
         // ┌──────────────────────────────────────────────────────────┐
@@ -455,8 +452,9 @@
         // Source of truth for the canonical SQL script (fetched at runtime
         // for traceability & dynamic column/table detection).
         const SUPABASE_SQL_MAPPING_TABLE = 'gammapace_internal_mapping';
-        const SQL_MAPPING_TITLE = 'Intraday Trend Analyis';
-        const SQL_MAPPING_SNO = 6;
+        // The requirement: pull the Inception SQL by Sno = 10.
+        const SQL_MAPPING_TITLE_OVERRIDE = '';
+        const SQL_MAPPING_SNO = 10;
 
         // RPC (created by setup_run_mapping_sqls.sql) that executes the
         // stored script statement-by-statement and returns the final
@@ -464,13 +462,16 @@
         const RPC_FUNCTION_NAME = 'run_mapping_sql';
 
         const REFRESH_INTERVAL_MS = 3000; // 3 seconds
-        const CHART_TOP_N = 10;           // symbols shown on the line chart
 
         // Runtime state (filled at startup / per refresh)
         let CANONICAL_SQL_QUERY = null;   // the stored script text (reference only)
+        let SQL_MAPPING_TITLE = null;     // resolved title of the sno=10 row
         let DATA_SOURCE_TABLE = null;     // result table extracted from the script
-        let RANK_COLUMN = null;           // ordering column (ends with '_rank')
+        let RANK_COLUMN = null;           // ordering/ranking column (rank, *_rank, ...)
+        let GAIN_COLUMN = null;           // y-axis column (percentage_gain, ...)
         let COLUMN_ORDER = null;          // canonical column list from INSERT(...)
+        let LAST_STATEMENT_KIND = null;   // kind of the script's final statement
+        let DIRECT_READ = null;           // result-table read diagnostic (status/path)
 
         const SUPABASE_HEADERS = {
             'apikey': SUPABASE_ANON_KEY,
@@ -479,13 +480,12 @@
         };
 
         // ┌──────────────────────────────────────────────────────────┐
-        // │  CANONICAL SQL FETCH (gammapace_internal_mapping)        │
+        // │  CANONICAL SQL FETCH (gammapace_internal_mapping, sno=10)│
         // └──────────────────────────────────────────────────────────┘
         async function fetchCanonicalSql() {
             var url = SUPABASE_URL + '/rest/v1/' + SUPABASE_SQL_MAPPING_TABLE +
-                '?select=sql' +
-                '&title=eq.' + encodeURIComponent(SQL_MAPPING_TITLE) +
-                '&sno=eq.' + encodeURIComponent(SQL_MAPPING_SNO);
+                '?select=title,sql' +
+                '&sno=eq.' + encodeURIComponent(String(SQL_MAPPING_SNO));
 
             var response = await fetch(url, { method: 'GET', headers: SUPABASE_HEADERS });
 
@@ -498,22 +498,55 @@
             var rows = await response.json();
             if (!rows || rows.length === 0 || !rows[0].sql) {
                 throw new Error('No sql found in ' + SUPABASE_SQL_MAPPING_TABLE +
-                    " for title='" + SQL_MAPPING_TITLE + "', sno=" + SQL_MAPPING_SNO);
+                    ' for Sno=' + SQL_MAPPING_SNO + '.  Please store the Inception ' +
+                    'SQL script in that row (see the requirement: "select SQL from ' +
+                    'gammapace_internal_mapping where Sno = 10").');
             }
-            return rows[0].sql;
+            return { title: rows[0].title || null, sql: rows[0].sql };
+        }
+
+        /** Strip a schema qualifier so the value can be used directly as a
+         *  PostgREST resource path.  The public schema is the REST root, so
+         *  keeping a "public." prefix makes the call 404 (this happened for
+         *  sno=10 because its INSERT INTO uses "public.inception_stock_intraday"). */
+        function stripSchemaPrefix(name) {
+            var parts = String(name || '').split('.');
+            return parts[parts.length - 1];
         }
 
         /** Extract the result table name from the stored script.
-         *  Prefers the INSERT INTO target (the pipeline populates it),
-         *  falls back to the LAST "FROM <table>" (the final SELECT). */
+         *  Prefers the INSERT INTO / CREATE TABLE AS target (the pipeline
+         *  populates it), falls back to the LAST "FROM <table>" (the final
+         *  SELECT).  Returns the schema-unqualified table name for REST use. */
         function extractResultTable(sqlText) {
             var s = String(sqlText || '');
             var m = s.match(/\binsert\s+into\s+([A-Za-z_][A-Za-z0-9_$]*(?:\.[A-Za-z_][A-Za-z0-9_$]*)?)/i);
-            if (m) return m[1].toLowerCase();
+            if (m) return stripSchemaPrefix(m[1]).toLowerCase();
+            m = s.match(/\bcreate\s+(?:or\s+replace\s+)?table\s+([A-Za-z_][A-Za-z0-9_$]*(?:\.[A-Za-z_][A-Za-z0-9_$]*)?)/i);
+            if (m) return stripSchemaPrefix(m[1]).toLowerCase();
             var re = /\bfrom\s+([A-Za-z_][A-Za-z0-9_$]*(?:\.[A-Za-z_][A-Za-z0-9_$]*)?)\b/gi;
             var last = null, mm;
             while ((mm = re.exec(s)) !== null) last = mm[1];
-            return last ? last.toLowerCase() : null;
+            return last ? stripSchemaPrefix(last).toLowerCase() : null;
+        }
+
+        /** Determine the kind of the FINAL statement of the stored script
+         *  (e.g. "SELECT", "INSERT", "CREATE", "DROP", "TRUNCATE"...).  The
+         *  RPC only forwards rows when this final statement is a SELECT/WITH/
+         *  TABLE/VALUES — this helper tells us (and the user) why the RPC
+         *  might have returned 0 rows. */
+        function lastStatementKind(sqlText) {
+            var s = String(sqlText || '');
+            var stmts = s.split(';');
+            var last = '';
+            for (var i = 0; i < stmts.length; i++) {
+                if (stmts[i].trim() !== '') last = stmts[i];
+            }
+            var p = last.trim();
+            p = p.replace(/^(\/\/|--)/, '');
+            p = p.replace(/\/\*[\s\S]*?\*\//g, '');
+            var kw = p.match(/^\s*([A-Za-z]+)/);
+            return kw ? kw[1].toUpperCase() : null;
         }
 
         /** Extract the canonical column list from the script's
@@ -528,22 +561,64 @@
             return cols.length > 0 ? cols : null;
         }
 
+        /** Pick the ranking column from the canonical column list.
+         *  Prefers a literal 'rank'/'stock_rank'/'buy_rank', otherwise the
+         *  first column ending in '_rank' (same convention as the trend pages). */
+        function pickRankColumn(cols) {
+            if (!cols || cols.length === 0) {
+                return (RANK_COLUMN && RANK_COLUMN !== '') ? RANK_COLUMN : null;
+            }
+            var pref = ['rank', 'stock_rank', 'buy_rank', 'inception_rank'];
+            for (var i = 0; i < pref.length; i++) {
+                if (cols.indexOf(pref[i]) !== -1) return pref[i];
+            }
+            for (var j = 0; j < cols.length; j++) {
+                if (/rank$/.test(cols[j])) return cols[j];
+            }
+            return null;
+        }
+
+        /** Pick the percentage-gain (y-axis) column.
+         *  Prefers an exact 'percentage_gain', otherwise any of the common
+         *  aliases, otherwise the first '*_gain' / 'pct_*' numeric column. */
+        function pickGainColumn(cols) {
+            if (!cols || cols.length === 0) {
+                return (GAIN_COLUMN && GAIN_COLUMN !== '') ? GAIN_COLUMN : null;
+            }
+            var exact = ['percentage_gain', 'percentage_change', 'percent_gain',
+                'pct_gain', 'pct_change', 'gain_pct'];
+            for (var i = 0; i < exact.length; i++) {
+                if (cols.indexOf(exact[i]) !== -1) return exact[i];
+            }
+            for (var j = 0; j < cols.length; j++) {
+                if (/pct|gain|percent|change/.test(cols[j])) return cols[j];
+            }
+            return null;
+        }
+
         /** Load the canonical SQL once at startup (traceability + fallbacks). */
         async function loadCanonicalSql() {
             try {
-                CANONICAL_SQL_QUERY = await fetchCanonicalSql();
+                var loaded = await fetchCanonicalSql();
+                CANONICAL_SQL_QUERY = loaded.sql;
+                SQL_MAPPING_TITLE =
+                    (SQL_MAPPING_TITLE_OVERRIDE && SQL_MAPPING_TITLE_OVERRIDE.trim()) ||
+                    loaded.title;
                 DATA_SOURCE_TABLE = extractResultTable(CANONICAL_SQL_QUERY);
                 COLUMN_ORDER = extractInsertColumns(CANONICAL_SQL_QUERY);
-                if (COLUMN_ORDER) {
-                    RANK_COLUMN = COLUMN_ORDER.find(function (c) { return /_rank$/.test(c); }) || null;
-                }
-                console.info('[TrendAnalysis] Canonical SQL loaded from ' +
-                    SUPABASE_SQL_MAPPING_TABLE + " (Title='" + SQL_MAPPING_TITLE +
-                    "', Sno=" + SQL_MAPPING_SNO + '). Result table: ' + DATA_SOURCE_TABLE +
-                    ' | Columns: ' + (COLUMN_ORDER ? COLUMN_ORDER.length : 'n/a') +
-                    ' | Rank column: ' + RANK_COLUMN);
+                RANK_COLUMN = pickRankColumn(COLUMN_ORDER);
+                GAIN_COLUMN = pickGainColumn(COLUMN_ORDER);
+                LAST_STATEMENT_KIND = lastStatementKind(CANONICAL_SQL_QUERY);
+                console.info('[InceptionAnalysis] Canonical SQL loaded from ' +
+                    SUPABASE_SQL_MAPPING_TABLE + ' (Sno=' + SQL_MAPPING_SNO +
+                    ", Title='" + SQL_MAPPING_TITLE + "'). Result table: " +
+                    DATA_SOURCE_TABLE + ' | Last statement: ' + LAST_STATEMENT_KIND +
+                    ' | Columns: ' +
+                    (COLUMN_ORDER ? COLUMN_ORDER.length : 'n/a') +
+                    ' | Rank column: ' + RANK_COLUMN +
+                    ' | Gain column: ' + GAIN_COLUMN);
             } catch (err) {
-                console.warn('[TrendAnalysis] Could not load canonical SQL:', err.message);
+                console.warn('[InceptionAnalysis] Could not load canonical SQL:', err.message);
             }
         }
 
@@ -551,6 +626,9 @@
         // │  DATA FETCH — run the script, return the final SELECT    │
         // └──────────────────────────────────────────────────────────┘
         async function callRunMappingSql() {
+            if (!SQL_MAPPING_TITLE) {
+                throw new Error('Mapping title not resolved yet — cannot run the RPC.');
+            }
             var url = SUPABASE_URL + '/rest/v1/rpc/' + RPC_FUNCTION_NAME;
             var response = await fetch(url, {
                 method: 'POST',
@@ -585,18 +663,44 @@
         /** Run the full SQL pipeline and get the final SELECT's rows.
          *  If the RPC returns nothing (e.g. the script ends without a
          *  SELECT), fall back to reading the result table directly. */
-        async function fetchTrendData() {
-            var rows = await callRunMappingSql();
-
-            if (rows.length === 0 && DATA_SOURCE_TABLE) {
-                var url = SUPABASE_URL + '/rest/v1/' + DATA_SOURCE_TABLE + '?select=*';
-                if (RANK_COLUMN) url += '&order=' + RANK_COLUMN + '.asc';
-                var response = await fetch(url, { method: 'GET', headers: SUPABASE_HEADERS });
-                if (response.ok) rows = await response.json();
+        async function fetchInceptionData() {
+            var rows = [];
+            var rpcError = null;
+            try {
+                rows = await callRunMappingSql();
+            } catch (err) {
+                rpcError = err;
+                rows = [];
             }
 
-            // The script inserts rows in ranked order; re-sort by the rank
-            // column when it is present so the display order is guaranteed.
+            DIRECT_READ = 'rpc=' + (rpcError ? 'error' : 'ok') +
+                ' rows=' + rows.length;
+
+            // The RPC either returned no rows or failed.  If we know the
+            // result table, read it directly — the Inception SQL may already
+            // have populated it (row count / data exists even if the final
+            // SELECT can't be forwarded as a result query).  This path only
+            // works if the anon key may SELECT from that table (RLS grants).
+            if (rows.length === 0 && DATA_SOURCE_TABLE) {
+                try {
+                    var url = SUPABASE_URL + '/rest/v1/' + DATA_SOURCE_TABLE + '?select=*';
+                    if (RANK_COLUMN) url += '&order=' + RANK_COLUMN + '.asc';
+                    var response = await fetch(url, { method: 'GET', headers: SUPABASE_HEADERS });
+                    DIRECT_READ += ' | direct[' + DATA_SOURCE_TABLE + ']=' +
+                        response.status + (response.ok ? ' ok' : ' blocked');
+                    if (response.ok) {
+                        var arr = await response.json();
+                        if (Array.isArray(arr)) rows = arr;
+                    }
+                } catch (err) {
+                    DIRECT_READ += ' | direct threw: ' + err.message;
+                    if (!rows.length && rpcError) throw rpcError;
+                }
+                if (!rows.length && rpcError) throw rpcError;
+            }
+
+            // Ensure display order is guaranteed: sort ascending by the rank
+            // column so #1 is leftmost on the chart.
             if (RANK_COLUMN && rows.length > 1 && typeof rows[0][RANK_COLUMN] === 'number') {
                 rows.sort(function (a, b) { return (a[RANK_COLUMN] || 0) - (b[RANK_COLUMN] || 0); });
             }
@@ -606,36 +710,73 @@
         // ┌──────────────────────────────────────────────────────────┐
         // │  DYNAMIC COLUMN RESOLUTION & FORMATTING                  │
         // └──────────────────────────────────────────────────────────┘
-
-        /** Resolve display columns from the returned rows (jsonb keys keep
-         *  the table's column order), falling back to the INSERT(...) list. */
         function resolveColumns(rows) {
             if (!rows || rows.length === 0) return COLUMN_ORDER || [];
             var keys = Object.keys(rows[0]);
+            var ordered;
             if (COLUMN_ORDER) {
-                var ordered = COLUMN_ORDER.filter(function (c) { return keys.indexOf(c) !== -1; });
+                ordered = COLUMN_ORDER.filter(function (c) { return keys.indexOf(c) !== -1; });
                 keys.forEach(function (k) { if (ordered.indexOf(k) === -1) ordered.push(k); });
-                return ordered;
+            } else {
+                // No INSERT(...) column list (e.g. a pure SELECT / CREATE
+                // TABLE AS script) — the returned jsonb keys ARE the columns.
+                ordered = keys.slice();
             }
-            return keys;
+            // Always re-derive the rank / gain columns from the REAL returned
+            // rows.  This is essential: when the stored script has no
+            // INSERT(...) list, COLUMN_ORDER is null and without this the
+            // bar chart would use a null GAIN_COLUMN (all-zero bars → "no data").
+            var rk = pickRankColumn(ordered);
+            if (rk) RANK_COLUMN = rk;
+            var gn = pickGainColumn(ordered);
+            if (!gn) gn = detectGainColumnFromData(ordered, rows);
+            if (gn) GAIN_COLUMN = gn;
+            return ordered;
+        }
+
+        /** Data-aware fallback for the y-axis column.  When the column name
+         *  alone doesn't reveal it, pick the fully-numeric column (other than
+         *  the rank column and the symbol) whose values look like a realistic
+         *  percentage-gain (small magnitude, mixes of + and -). */
+        function detectGainColumnFromData(cols, rows) {
+            if (!cols || !rows || rows.length === 0) return null;
+            var best = null, bestScore = -1;
+            for (var c = 0; c < cols.length; c++) {
+                var col = cols[c];
+                if (col === RANK_COLUMN || col === 'symbol') continue;
+                var numeric = 0, total = 0, hasNeg = false, maxAbs = 0;
+                for (var r = 0; r < rows.length; r++) {
+                    var v = rows[r][col];
+                    if (typeof v === 'number') {
+                        numeric++;
+                        if (v < 0) hasNeg = true;
+                        var a = Math.abs(v);
+                        if (a > maxAbs) maxAbs = a;
+                    }
+                    total++;
+                }
+                if (numeric !== total || total === 0) continue; // must be fully numeric
+                if (maxAbs > 120) continue;                     // too big to be a % gain
+                var score = total + (hasNeg ? 2 : 0);
+                if (score > bestScore) { bestScore = score; best = col; }
+            }
+            return best;
         }
 
         /** Human-readable label for a column name. */
         function labelFor(col) {
-            if (col === 'buy_rank') return '#';
+            if (col === 'rank' || col === 'stock_rank' || col === 'buy_rank') return '#';
             if (col === 'symbol') return 'Symbol';
             if (col === 'trade_time') return 'Trade Time (ET)';
             if (col === 'current_price') return 'Current Price ($)';
             if (col === 'analysis_timestamp') return 'Analysis Timestamp';
+            if (col === 'percentage_gain') return 'Percentage Gain (%)';
+            if (col === 'percentage_change') return 'Percentage Change (%)';
             if (col === 'buy_score') return 'Buy Score';
-            if (col === 'long_term_state') return 'Long-Term State';
-            if (col === 'short_term_state') return 'Short-Term State';
-            if (col === 'trend_signal') return 'Trend Signal';
             var m;
             if ((m = col.match(/^gain_(\d+)min$/))) return 'Gain ' + m[1] + 'm (%)';
             if ((m = col.match(/^avg_pct_(\d+)min$/))) return 'Avg % ' + m[1] + 'm';
             if ((m = col.match(/^low_(\d+)min$/))) return 'Low ' + m[1] + 'm ($)';
-            if ((m = col.match(/^recovery_from_(\d+)min_low$/))) return 'Rec ' + m[1] + 'm (%)';
             return col.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
         }
 
@@ -643,7 +784,8 @@
         function fmtVal(col, v) {
             if (v === null || v === undefined || v === '') return '-';
             if (typeof v === 'number') {
-                if (col === 'buy_rank' || col === 'buy_score') return String(v);
+                if (col === 'rank' || col === 'stock_rank' || col === 'buy_rank' ||
+                    col === 'buy_score') return String(v);
                 if (/^(current_price|low_)/.test(col)) return v.toFixed(2);
                 if (/^(gain_|avg_pct_|recovery_)/.test(col)) {
                     return String(Math.round(v * 10000) / 10000);
@@ -673,7 +815,8 @@
                 if (s === 'FALLING') return '<span class="negative">' + txt + '</span>';
                 return '<span class="state-flat">' + txt + '</span>';
             }
-            if (/^(gain_|avg_pct_|recovery_)/.test(col) && typeof v === 'number') {
+            var isGain = /pct|gain|percent|change|recovery/.test(col);
+            if (isGain && typeof v === 'number') {
                 return '<span class="' + (v >= 0 ? 'positive' : 'negative') + '">' + txt + '</span>';
             }
             if (col === 'symbol') return '<strong>' + txt + '</strong>';
@@ -681,33 +824,43 @@
         }
 
         // ┌──────────────────────────────────────────────────────────┐
-        // │  CHART.JS — Multi-series LINE chart                      │
-        // │  X-axis: momentum windows (180m -> 5m -> Now)            │
-        // │  Y-axis: avg % increase — one line per symbol            │
+        // │  CHART.JS — Vertical BAR chart                           │
+        // │  X-axis: symbol ranked #1 leftmost -> last rightmost     │
+        // │  Y-axis: percentage gain (%)                            │
         // └──────────────────────────────────────────────────────────┘
         let chartInstance = null;
 
         function initChart() {
-            const ctx = document.getElementById('trendChart').getContext('2d');
+            const ctx = document.getElementById('inceptionChart').getContext('2d');
             chartInstance = new Chart(ctx, {
-                type: 'line',
-                data: { labels: [], datasets: [] },
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Percentage Gain (%)',
+                        data: [],
+                        backgroundColor: [],
+                        borderColor: 'rgba(139, 69, 19, 1)',
+                        borderWidth: 1,
+                        barPercentage: 0.85,
+                        categoryPercentage: 0.9
+                    }]
+                },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'nearest', intersect: false },
                     plugins: {
-                        legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: { color: '#3c2d1f', font: { size: 10 }, boxWidth: 20 }
-                        },
+                        legend: { display: false },
                         tooltip: {
                             callbacks: {
+                                title: function (items) {
+                                    var i = items && items.length ? items[0].index : -1;
+                                    return 'Symbol: ' + ((chartInstance && i >= 0) ?
+                                        chartInstance.data.labels[i] : '');
+                                },
                                 label: function (ctx) {
-                                    var v = ctx.raw === null || ctx.raw === undefined ? '-' :
-                                        Number(ctx.raw).toFixed(4);
-                                    return ctx.dataset.label + ': ' + v + '%';
+                                    return 'Percentage Gain: ' +
+                                        Number(ctx.raw).toFixed(4) + '%';
                                 }
                             }
                         }
@@ -716,82 +869,62 @@
                         x: {
                             title: {
                                 display: true,
-                                text: 'Momentum window (minutes ago -> now)',
+                                text: 'Symbol (rank #1 leftmost → last rightmost)',
                                 color: '#3c2d1f',
                                 font: { size: 11 }
                             },
                             grid: { color: 'rgba(0,0,0,0.05)' },
-                            ticks: { color: '#3c2d1f', font: { size: 11 } }
+                            ticks: { color: '#3c2d1f', font: { size: 10 } }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: 'Avg % increase',
+                                text: 'Percentage Gain (%)',
                                 color: '#3c2d1f',
                                 font: { size: 11 }
                             },
+                            beginAtZero: true,
                             grid: { color: 'rgba(0,0,0,0.05)' },
-                            ticks: { color: '#3c2d1f', font: { size: 11 } }
+                            ticks: {
+                                color: '#3c2d1f',
+                                font: { size: 11 },
+                                callback: function (v) { return Number(v).toFixed(2) + '%'; }
+                            }
                         }
                     }
                 }
             });
         }
 
-        /** Build the X-axis (labels) and the matching data columns from the
-         *  canonical columns: every avg_pct_<N>min sorted newest-window-last,
-         *  plus a final "Now" point from gain_1min when present. */
-        function buildChartSpec(columns) {
-            var metrics = columns.map(function (c) {
-                var m = c.match(/^avg_pct_(\d+)min$/);
-                return m ? { col: c, min: parseInt(m[1], 10) } : null;
-            }).filter(Boolean).sort(function (a, b) { return b.min - a.min; });
-
-            var labels = metrics.map(function (m) { return m.min + 'm'; });
-            var dataCols = metrics.map(function (m) { return m.col; });
-
-            if (columns.indexOf('gain_1min') !== -1) {
-                labels.push('Now');
-                dataCols.push('gain_1min');
-            }
-            return { labels: labels, dataCols: dataCols };
+        function barColor(v) {
+            if (v === null || v === undefined) return 'rgba(150, 150, 150, 0.8)';
+            return (v >= 0)
+                ? 'rgba(39, 174, 96, 0.85)'   // green for positive
+                : 'rgba(231, 76, 60, 0.85)';  // red for negative
         }
 
-        /** Distinct line color per symbol (HSL wheel spread). */
-        function lineColor(i) {
-            var hue = Math.round((i * 360) / Math.max(CHART_TOP_N, 1)) % 360;
-            return 'hsl(' + hue + ', 65%, 45%)';
-        }
+        function updateChart(rows) {
+            if (!chartInstance) return;
 
-        function updateChart(rows, columns) {
-            var spec = buildChartSpec(columns);
-            var display = rows.slice(0, CHART_TOP_N);
+            var labels = rows.map(function (r, i) {
+                if (RANK_COLUMN && r[RANK_COLUMN] !== undefined && r[RANK_COLUMN] !== null) {
+                    return String(r[RANK_COLUMN]) + ' · ' + (r.symbol || ('Row ' + (i + 1)));
+                }
+                return r.symbol || ('Row ' + (i + 1));
+            });
 
-            if (chartInstance) {
-                chartInstance.data.labels = spec.labels;
-                chartInstance.data.datasets = display.map(function (r, i) {
-                    var color = lineColor(i);
-                    return {
-                        label: r.symbol || ('Row ' + (i + 1)),
-                        data: spec.dataCols.map(function (c) {
-                            var v = r[c];
-                            return (typeof v === 'number') ? v : null;
-                        }),
-                        borderColor: color,
-                        backgroundColor: color,
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: false,
-                        spanGaps: true
-                    };
-                });
-                chartInstance.update();
-            }
+            var values = rows.map(function (r) {
+                var v = GAIN_COLUMN ? r[GAIN_COLUMN] : null;
+                return (typeof v === 'number') ? v : 0;
+            });
+
+            chartInstance.data.labels = labels;
+            chartInstance.data.datasets[0].data = values;
+            chartInstance.data.datasets[0].backgroundColor = values.map(barColor);
+            chartInstance.update();
 
             const placeholder = document.getElementById('chartPlaceholder');
-            const canvas = document.getElementById('trendChart');
+            const canvas = document.getElementById('inceptionChart');
             if (placeholder) placeholder.style.display = 'none';
             if (canvas) canvas.style.display = 'block';
         }
@@ -802,7 +935,7 @@
         let tableHeadSignature = null;
 
         function buildTableHead(columns) {
-            var headRow = document.querySelector('#trendTable thead tr');
+            var headRow = document.querySelector('#inceptionTable thead tr');
             if (!headRow) return;
             headRow.innerHTML = columns.map(function (c) {
                 return '<th>' + labelFor(c) + '</th>';
@@ -811,13 +944,31 @@
         }
 
         function updateTable(rows, columns) {
-            const tbody = document.getElementById('trendTableBody');
+            const tbody = document.getElementById('inceptionTableBody');
 
             if (!rows || rows.length === 0) {
                 if (columns.length) buildTableHead(columns);
+                var why = 'No data returned.  Last statement of the sno=' +
+                    SQL_MAPPING_SNO + ' script: <b>' + (LAST_STATEMENT_KIND || '?') +
+                    '</b>.  Detected result table: <b>' + (DATA_SOURCE_TABLE || 'none') +
+                    '</b>.  Fetch: ' + (DIRECT_READ || 'n/a') + '.';
+                var hint = '';
+                if (LAST_STATEMENT_KIND && LAST_STATEMENT_KIND !== 'SELECT' &&
+                    LAST_STATEMENT_KIND !== 'WITH' && LAST_STATEMENT_KIND !== 'TABLE' &&
+                    LAST_STATEMENT_KIND !== 'VALUES') {
+                    hint = ' The RPC only returns rows when the script <b>ends</b> ' +
+                        'with a plain <b>SELECT * FROM &lt;result_table&gt;;</b> statement. ' +
+                        'Add that as the last statement, or grant the anon key SELECT ' +
+                        'on <b>' + (DATA_SOURCE_TABLE || 'result_table') + '</b> so the ' +
+                        'direct read can work.';
+                } else if (DATA_SOURCE_TABLE && DIRECT_READ && DIRECT_READ.indexOf('blocked') !== -1) {
+                    hint = ' The result table <b>' + DATA_SOURCE_TABLE +
+                        '</b> is not readable by the anon key (RLS). Enable SELECT ' +
+                        'for anon/authenticated on that table, or let the RPC return it.';
+                }
                 tbody.innerHTML = '<tr><td colspan="' + Math.max(columns.length, 1) +
-                    '" class="table-placeholder">No data available yet — the SQL script ' +
-                    'has not produced rows (it may still be outside market hours).</td></tr>';
+                    '" class="table-placeholder"><b>No data available yet</b> — ' +
+                    why + hint + '</td></tr>';
                 return;
             }
 
@@ -853,21 +1004,27 @@
             setRefreshingState(true);
 
             try {
-                const rows = await fetchTrendData();
+                const rows = await fetchInceptionData();
                 const columns = resolveColumns(rows);
 
-                updateChart(rows, columns);
+                updateChart(rows);
                 updateTable(rows, columns);
 
                 const now = new Date();
                 let msg = '<i class="fas fa-check-circle" style="color:green;"></i> ' +
                     'SQL executed · ' + rows.length + ' rows · Updated: ' + now.toLocaleTimeString();
+                if (rows.length) {
+                    msg += ' · gain=' + (GAIN_COLUMN || '?') +
+                        ' · rank=' + (RANK_COLUMN || 'raw-order');
+                } else if (DIRECT_READ) {
+                    msg += ' · ' + DIRECT_READ;
+                }
                 if (rows.length && rows[0]['analysis_timestamp']) {
                     msg += ' · Analysis: ' + fmtVal('analysis_timestamp', rows[0]['analysis_timestamp']) + ' ET';
                 }
                 document.getElementById('lastUpdatedText').innerHTML = msg;
             } catch (err) {
-                console.error('TrendAnalysis refresh error:', err);
+                console.error('InceptionAnalysis refresh error:', err);
                 document.getElementById('lastUpdatedText').innerHTML =
                     '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> ' +
                     'Error: ' + err.message +
@@ -884,7 +1041,8 @@
             initChart();
 
             // Load the canonical SQL first — it provides the result table
-            // name, canonical column order and rank column (no hard-coding).
+            // name, canonical column order, rank column and gain column
+            // (no hard-coding).
             await loadCanonicalSql();
 
             // First data fetch: executes the full SQL pipeline via RPC and
@@ -946,14 +1104,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-

@@ -725,6 +725,7 @@
                             <a href="Intraday.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradayReport')"><i class="fas fa-clock"></i> Intraday Report</a>
                             <a href="Intraday_Steady_Growth_Stocks.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradaySteadyGrowth')"><i class="fas fa-chart-line"></i> Intraday Steady Growth</a>
                             <a href="Intraday_Trend.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradayTrend')"><i class="fas fa-wave-square"></i> Intraday Trend</a>
+                            <a href="Intraday_Inception.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradayInception')"><i class="fas fa-rocket"></i> Intraday Inception</a>
                         </div>
                     </li>
                     <li><a href="#about" onclick="selectAbout()"><i class="fas fa-lightbulb"></i> About</a></li>
@@ -1203,6 +1204,11 @@
 
             if (option === 'IntradayTrend') {
                 window.location.href = 'Intraday_Trend.html';
+                return;
+            }
+
+            if (option === 'IntradayInception') {
+                window.location.href = 'Intraday_Inception.html';
                 return;
             }
         }
