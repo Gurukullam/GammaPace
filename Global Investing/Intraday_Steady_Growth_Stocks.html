@@ -394,7 +394,7 @@
         // └──────────────────────────────────────────────────────────┘
         const WINDOW_MINUTES = 185;
         const PAGE_SIZE = 1000;
-        const PARALLEL_PAGES = 10;
+        const PARALLEL_PAGES = 4;            // concurrent page requests on bulk load (was 10 - fewer parallel scans avoid the anon-role ~3s statement timeout, 57014)
 
         let windowRows = [];
         let lastFetchedTs = null;
@@ -413,13 +413,36 @@
             return await response.json();
         }
 
+        // RETRY WRAPPER - the Supabase anon role enforces a short server-side
+        // statement_timeout (~3s). Under load, nasdaq_chart REST queries
+        // intermittently fail with HTTP 500 {"code":"57014", "message":"canceling
+        // statement due to statement timeout"}. A retry usually succeeds within a
+        // second or two, so transient timeouts / network errors are retried with
+        // backoff instead of surfacing the raw error to the user.
+        const PAGE_FETCH_MAX_ATTEMPTS = 4; // 1 initial attempt + 3 retries
+        async function fetchWindowPageWithRetry(urlBase, offset) {
+            for (var attempt = 1; attempt <= PAGE_FETCH_MAX_ATTEMPTS; attempt++) {
+                try {
+                    return await fetchWindowPage(urlBase, offset);
+                } catch (err) {
+                    var msg = String((err && err.message) || err);
+                    var transient = /57014|statement timeout| 500 |Failed to fetch|NetworkError|network/i.test(msg);
+                    if (attempt >= PAGE_FETCH_MAX_ATTEMPTS || !transient) throw err;
+                    var waitMs = 1000 * attempt + Math.floor(Math.random() * 500);
+                    console.warn('[PageFetch] attempt ' + attempt + '/' + PAGE_FETCH_MAX_ATTEMPTS +
+                        ' failed (offset ' + offset + '): ' + msg + ' - retrying in ' + waitMs + 'ms');
+                    await new Promise(function (resolve) { setTimeout(resolve, waitMs); });
+                }
+            }
+        }
+
         async function fetchAllPages(urlBase) {
             var all = [];
             var offset = 0;
             while (true) {
                 var offsets = [];
                 for (var j = 0; j < PARALLEL_PAGES; j++, offset += PAGE_SIZE) offsets.push(offset);
-                var pages = await Promise.all(offsets.map(function(o){ return fetchWindowPage(urlBase, o); }));
+                var pages = await Promise.all(offsets.map(function(o){ return fetchWindowPageWithRetry(urlBase, o); }));
                 pages.forEach(function(p){ all = all.concat(p); });
                 if (pages.some(function(p){ return p.length < PAGE_SIZE; })) break;
             }

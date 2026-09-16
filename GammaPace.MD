@@ -264,6 +264,7 @@ Each per-symbol endpoint has **mode chips**: `ALL NASDAQ` / `Single Symbol` /
 | 5 | VERIFY | Company page end-to-end | Re-test all 10 endpoints. Confirm every target table exists + constraints + RLS in the `ppdm...` project. |
 | 6 | NOTE | Two separate Supabase projects | Market = musho... project; Company = ppdm project. Keys/tables/RLS differ per project. |
 | 7 | INFO | Gamma engine SQLs | `INTRADAY_ENGINE_SQLS` / `LONGTERM_ENGINE_SQLS` arrays (Market page, older code) are empty extension points; the newer flow uses `gammapace_internal_mapping` + `execute_dynamic_sql`. |
+| 8 | DONE | Intermittent 57014 timeout on Intraday + Steady Growth reports | REST paging of nasdaq_chart (10 parallel pages) intermittently exceeded the anon role's ~3s statement_timeout -> HTTP 500 {"code":"57014"}. Fixed 2026-09-16 client-side in Intraday.html + Intraday_Steady_Growth_Stocks.html: PARALLEL_PAGES 10 -> 4 + per-page retry with backoff (4 attempts; retries 57014/500/network). Recommended server-side hardening (one-time, Supabase SQL Editor): CREATE INDEX IF NOT EXISTS idx_nasdaq_chart_timestamp ON public.nasdaq_chart (timestamp); ANALYZE public.nasdaq_chart; |
 
 ---
 
