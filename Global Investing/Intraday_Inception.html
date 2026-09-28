@@ -376,7 +376,7 @@
             <span class="refresh-label">
                 <span class="spinner-small" id="refreshSpinner" style="display:none;"></span>
                 <i class="fas fa-sync-alt" style="color: #8b4513;"></i>
-                Auto-refresh every 3s — one tab runs the SQL script at a time, then reads the final SELECT (auto back-off while the DB is locked)
+                Auto-refresh every 3s (a fast read of the result table) - the heavy SQL pipeline that rewrites that table runs at most once a minute, one tab at a time
             </span>
             <span class="last-updated">
                 <span id="lastUpdatedText">
@@ -429,9 +429,11 @@
     <!-- Every 3 seconds this page:                                    -->
     <!--   1. POSTs to the RPC run_mapping_sql(p_title, p_sno), which  -->
     <!--      fetches the SQL script stored in gammapace_internal_     -->
-    <!--      mapping (sno=10), executes EVERY statement in sequence   -->
-    <!--      (truncate -> insert -> ...) and returns the rows of the  -->
-    <!--      FINAL SELECT as JSON.                                    -->
+    <!--      mapping (sno=10) and executes EVERY statement in sequence -->
+    <!--      (truncate -> insert -> ...).  It is used only as the      -->
+    <!--      TRIGGER for the report: that function currently answers    -->
+    <!--      "[]" for every mapping row, so the rows that get rendered  -->
+    <!--      are read back from the result table over PostgREST.       -->
     <!--   2. Renders a vertical bar chart (x = symbol, y = percentage -->
     <!--      gain, ranked #1 leftmost -> last rightmost) and the full -->
     <!--      data table from that response.                           -->
@@ -445,10 +447,10 @@
     <!--      Guards: (a) one-tab-at-a-time lease,                     -->
     <!--      (b) exponential back-off 3s -> 60s after a DB-busy /     -->
     <!--      timeout failure, (c) AbortController timeout on the RPC, -->
-    <!--      (d) the direct result-table read was REMOVED — its       -->
-    <!--      SELECT held ACCESS SHARE on the table the pipeline wants -->
-    <!--      to TRUNCATE (making the lock timeout more likely) and it -->
-    <!--      can never succeed with the anon key anyway (~3s, 57014). -->
+    <!--      (d) the report rows are READ back from the result table, -->
+    <!--      but only while no other tab owns the pipeline lease, and  -->
+    <!--      that table holds just the current top-N (10 rows, ~0.5s),  -->
+    <!--      so the read never fights the pipeline's TRUNCATE lock.     -->
     <!--      Server-side hardening: setup_inception_pipeline_lock_    -->
     <!--      fix.sql (lock_timeout 60s + pg_advisory_xact_lock).      -->
     <!--                                                               -->
@@ -508,12 +510,23 @@
         // │     script, so concurrent runs queue on one cheap lock    │
         // │     instead of colliding on the table lock.               │
         // └──────────────────────────────────────────────────────────┘
-        const RPC_TIMEOUT_MS = 150000;         // > the RPC's statement_timeout (120s)
+        const RPC_TIMEOUT_MS = 330000;         // > the RPC's statement_timeout (5min)
         const PIPELINE_LEASE_KEY = 'gammapace_inception_pipeline_lease';
-        const PIPELINE_LEASE_TTL_MS = 180000;  // a dead tab's lease expires after 3 min
+        // Cross-tab "when did the last ETL run" stamp.  The lease above only
+        // SERIALISES runs (it is handed back in the finally block), so without
+        // this stamp the 60s throttle would be per-tab and the other tabs
+        // would re-fire the pipeline the moment we release the lease.
+        const PIPELINE_LAST_RUN_KEY = 'gammapace_inception_pipeline_last_run';
+        const PIPELINE_LEASE_TTL_MS = 400000;  // a dead tab's lease expires after ~7 min
         const BACKOFF_BASE_MS = 3000;          // first retry delay after a failure
         const BACKOFF_MAX_MS = 60000;          // retry delay cap
-        const PIPELINE_MIN_GAP_MS = 0;         // 0 = honour the 3s tick; raise (e.g. 30000) to throttle the ETL
+        // The ETL behind sno=10 is heavy (7-day nasdaq_stocks scan + today's
+        // nasdaq_chart scan + 3 writes) and it became slow enough (40s-2min)
+        // that running it every 3s made every client queue on the pipeline
+        // lock until the 120s statement timeout killed them (SQLSTATE 57014).
+        // Therefore the *pipeline* now runs at most once per minute; the
+        // "Retry now" link always runs immediately.
+        const PIPELINE_MIN_GAP_MS = 60000;
         const TAB_ID = 'tab-' + String(Date.now()) + '-' +
             String(Math.floor(Math.random() * 1000000000));
 
@@ -525,7 +538,8 @@
         let GAIN_COLUMN = null;           // y-axis column (percentage_gain, ...)
         let COLUMN_ORDER = null;          // canonical column list from INSERT(...)
         let LAST_STATEMENT_KIND = null;   // kind of the script's final statement
-        let DIRECT_READ = null;           // result-table read diagnostic (status/path)
+        let DIRECT_READ = null;           // "pipeline=.. | table=.. rows=N" diagnostic
+        let lastPipelineWarning = null;   // non-fatal ETL problem (e.g. 55P03)
 
         const SUPABASE_HEADERS = {
             'apikey': SUPABASE_ANON_KEY,
@@ -582,6 +596,18 @@
         function leaseAgeSeconds(lease) {
             if (!lease || !lease.ts) return 0;
             return Math.max(0, Math.round((Date.now() - lease.ts) / 1000));
+        }
+
+        /** Epoch ms of the last pipeline start, shared by every tab, so the
+         *  PIPELINE_MIN_GAP_MS throttle is global and not per-tab.
+         *  localStorage is best-effort: when it is unavailable we fall back to
+         *  the local nextPipelineAllowedAt gate, i.e. the current behaviour. */
+        function readSharedLastRun() {
+            var n = parseInt(storageGet(PIPELINE_LAST_RUN_KEY), 10);
+            return isNaN(n) ? 0 : n;
+        }
+        function writeSharedLastRun(ms) {
+            storageSet(PIPELINE_LAST_RUN_KEY, String(ms));
         }
 
         // ┌──────────────────────────────────────────────────────────┐
@@ -813,42 +839,128 @@
             return Array.isArray(data) ? data : [data];
         }
 
-        /** Run the full SQL pipeline and get the final SELECT's rows.
+        /** Read the pipeline's result table straight from PostgREST.
          *
-         *  NOTE: the direct "read the result table" fallback was REMOVED on
-         *  purpose.  That GET held ACCESS SHARE on inception_stock_intraday —
-         *  the very table the pipeline TRUNCATEs (ACCESS EXCLUSIVE) — so a 3s
-         *  read could push a concurrent pipeline run past its 10s lock_timeout
-         *  (55P03).  It could also never succeed: the anon role's statement
-         *  timeout kills that read at ~3s with 57014. */
-        async function fetchInceptionData() {
-            var rows = [];
-            var rpcError = null;
-            try {
-                rows = await callRunMappingSql();
-            } catch (err) {
-                rpcError = err;
-                rows = [];
+         *  This is the ONLY source of rows for the chart + table.
+         *
+         *  run_mapping_sql() executes the stored script correctly — verified
+         *  live on 2026-09-28: the sno=10 run repopulates
+         *  inception_stock_intraday with a fresh analysis_timestamp — but it
+         *  returns "[]" instead of the final SELECT's rows, for EVERY mapping
+         *  row (even sno=8, whose whole script is "select now();").  The old
+         *  direct read was removed because the table is the one the ETL
+         *  TRUNCATEs; that concern is handled differently now (see the lease
+         *  check in refreshData: the read only happens when no other tab owns
+         *  the pipeline), and the read itself is cheap and reliable — the
+         *  result table only ever holds the current top-N (10 rows, ~1.8 kB,
+         *  measured 0.46s with the anon key, HTTP 200).
+         *
+         *  @returns {Promise<{rows: Array, error: (Error|null)}>} */
+        async function readResultTable() {
+            if (!DATA_SOURCE_TABLE) {
+                return {
+                    rows: [],
+                    error: dbError('Could not work out which table the sno=' + SQL_MAPPING_SNO +
+                        ' script fills, so there is nothing to read.  Detected result ' +
+                        'table: none.', null)
+                };
             }
 
-            DIRECT_READ = 'rpc=' + (rpcError ? 'error(' + (rpcError.dbCode || 'rpc') + ')' : 'ok') +
-                ' rows=' + rows.length +
-                ' | direct-read skipped (a concurrent SELECT would block the pipeline TRUNCATE)';
+            var url = SUPABASE_URL + '/rest/v1/' +
+                encodeURIComponent(DATA_SOURCE_TABLE) + '?select=*' +
+                (RANK_COLUMN ? '&order=' + encodeURIComponent(RANK_COLUMN) + '.asc' : '');
 
-            if (rpcError) throw rpcError;
+            try {
+                var response = await fetch(url, { method: 'GET', headers: SUPABASE_HEADERS });
+                if (!response.ok) {
+                    var errorBody = await response.text();
+                    return {
+                        rows: [],
+                        error: dbError('Could not read ' + DATA_SOURCE_TABLE + ': ' +
+                            response.status + ' ' + response.statusText + ' - ' + errorBody,
+                            (errorBody.indexOf('55P03') !== -1) ? '55P03' : null)
+                    };
+                }
+                var text = await response.text();
+                if (!text) return { rows: [], error: null };
+                var data = JSON.parse(text);
+                return { rows: Array.isArray(data) ? data : [data], error: null };
+            } catch (netErr) {
+                return {
+                    rows: [],
+                    error: dbError('Network error reading ' + DATA_SOURCE_TABLE + ': ' +
+                        ((netErr && netErr.message) || netErr), 'NETWORK')
+                };
+            }
+        }
 
-            if (rows.length === 0 && DATA_SOURCE_TABLE) {
-                throw dbError('The pipeline returned 0 rows.  Detected result table: ' +
-                    DATA_SOURCE_TABLE + ' (final statement kind: ' +
-                    (LAST_STATEMENT_KIND || '?') + ').', null);
+        /** One refresh cycle: run the heavy ETL (only when due) and read back
+         *  the rows it produced.
+         *
+         *  runPipeline=false -> cheap read-only tick (every REFRESH_INTERVAL_MS)
+         *  runPipeline=true  -> execute the sno=10 script through the RPC, then
+         *                        read the table it just rewrote (every
+         *                        PIPELINE_MIN_GAP_MS, one tab at a time)
+         *
+         *  The RPC is only a TRIGGER: its own row payload is ignored because
+         *  the function always answers "[]".  An ETL failure is NOT fatal while
+         *  the table still holds rows — the report keeps rendering the last
+         *  good data and the status bar explains what went wrong. */
+        async function fetchInceptionData(runPipeline) {
+            var rpcError = null;
+            if (runPipeline) {
+                try {
+                    await callRunMappingSql();
+                } catch (err) {
+                    rpcError = err;
+                }
+            }
+
+            var read = await readResultTable();
+
+            DIRECT_READ = 'pipeline=' + (runPipeline
+                ? (rpcError ? 'error(' + (rpcError.dbCode || 'rpc') + ')' : 'ok')
+                : 'skipped(reading only)') +
+                ' | table=' + (DATA_SOURCE_TABLE || '?') +
+                ' rows=' + read.rows.length +
+                (read.error ? ' read-error=' + (read.error.dbCode || 'http') : '');
+
+            // A failing ETL is a warning as long as there is data on screen.
+            lastPipelineWarning = rpcError
+                ? (rpcError.dbCode ? (rpcError.dbCode + ' \u2014 ' + rpcError.message) : rpcError.message)
+                : null;
+
+            if (read.error) {
+                // Both paths failed: surface the read error, but keep the ETL
+                // failure in the message because that is the usual root cause.
+                if (rpcError) {
+                    read.error.message = 'The SQL pipeline failed (' +
+                        (rpcError.dbCode || 'rpc') + '), so the result table could not be ' +
+                        'refreshed either: ' + read.error.message;
+                }
+                throw read.error;
+            }
+
+            if (read.rows.length === 0) {
+                if (rpcError) throw rpcError;      // the real reason for the empty report
+                throw dbError('No rows in ' + DATA_SOURCE_TABLE + ' yet.  Last statement of ' +
+                    'the sno=' + SQL_MAPPING_SNO + ' script: ' +
+                    (LAST_STATEMENT_KIND || '?') + '.  The pipeline may still be running ' +
+                    'on the next tick.', null);
             }
 
             // Ensure display order is guaranteed: sort ascending by the rank
             // column so #1 is leftmost on the chart.
-            if (RANK_COLUMN && rows.length > 1 && typeof rows[0][RANK_COLUMN] === 'number') {
-                rows.sort(function (a, b) { return (a[RANK_COLUMN] || 0) - (b[RANK_COLUMN] || 0); });
+            if (RANK_COLUMN && read.rows.length > 1) {
+                read.rows.sort(function (a, b) {
+                    var av = Number(a[RANK_COLUMN]);
+                    var bv = Number(b[RANK_COLUMN]);
+                    if (isNaN(av)) av = 0;
+                    if (isNaN(bv)) bv = 0;
+                    return av - bv;
+                });
             }
-            return rows;
+            return read.rows;
         }
 
         // ┌──────────────────────────────────────────────────────────┐
@@ -938,12 +1050,79 @@
             }
             if (col === 'trade_time' && /^\d{2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
             if (col === 'analysis_timestamp') {
-                var d = new Date(v);
-                if (!isNaN(d)) {
-                    return d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: false });
+                // The ETL writes New York WALL-CLOCK text with no UTC offset
+                // (e.g. "2026-09-28T11:55:44").  new Date(v) would read that as
+                // browser-local time and toLocaleTimeString() would then shift
+                // it a second time, so every viewer outside New York saw a
+                // wrong clock.  The stored value is already the NY time.
+                var raw = String(v);
+                var ts = raw.match(/[T ](\d{2}:\d{2}(?::\d{2})?)/);
+                if (!ts) return raw;
+                // An explicit offset (or trailing Z) means the text already
+                // carries its own zone, so the clock is shown verbatim and
+                // labelled with that offset instead of assuming New York.
+                var off = raw.match(/([+-])(\d{2}):?(\d{2})\s*$/);
+                if (off) {
+                    var h = +off[2], m = +off[3];
+                    var sign = (off[1] === '-') ? '-' : '+';
+                    return ts[1] + ' UTC' + sign + (h < 10 ? '0' : '') + h +
+                        (m < 10 ? '0' : '') + m;
                 }
+                if (/[Zz]\s*$/.test(raw)) return ts[1] + ' UTC';
+                return ts[1];
             }
             return String(v);
+        }
+
+        /** Age in seconds of the newest row's analysis_timestamp, or -1.
+         *
+         *  The ETL stamps America/New_York WALL-CLOCK text with no offset
+         *  ("2026-09-28T11:55:44"), so the only correct comparison is against
+         *  the current New York wall clock — not the browser's own timezone. */
+        function dataAgeSeconds(row) {
+            if (!row || !row['analysis_timestamp']) return -1;
+            var m = String(row['analysis_timestamp'])
+                .match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+            if (!m) return -1;
+            var nowParts = {};
+            try {
+                new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'America/New_York', hour12: false,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                }).formatToParts(new Date()).forEach(function (p) {
+                    if (p.type !== 'literal') nowParts[p.type] = p.value;
+                });
+            } catch (err) { return -1; }
+            if (!nowParts.year) return -1;
+            var dataSec = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+            var hour = (+nowParts.hour === 24) ? 0 : +nowParts.hour;
+            var nowSec = Date.UTC(+nowParts.year, +nowParts.month - 1, +nowParts.day,
+                hour, +nowParts.minute, +nowParts.second);
+            var ageSec = Math.round((nowSec - dataSec) / 1000);
+
+            // The two stored scripts stamp this column differently:
+            //   sno=10 -> DATE_TRUNC('second', NOW() AT TIME ZONE 'America/New_York')
+            //   sno=6  -> NOW()   (i.e. the UTC wall clock)
+            // So a value more than ~2h AHEAD of the New York clock is really a
+            // UTC stamp: re-evaluate it as UTC and correct by the zone offset.
+            if (ageSec < -7200) {
+                try {
+                    var nyNow = new Date(new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'America/New_York',
+                        timeZoneName: 'longOffset'
+                    }).formatToParts(new Date()).reduce(function (a, x) {
+                        if (x.type === 'timeZoneName') a.tz = x.value; return a;
+                    }, {}).tz);
+                    var off = /GMT([+-])(\d{1,2}):(\d{2})/.exec(nyNow);
+                    if (off) {
+                        var mins = (off[1] === '-' ? -1 : 1) *
+                            (parseInt(off[2], 10) * 60 + parseInt(off[3], 10));
+                        ageSec = Math.round((nowSec - (dataSec + mins * 60000)) / 1000);
+                    }
+                } catch (err) { /* keep the NY interpretation */ }
+            }
+            return Math.max(0, ageSec);
         }
 
         /** Render one cell with semantic color coding. */
@@ -1143,10 +1322,12 @@
         let isRefreshing = false;
         let refreshTimer = null;
         let consecutiveFailures = 0;      // reset by any successful run
-        let nextRunAllowedAt = 0;         // epoch ms — back-off gate
+        let nextReadAllowedAt = 0;        // epoch ms — when the next table READ may run
+        let nextPipelineAllowedAt = 0;    // epoch ms — when the next ETL (RPC) may run
         let lastRunMs = null;             // duration of the last successful run
         let lastRunFailure = null;        // short text of the last failure
         let lastWaitingNotice = null;     // de-dupes the "other tab" status line
+        let lastSuccessMsg = null;        // last "SQL executed ..." status line
 
         function setRefreshingState(refreshing) {
             isRefreshing = refreshing;
@@ -1176,22 +1357,56 @@
                 age + 's ago) — showing the last data; this tab takes over next tick.');
         }
 
+        /** Automatic tick inside the read cadence / back-off window:
+         *  keep the last result and show the countdown. */
+        function showSkippedTick() {
+            if (!lastSuccessMsg) return;
+            var readSecs = Math.max(0, Math.round((nextReadAllowedAt - Date.now()) / 1000));
+            var pipeSecs = Math.max(0, Math.round((nextPipelineAllowedAt - Date.now()) / 1000));
+            var notice = 'skip:' + readSecs + ':' + pipeSecs;
+            if (notice === lastWaitingNotice) return;
+            lastWaitingNotice = notice;
+            setStatusHtml(lastSuccessMsg +
+                ' · <span style="color:#666;">refreshing in ' + readSecs + 's' +
+                (PIPELINE_MIN_GAP_MS > 0 ? ' · next SQL pipeline in ' + pipeSecs + 's' : '') +
+                '</span>');
+        }
+
         async function refreshData(manual) {
             if (isRefreshing) return;
 
-            // Back-off window (set after a DB-busy / timeout failure).
-            if (!manual && Date.now() < nextRunAllowedAt) return;
+            var now = Date.now();
+
+            // Two independent cadences:
+            //   READ  - a plain PostgREST GET of the result table: ~0.5s for
+            //           the 10-row table, so it is safe on every 3s tick and
+            //           that is what keeps the report live.
+            //   ETL   - the RPC that TRUNCATEs + rebuilds the table: ~25s and
+            //           lock-contention prone, so at most once every
+            //           PIPELINE_MIN_GAP_MS and in ONE tab at a time.
+            var pipelineDue = manual || PIPELINE_MIN_GAP_MS <= 0 ||
+                (now >= nextPipelineAllowedAt);
+            var readDue = manual || (now >= nextReadAllowedAt);
+
+            // Back-off window (after a DB-busy / timeout failure).
+            if (!readDue) {
+                showSkippedTick();
+                return;
+            }
 
             // Cross-tab single-flight.  The sno=10 script TRUNCATEs
-            // inception_stock_intraday inside ONE transaction, so a second
-            // concurrent run would wait for the table lock and be cancelled
-            // with 55P03 once the RPC's 10s lock_timeout expires.
+            // inception_stock_intraday inside ONE transaction (ACCESS
+            // EXCLUSIVE), so while another tab owns the pipeline we must
+            // neither run the ETL NOR read the table: a concurrent SELECT
+            // would block on that lock (anon statement_timeout -> 57014) and
+            // would also delay the TRUNCATE towards a 55P03.  We simply keep
+            // the data already on screen and take over on a later tick.
             var lease = readPipelineLease();
             if (lease && lease.id !== TAB_ID) {
                 showWaitingForOtherTab(lease);
                 return;
             }
-            if (!claimPipelineLease()) {
+            if (pipelineDue && !claimPipelineLease()) {
                 showWaitingForOtherTab(readPipelineLease());
                 return;
             }
@@ -1200,40 +1415,57 @@
             lastWaitingNotice = null;
             setRefreshingState(true);
             var startedAt = Date.now();
+            if (pipelineDue) writeSharedLastRun(startedAt);
 
             try {
-                const rows = await fetchInceptionData();
+                const rows = await fetchInceptionData(pipelineDue);
                 const columns = resolveColumns(rows);
 
                 updateChart(rows);
                 updateTable(rows, columns);
 
                 consecutiveFailures = 0;
-                nextRunAllowedAt = (PIPELINE_MIN_GAP_MS > 0)
-                    ? (Date.now() + PIPELINE_MIN_GAP_MS)   // optional ETL throttle
-                    : 0;
+                nextReadAllowedAt = Date.now() + REFRESH_INTERVAL_MS;
+                if (pipelineDue) {
+                    nextPipelineAllowedAt = Date.now() + PIPELINE_MIN_GAP_MS;
+                }
                 lastRunFailure = null;
                 lastRunMs = Date.now() - startedAt;
 
                 const now = new Date();
                 let msg = '<i class="fas fa-check-circle" style="color:green;"></i> ' +
-                    'SQL executed · ' + rows.length + ' rows · Updated: ' +
-                    now.toLocaleTimeString() + ' · ' + (lastRunMs / 1000).toFixed(1) + 's';
-                if (rows.length) {
-                    msg += ' · gain=' + (GAIN_COLUMN || '?') +
-                        ' · rank=' + (RANK_COLUMN || 'raw-order');
-                } else if (DIRECT_READ) {
-                    msg += ' · ' + DIRECT_READ;
+                    (pipelineDue ? 'SQL executed · ' : 'Data read · ') +
+                    rows.length + ' rows · ' + (DATA_SOURCE_TABLE || '?') +
+                    ' · Updated: ' + now.toLocaleTimeString() +
+                    ' · ' + (lastRunMs / 1000).toFixed(1) + 's' +
+                    ' · gain=' + (GAIN_COLUMN || '?') +
+                    ' · rank=' + (RANK_COLUMN || 'raw-order');
+                if (PIPELINE_MIN_GAP_MS > 0) {
+                    msg += ' · pipeline every ' + Math.round(PIPELINE_MIN_GAP_MS / 1000) + 's';
                 }
-                if (rows.length && rows[0]['analysis_timestamp']) {
-                    msg += ' · Analysis: ' + fmtVal('analysis_timestamp', rows[0]['analysis_timestamp']) + ' ET';
+                var age = dataAgeSeconds(rows[0]);
+                if (age >= 0) {
+                    // Label the zone from the stored text: sno=10 writes New
+                    // York wall-clock (no offset), sno=6 writes UTC.
+                    var tsRaw = String(rows[0]['analysis_timestamp'] || '');
+                    var zone = (/([+-]\d{2}:?\d{2})\s*$/.test(tsRaw) || /[Zz]\s*$/.test(tsRaw))
+                        ? '' : ' ET';
+                    msg += ' · Analysis: ' + fmtVal('analysis_timestamp', tsRaw) +
+                        zone + ' (' + (age < 90 ? age + 's ago' : Math.round(age / 60) + 'm ago') + ')';
+                }
+                if (lastPipelineWarning) {
+                    msg = '<i class="fas fa-exclamation-circle" style="color:#e67e22;"></i> ' +
+                        'Pipeline warning: ' + lastPipelineWarning +
+                        ' — showing the last data · ' + msg;
                 }
                 setStatusHtml(msg);
+                lastSuccessMsg = msg;
             } catch (err) {
                 console.error('InceptionAnalysis refresh error:', err);
                 consecutiveFailures++;
                 var delay = backoffDelayMs(consecutiveFailures);
-                nextRunAllowedAt = Date.now() + delay;
+                nextReadAllowedAt = Date.now() + delay;
+                nextPipelineAllowedAt = Date.now() + delay;
                 lastRunFailure = err.dbCode
                     ? (err.dbCode + ' — ' + err.message)
                     : err.message;

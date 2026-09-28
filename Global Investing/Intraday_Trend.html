@@ -432,12 +432,16 @@
     <!-- INTRADAY TREND ANALYSIS — SQL-driven dashboard                -->
     <!--                                                               -->
     <!-- Every 3 seconds this page:                                    -->
-    <!--   1. POSTs to the RPC run_mapping_sql(p_title, p_sno), which  -->
-    <!--      fetches the SQL script stored in gammapace_internal_     -->
-    <!--      mapping (title='Intraday Trend Analyis', sno=6),         -->
-    <!--      executes EVERY statement in sequence (truncate ->        -->
-    <!--      insert -> ...) and returns the rows of the FINAL         -->
-    <!--      SELECT as JSON.                                          -->
+    <!--   1. Every 3s it READS the result table (trend_analysis) and  -->
+    <!--      renders the chart + table from those rows.                -->
+    <!--   2. At most once a minute, and only in ONE tab at a time, it   -->
+    <!--      POSTs to the RPC run_mapping_sql(p_title, p_sno), which   -->
+    <!--      fetches the SQL script stored in                          -->
+    <!--      gammapace_internal_mapping                                -->
+    <!--      (title='Intraday Trend Analyis', sno=6) and executes EVERY -->
+    <!--      statement in sequence (truncate -> insert -> ...).        -->
+    <!--      That function is used only as the TRIGGER: it answers      -->
+    <!--      "[]" rather than the final SELECT's rows.                 -->
     <!--   2. Renders a line chart (avg % momentum per symbol) and     -->
     <!--      the full data table from that response.                  -->
     <!--                                                               -->
@@ -466,11 +470,36 @@
         const REFRESH_INTERVAL_MS = 3000; // 3 seconds
         const CHART_TOP_N = 10;           // symbols shown on the line chart
 
+        // -- CONCURRENCY & RESILIENCE -------------------------------
+        // The sno=6 script TRUNCATEs + rebuilds trend_analysis inside ONE
+        // transaction (ACCESS EXCLUSIVE).  Concurrent runs therefore queue
+        // on the table lock and, with run_mapping_sql's lock_timeout, are
+        // cancelled with SQLSTATE 55P03.  Guards (same design as
+        // Intraday_Inception.html):
+        //   1. cross-tab single-flight lease - only one tab runs the ETL
+        //   2. back-off 3s -> 60s after a DB-busy / timeout failure
+        //   3. AbortController timeout so a hung RPC cannot freeze the loop
+        //   4. a shared last-run stamp, so releasing the lease cannot let
+        //      the next tab immediately re-fire the ETL
+        //   5. the report rows are READ from the result table; the RPC is
+        //      only a trigger because it answers "[]" (see fetchTrendData)
+        const RPC_TIMEOUT_MS = 120000;
+        const PIPELINE_LEASE_KEY = 'gammapace_trend_pipeline_lease';
+        const PIPELINE_LAST_RUN_KEY = 'gammapace_trend_pipeline_last_run';
+        const PIPELINE_LEASE_TTL_MS = 400000;  // a dead tab's lease expires after ~7 min
+        const BACKOFF_BASE_MS = 3000;
+        const BACKOFF_MAX_MS = 60000;
+        const PIPELINE_MIN_GAP_MS = 60000;     // ETL at most once a minute
+        const TAB_ID = 'tab-' + String(Date.now()) + '-' +
+            String(Math.floor(Math.random() * 1000000000));
+
         // Runtime state (filled at startup / per refresh)
         let CANONICAL_SQL_QUERY = null;   // the stored script text (reference only)
         let DATA_SOURCE_TABLE = null;     // result table extracted from the script
         let RANK_COLUMN = null;           // ordering column (ends with '_rank')
         let COLUMN_ORDER = null;          // canonical column list from INSERT(...)
+        let lastPipelineWarning = null;   // non-fatal ETL problem (e.g. 55P03)
+        let DIRECT_READ = null;           // "pipeline=.. | table=.. rows=N" diagnostic
 
         const SUPABASE_HEADERS = {
             'apikey': SUPABASE_ANON_KEY,
@@ -481,6 +510,66 @@
         // ┌──────────────────────────────────────────────────────────┐
         // │  CANONICAL SQL FETCH (gammapace_internal_mapping)        │
         // └──────────────────────────────────────────────────────────┘
+        // ---------------------------------------------------------------
+        //  CROSS-TAB PIPELINE LEASE (single-flight)
+        // ---------------------------------------------------------------
+        //  localStorage is shared by every tab of the same origin, so it is
+        //  a cheap "only one tab may run the ETL right now" token.  Every
+        //  storage call is wrapped, so a restricted context (e.g. a
+        //  sandboxed file://) degrades gracefully to "no lease = allowed".
+        function storageGet(key) {
+            try { return window.localStorage.getItem(key); } catch (err) { return null; }
+        }
+        function storageSet(key, value) {
+            try { window.localStorage.setItem(key, value); } catch (err) { /* ignore */ }
+        }
+        function storageRemove(key) {
+            try { window.localStorage.removeItem(key); } catch (err) { /* ignore */ }
+        }
+
+        /** @returns {object|null} the live lease ({id, ts}) or null when
+         *  absent / unreadable / expired. */
+        function readPipelineLease() {
+            var raw = storageGet(PIPELINE_LEASE_KEY);
+            if (!raw) return null;
+            var lease = null;
+            try { lease = JSON.parse(raw); } catch (err) { return null; }
+            if (!lease || !lease.ts) return null;
+            if (Date.now() - lease.ts > PIPELINE_LEASE_TTL_MS) return null; // stale owner
+            return lease;
+        }
+
+        /** Claim the lease for this tab (true = this tab may run the ETL). */
+        function claimPipelineLease() {
+            var lease = readPipelineLease();
+            if (lease && lease.id !== TAB_ID) return false;
+            storageSet(PIPELINE_LEASE_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() }));
+            return true;
+        }
+
+        /** Hand the lease back so a later tick (any tab) may run the ETL. */
+        function releasePipelineLease() {
+            var lease = readPipelineLease();
+            if (lease && lease.id !== TAB_ID) return;
+            storageRemove(PIPELINE_LEASE_KEY);
+        }
+
+        /** Seconds since the owning tab claimed the lease. */
+        function leaseAgeSeconds(lease) {
+            if (!lease || !lease.ts) return 0;
+            return Math.max(0, Math.round((Date.now() - lease.ts) / 1000));
+        }
+
+        /** Epoch ms of the last ETL start, shared by every tab, so the
+         *  PIPELINE_MIN_GAP_MS throttle is global and not per-tab. */
+        function readSharedLastRun() {
+            var n = parseInt(storageGet(PIPELINE_LAST_RUN_KEY), 10);
+            return isNaN(n) ? 0 : n;
+        }
+        function writeSharedLastRun(ms) {
+            storageSet(PIPELINE_LAST_RUN_KEY, String(ms));
+        }
+
         async function fetchCanonicalSql() {
             var url = SUPABASE_URL + '/rest/v1/' + SUPABASE_SQL_MAPPING_TABLE +
                 '?select=sql' +
@@ -550,15 +639,49 @@
         // ┌──────────────────────────────────────────────────────────┐
         // │  DATA FETCH — run the script, return the final SELECT    │
         // └──────────────────────────────────────────────────────────┘
+        /** Build an Error carrying the PostgreSQL SQLSTATE reported by the
+         *  RPC (55P03 = lock timeout, 57014 = statement timeout, 40P01 = deadlock). */
+        function dbError(message, dbCode) {
+            var err = new Error(message);
+            err.dbCode = dbCode || null;
+            return err;
+        }
+
         async function callRunMappingSql() {
             var url = SUPABASE_URL + '/rest/v1/rpc/' + RPC_FUNCTION_NAME;
-            var response = await fetch(url, {
-                method: 'POST',
-                headers: Object.assign({}, SUPABASE_HEADERS, {
-                    'Content-Type': 'application/json'
-                }),
-                body: JSON.stringify({ p_title: SQL_MAPPING_TITLE, p_sno: SQL_MAPPING_SNO })
-            });
+
+            // Abort a hung call instead of freezing the refresh loop forever.
+            var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            var timedOut = false;
+            var timer = null;
+            if (controller) {
+                timer = setTimeout(function () {
+                    timedOut = true;
+                    try { controller.abort(); } catch (err) { /* ignore */ }
+                }, RPC_TIMEOUT_MS);
+            }
+
+            var response;
+            try {
+                response = await fetch(url, {
+                    method: 'POST',
+                    headers: Object.assign({}, SUPABASE_HEADERS, {
+                        'Content-Type': 'application/json'
+                    }),
+                    body: JSON.stringify({ p_title: SQL_MAPPING_TITLE, p_sno: SQL_MAPPING_SNO }),
+                    signal: controller ? controller.signal : undefined
+                });
+            } catch (netErr) {
+                if (timedOut) {
+                    throw dbError('The SQL pipeline did not answer within ' +
+                        Math.round(RPC_TIMEOUT_MS / 1000) + 's - the RPC call was aborted.',
+                        'TIMEOUT');
+                }
+                throw dbError('Network error calling ' + RPC_FUNCTION_NAME + ': ' +
+                    ((netErr && netErr.message) || netErr), 'NETWORK');
+            } finally {
+                if (timer) clearTimeout(timer);
+            }
 
             if (!response.ok) {
                 var errorBody = await response.text();
@@ -566,14 +689,24 @@
                     throw new Error('RPC "' + RPC_FUNCTION_NAME + '" is not installed yet. ' +
                         'Please run setup_run_mapping_sqls.sql once in the Supabase SQL Editor.');
                 }
-                if (errorBody.indexOf('57014') !== -1) {
-                    throw new Error('SQL script exceeded the database statement timeout. ' +
-                        'Run this in the Supabase SQL Editor to raise the limit: ' +
-                        "ALTER FUNCTION public.run_mapping_sql(text, integer) " +
-                        "SET statement_timeout = '120s';");
+                if (errorBody.indexOf('55P03') !== -1) {
+                    throw dbError('The SQL pipeline could not get its table lock ' +
+                        '(SQLSTATE 55P03 - another run was holding the tables, e.g. ' +
+                        'trend_analysis). The page backs off and retries automatically.',
+                        '55P03');
                 }
-                throw new Error('Supabase RPC error: ' + response.status + ' ' +
-                    response.statusText + ' - ' + errorBody);
+                if (errorBody.indexOf('40P01') !== -1) {
+                    throw dbError('The SQL pipeline hit a database deadlock ' +
+                        '(SQLSTATE 40P01). It is retried automatically.', '40P01');
+                }
+                if (errorBody.indexOf('57014') !== -1) {
+                    throw dbError('SQL script exceeded the database statement timeout ' +
+                        '(SQLSTATE 57014). Run this in the Supabase SQL Editor to raise ' +
+                        'the limit: ALTER FUNCTION public.run_mapping_sql(text, integer) ' +
+                        "SET statement_timeout = '300s';", '57014');
+                }
+                throw dbError('Supabase RPC error: ' + response.status + ' ' +
+                    response.statusText + ' - ' + errorBody, null);
             }
 
             var text = await response.text();
@@ -582,25 +715,119 @@
             return Array.isArray(data) ? data : [data];
         }
 
-        /** Run the full SQL pipeline and get the final SELECT's rows.
-         *  If the RPC returns nothing (e.g. the script ends without a
-         *  SELECT), fall back to reading the result table directly. */
-        async function fetchTrendData() {
-            var rows = await callRunMappingSql();
+        /** Read the pipeline's result table straight from PostgREST.
+         *
+         *  This is the ONLY source of rows for the chart + table.
+         *
+         *  run_mapping_sql() executes the stored script but answers "[]"
+         *  instead of the final SELECT's rows (verified 2026-09-28 for
+         *  sno=6, sno=8 and sno=10), so the RPC is used only as the TRIGGER
+         *  and the rendered rows are read from the table it rewrites.
+         *
+         *  The read only runs while no other tab owns the pipeline lease
+         *  (see refreshData), so it can never block on - or delay - the
+         *  ETL's ACCESS EXCLUSIVE TRUNCATE.
+         *
+         *  @returns {Promise<{rows: Array, error: (Error|null)}>} */
+        async function readResultTable() {
+            if (!DATA_SOURCE_TABLE) {
+                return {
+                    rows: [],
+                    error: dbError('Could not work out which table the sno=' + SQL_MAPPING_SNO +
+                        ' script fills, so there is nothing to read.', null)
+                };
+            }
 
-            if (rows.length === 0 && DATA_SOURCE_TABLE) {
-                var url = SUPABASE_URL + '/rest/v1/' + DATA_SOURCE_TABLE + '?select=*';
-                if (RANK_COLUMN) url += '&order=' + RANK_COLUMN + '.asc';
+            var url = SUPABASE_URL + '/rest/v1/' +
+                encodeURIComponent(DATA_SOURCE_TABLE) + '?select=*';
+            if (RANK_COLUMN) url += '&order=' + encodeURIComponent(RANK_COLUMN) + '.asc';
+
+            try {
                 var response = await fetch(url, { method: 'GET', headers: SUPABASE_HEADERS });
-                if (response.ok) rows = await response.json();
+                if (!response.ok) {
+                    var errorBody = await response.text();
+                    return {
+                        rows: [],
+                        error: dbError('Could not read ' + DATA_SOURCE_TABLE + ': ' +
+                            response.status + ' ' + response.statusText + ' - ' + errorBody,
+                            (errorBody.indexOf('55P03') !== -1) ? '55P03' : null)
+                    };
+                }
+                var text = await response.text();
+                if (!text) return { rows: [], error: null };
+                var data = JSON.parse(text);
+                return { rows: Array.isArray(data) ? data : [data], error: null };
+            } catch (netErr) {
+                return {
+                    rows: [],
+                    error: dbError('Network error reading ' + DATA_SOURCE_TABLE + ': ' +
+                        ((netErr && netErr.message) || netErr), 'NETWORK')
+                };
+            }
+        }
+
+        /** One refresh cycle: run the heavy ETL (only when due) and read back
+         *  the rows it produced.
+         *
+         *  runPipeline=false -> cheap read-only tick (every REFRESH_INTERVAL_MS)
+         *  runPipeline=true  -> execute the sno=6 script through the RPC, then
+         *                        read the table it just rewrote
+         *
+         *  An ETL failure is NOT fatal while the table still holds rows: the
+         *  report keeps rendering the last good data and the status bar
+         *  explains what went wrong. */
+        async function fetchTrendData(runPipeline) {
+            var rpcError = null;
+            if (runPipeline) {
+                try {
+                    await callRunMappingSql();
+                } catch (err) {
+                    rpcError = err;
+                }
+            }
+
+            var read = await readResultTable();
+
+            DIRECT_READ = 'pipeline=' + (runPipeline
+                ? (rpcError ? 'error(' + (rpcError.dbCode || 'rpc') + ')' : 'ok')
+                : 'skipped(reading only)') +
+                ' | table=' + (DATA_SOURCE_TABLE || '?') +
+                ' rows=' + read.rows.length +
+                (read.error ? ' read-error=' + (read.error.dbCode || 'http') : '');
+
+            lastPipelineWarning = rpcError
+                ? (rpcError.dbCode ? (rpcError.dbCode + ' - ' + rpcError.message) : rpcError.message)
+                : null;
+
+            if (read.error) {
+                if (rpcError) {
+                    read.error.message = 'The SQL pipeline failed (' +
+                        (rpcError.dbCode || 'rpc') + '), so the result table could not be ' +
+                        'refreshed either: ' + read.error.message;
+                }
+                throw read.error;
+            }
+
+            if (read.rows.length === 0) {
+                if (rpcError) throw rpcError;      // the real reason for the empty report
+                throw dbError('No rows in ' + DATA_SOURCE_TABLE + ' yet.  The sno=' +
+                    SQL_MAPPING_SNO + ' script ran without error but matched no symbols ' +
+                    'today (it may be outside market hours, or the stored SQL criteria ' +
+                    'may need revisiting).', null);
             }
 
             // The script inserts rows in ranked order; re-sort by the rank
             // column when it is present so the display order is guaranteed.
-            if (RANK_COLUMN && rows.length > 1 && typeof rows[0][RANK_COLUMN] === 'number') {
-                rows.sort(function (a, b) { return (a[RANK_COLUMN] || 0) - (b[RANK_COLUMN] || 0); });
+            if (RANK_COLUMN && read.rows.length > 1) {
+                read.rows.sort(function (a, b) {
+                    var av = Number(a[RANK_COLUMN]);
+                    var bv = Number(b[RANK_COLUMN]);
+                    if (isNaN(av)) av = 0;
+                    if (isNaN(bv)) bv = 0;
+                    return av - bv;
+                });
             }
-            return rows;
+            return read.rows;
         }
 
         // ┌──────────────────────────────────────────────────────────┐
@@ -652,12 +879,79 @@
             }
             if (col === 'trade_time' && /^\d{2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
             if (col === 'analysis_timestamp') {
-                var d = new Date(v);
-                if (!isNaN(d)) {
-                    return d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: false });
+                // The ETL writes New York WALL-CLOCK text with no UTC offset
+                // (e.g. "2026-09-28T12:07:12").  new Date(v) would read that
+                // as browser-local time and toLocaleTimeString() would then
+                // shift it a second time, so every viewer outside New York
+                // saw a wrong clock.  The stored value is already the NY time.
+                var raw = String(v);
+                var ts = raw.match(/[T ](\d{2}:\d{2}(?::\d{2})?)/);
+                if (!ts) return raw;
+                // An explicit offset (or trailing Z) means the text already
+                // carries its own zone, so the clock is shown verbatim and
+                // labelled with that offset instead of assuming New York.
+                var off = raw.match(/([+-])(\d{2}):?(\d{2})\s*$/);
+                if (off) {
+                    var h = +off[2], m = +off[3];
+                    var sign = (off[1] === '-') ? '-' : '+';
+                    return ts[1] + ' UTC' + sign + (h < 10 ? '0' : '') + h +
+                        (m < 10 ? '0' : '') + m;
                 }
+                if (/[Zz]\s*$/.test(raw)) return ts[1] + ' UTC';
+                return ts[1];
             }
             return String(v);
+        }
+
+        /** Age in seconds of the newest row's analysis_timestamp, or -1.
+         *
+         *  The ETL stamps America/New_York WALL-CLOCK text with no offset,
+         *  so the only correct comparison is against the current New York
+         *  wall clock - not the browser's own timezone. */
+        function dataAgeSeconds(row) {
+            if (!row || !row['analysis_timestamp']) return -1;
+            var m = String(row['analysis_timestamp'])
+                .match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+            if (!m) return -1;
+            var nowParts = {};
+            try {
+                new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'America/New_York', hour12: false,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                }).formatToParts(new Date()).forEach(function (p) {
+                    if (p.type !== 'literal') nowParts[p.type] = p.value;
+                });
+            } catch (err) { return -1; }
+            if (!nowParts.year) return -1;
+            var dataSec = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+            var hour = (+nowParts.hour === 24) ? 0 : +nowParts.hour;
+            var nowSec = Date.UTC(+nowParts.year, +nowParts.month - 1, +nowParts.day,
+                hour, +nowParts.minute, +nowParts.second);
+            var ageSec = Math.round((nowSec - dataSec) / 1000);
+
+            // The two stored scripts stamp this column differently:
+            //   sno=10 -> DATE_TRUNC('second', NOW() AT TIME ZONE 'America/New_York')
+            //   sno=6  -> NOW()   (i.e. the UTC wall clock)
+            // So a value more than ~2h AHEAD of the New York clock is really a
+            // UTC stamp: re-evaluate it as UTC and correct by the zone offset.
+            if (ageSec < -7200) {
+                try {
+                    var nyNow = new Date(new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'America/New_York',
+                        timeZoneName: 'longOffset'
+                    }).formatToParts(new Date()).reduce(function (a, x) {
+                        if (x.type === 'timeZoneName') a.tz = x.value; return a;
+                    }, {}).tz);
+                    var off = /GMT([+-])(\d{1,2}):(\d{2})/.exec(nyNow);
+                    if (off) {
+                        var mins = (off[1] === '-' ? -1 : 1) *
+                            (parseInt(off[2], 10) * 60 + parseInt(off[3], 10));
+                        ageSec = Math.round((nowSec - (dataSec + mins * 60000)) / 1000);
+                    }
+                } catch (err) { /* keep the NY interpretation */ }
+            }
+            return Math.max(0, ageSec);
         }
 
         /** Render one cell with semantic color coding. */
@@ -816,8 +1110,13 @@
             if (!rows || rows.length === 0) {
                 if (columns.length) buildTableHead(columns);
                 tbody.innerHTML = '<tr><td colspan="' + Math.max(columns.length, 1) +
-                    '" class="table-placeholder">No data available yet — the SQL script ' +
-                    'has not produced rows (it may still be outside market hours).</td></tr>';
+                    '" class="table-placeholder"><b>No data available yet</b> — ' +
+                    'the sno=' + SQL_MAPPING_SNO + ' script ran without error but ' +
+                    '<b>' + (DATA_SOURCE_TABLE || '?') + '</b> is empty, so it matched ' +
+                    'no symbols today.  Check: the stored SQL criteria in <b>' +
+                    SUPABASE_SQL_MAPPING_TABLE + '</b> (sno=' + SQL_MAPPING_SNO +
+                    '), whether the market is open, and that nasdaq_chart has rows ' +
+                    'for today.  Fetch: ' + (DIRECT_READ || 'n/a') + '.</td></tr>';
                 return;
             }
 
@@ -841,6 +1140,11 @@
         // └──────────────────────────────────────────────────────────┘
         let isRefreshing = false;
         let refreshTimer = null;
+        let consecutiveFailures = 0;      // reset by any successful run
+        let nextReadAllowedAt = 0;        // epoch ms - when the next table READ may run
+        let nextPipelineAllowedAt = 0;    // epoch ms - when the next ETL (RPC) may run
+        let lastWaitingNotice = null;     // de-dupes the "other tab" status line
+        let lastSuccessMsg = null;        // last "SQL executed ..." status line
 
         function setRefreshingState(refreshing) {
             isRefreshing = refreshing;
@@ -848,31 +1152,154 @@
             if (spinner) spinner.style.display = refreshing ? 'block' : 'none';
         }
 
-        async function refreshData() {
+        function setStatusHtml(html) {
+            var el = document.getElementById('lastUpdatedText');
+            if (el) el.innerHTML = html;
+        }
+
+        /** 3s, 6s, 12s, 24s, 48s ... capped at BACKOFF_MAX_MS. */
+        function backoffDelayMs(failures) {
+            var delay = BACKOFF_BASE_MS * Math.pow(2, Math.max(0, failures - 1));
+            return Math.min(delay, BACKOFF_MAX_MS);
+        }
+
+        /** Another tab of this report currently owns the pipeline lease. */
+        function showWaitingForOtherTab(lease) {
+            var age = leaseAgeSeconds(lease);
+            var notice = 'waiting:' + age;
+            if (notice === lastWaitingNotice) return;   // don't re-render every 3s
+            lastWaitingNotice = notice;
+            setStatusHtml('<i class="fas fa-hourglass-half" style="color:#8b4513;"></i> ' +
+                'Another tab of this report is running the SQL pipeline (started ' +
+                age + 's ago) - showing the last data; this tab takes over next tick.');
+        }
+
+        /** Automatic tick inside the read cadence / back-off window:
+         *  keep the last result and show the countdown. */
+        function showSkippedTick() {
+            if (!lastSuccessMsg) return;
+            var readSecs = Math.max(0, Math.round((nextReadAllowedAt - Date.now()) / 1000));
+            var pipeSecs = Math.max(0, Math.round((nextPipelineAllowedAt - Date.now()) / 1000));
+            var notice = 'skip:' + readSecs + ':' + pipeSecs;
+            if (notice === lastWaitingNotice) return;
+            lastWaitingNotice = notice;
+            setStatusHtml(lastSuccessMsg +
+                ' · <span style="color:#666;">refreshing in ' + readSecs + 's' +
+                (PIPELINE_MIN_GAP_MS > 0 ? ' · next SQL pipeline in ' + pipeSecs + 's' : '') +
+                '</span>');
+        }
+
+        async function refreshData(manual) {
             if (isRefreshing) return;
+
+            var now = Date.now();
+
+            // Two independent cadences:
+            //   READ  - a plain PostgREST GET of the result table: fast, so it
+            //           is safe on every 3s tick and keeps the report live.
+            //   ETL   - the RPC that TRUNCATEs + rebuilds the table: ~10s and
+            //           lock-contention prone, so at most once every
+            //           PIPELINE_MIN_GAP_MS and in ONE tab at a time.
+            var pipelineDue = manual || PIPELINE_MIN_GAP_MS <= 0 ||
+                (now >= nextPipelineAllowedAt);
+            var readDue = manual || (now >= nextReadAllowedAt);
+
+            // Back-off window (after a DB-busy / timeout failure).
+            if (!readDue) {
+                showSkippedTick();
+                return;
+            }
+
+            // Cross-tab single-flight.  The sno=6 script TRUNCATEs
+            // trend_analysis inside ONE transaction (ACCESS EXCLUSIVE), so
+            // while another tab owns the pipeline we must neither run the ETL
+            // NOR read the table: a concurrent SELECT would block on that lock
+            // (anon statement_timeout -> 57014) and would also delay the
+            // TRUNCATE towards a 55P03.  We keep the data on screen and take
+            // over on a later tick.
+            var lease = readPipelineLease();
+            if (lease && lease.id !== TAB_ID) {
+                showWaitingForOtherTab(lease);
+                return;
+            }
+            if (pipelineDue && !claimPipelineLease()) {
+                showWaitingForOtherTab(readPipelineLease());
+                return;
+            }
+
+            isRefreshing = true;
+            lastWaitingNotice = null;
             setRefreshingState(true);
+            var startedAt = Date.now();
+            if (pipelineDue) writeSharedLastRun(startedAt);
 
             try {
-                const rows = await fetchTrendData();
+                const rows = await fetchTrendData(pipelineDue);
                 const columns = resolveColumns(rows);
 
                 updateChart(rows, columns);
                 updateTable(rows, columns);
 
-                const now = new Date();
-                let msg = '<i class="fas fa-check-circle" style="color:green;"></i> ' +
-                    'SQL executed · ' + rows.length + ' rows · Updated: ' + now.toLocaleTimeString();
-                if (rows.length && rows[0]['analysis_timestamp']) {
-                    msg += ' · Analysis: ' + fmtVal('analysis_timestamp', rows[0]['analysis_timestamp']) + ' ET';
+                consecutiveFailures = 0;
+                nextReadAllowedAt = Date.now() + REFRESH_INTERVAL_MS;
+                if (pipelineDue) {
+                    nextPipelineAllowedAt = Date.now() + PIPELINE_MIN_GAP_MS;
                 }
-                document.getElementById('lastUpdatedText').innerHTML = msg;
+                var lastRunMs = Date.now() - startedAt;
+
+                const now2 = new Date();
+                let msg = '<i class="fas fa-check-circle" style="color:green;"></i> ' +
+                    (pipelineDue ? 'SQL executed · ' : 'Data read · ') +
+                    rows.length + ' rows · ' + (DATA_SOURCE_TABLE || '?') +
+                    ' · Updated: ' + now2.toLocaleTimeString() +
+                    ' · ' + (lastRunMs / 1000).toFixed(1) + 's' +
+                    (PIPELINE_MIN_GAP_MS > 0
+                        ? ' · pipeline every ' + Math.round(PIPELINE_MIN_GAP_MS / 1000) + 's'
+                        : '');
+                var age = dataAgeSeconds(rows[0]);
+                if (age >= 0) {
+                    // Label the zone from the stored text: sno=10 writes New
+                    // York wall-clock (no offset), sno=6 writes UTC.
+                    var tsRaw = String(rows[0]['analysis_timestamp'] || '');
+                    var zone = (/([+-]\d{2}:?\d{2})\s*$/.test(tsRaw) || /[Zz]\s*$/.test(tsRaw))
+                        ? '' : ' ET';
+                    msg += ' · Analysis: ' + fmtVal('analysis_timestamp', tsRaw) +
+                        zone + ' (' + (age < 90 ? age + 's ago' : Math.round(age / 60) + 'm ago') + ')';
+                }
+                if (lastPipelineWarning) {
+                    msg = '<i class="fas fa-exclamation-circle" style="color:#e67e22;"></i> ' +
+                        'Pipeline warning: ' + lastPipelineWarning +
+                        ' - showing the last data · ' + msg;
+                }
+                setStatusHtml(msg);
+                lastSuccessMsg = msg;
             } catch (err) {
                 console.error('TrendAnalysis refresh error:', err);
-                document.getElementById('lastUpdatedText').innerHTML =
-                    '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> ' +
-                    'Error: ' + err.message +
-                    ' <span style="cursor:pointer;color:#8b4513;" onclick="refreshData()">Retry</span>';
+                consecutiveFailures++;
+                var delay = backoffDelayMs(consecutiveFailures);
+                nextReadAllowedAt = Date.now() + delay;
+                nextPipelineAllowedAt = Date.now() + delay;
+
+                var head;
+                if (err.dbCode === '55P03') {
+                    head = '<i class="fas fa-hourglass-half" style="color:#e67e22;"></i> ' +
+                        '<b>Pipeline busy (55P03 lock timeout)</b> - another run held ' +
+                        'the tables. ';
+                } else if (err.dbCode === '57014') {
+                    head = '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> ' +
+                        '<b>Statement timeout (57014)</b> - ';
+                } else if (err.dbCode === 'TIMEOUT') {
+                    head = '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> ' +
+                        '<b>RPC aborted</b> - ';
+                } else {
+                    head = '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> ' +
+                        'Error: ';
+                }
+                setStatusHtml(head + err.message +
+                    ' <span style="color:#666;">retrying in ' + Math.round(delay / 1000) + 's</span>' +
+                    ' <span style="cursor:pointer;color:#8b4513;" onclick="refreshData(true)">Retry now</span>');
             } finally {
+                releasePipelineLease();
                 setRefreshingState(false);
             }
         }

@@ -134,3 +134,37 @@ SELECT sno,
         WHERE polrelid = 'public.gammapace_internal_mapping'::regclass;
    ============================================================ */
 
+
+/* ------------------------------------------------------------
+   6. ETL SCAN INDEXES (added 2026-09-28)
+   ------------------------------------------------------------
+   The sno=10 script scans 7 days of nasdaq_stocks and all of
+   today's nasdaq_chart on every run (measured 24.7s).  These
+   indexes make the load_date filters cheap:
+
+       CREATE INDEX IF NOT EXISTS idx_nasdaq_chart_load_date
+            ON public.nasdaq_chart (load_date);
+       CREATE INDEX IF NOT EXISTS idx_nasdaq_stocks_load_date
+            ON public.nasdaq_stocks (load_date);
+
+   ANALYZE lets the planner use them straight away (the tables are
+   large and were previously only auto-analyzed):
+
+       ANALYZE public.inception_stock_intraday_hist;
+       ANALYZE public.nasdaq_chart;
+       ANALYZE public.nasdaq_stocks;
+
+   The history table grows by ~10 rows per run; it is append-only.
+   To keep it bounded, uncomment and adjust as needed:
+
+   -- DELETE FROM public.inception_stock_intraday_hist
+   --  WHERE analysis_timestamp <
+   --        (NOW() AT TIME ZONE 'America/New_York')::date - INTERVAL '7 days';
+
+   NOTE: the pages no longer need run_mapping_sql() to RETURN rows.
+   Both Intraday_Inception.html and Intraday_Trend.html now read
+   inception_stock_intraday / trend_analysis directly over PostgREST
+   and use the RPC only as a trigger, because the deployed
+   run_mapping_sql() answers "[]" for every sno.  Re-running
+   setup_run_mapping_sqls.sql repairs that function.
+   ============================================================ */
