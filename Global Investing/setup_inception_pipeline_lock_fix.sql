@@ -108,3 +108,29 @@ SELECT sno,
        position('pg_advisory_xact_lock' in sql) > 0 AS has_advisory_lock
   FROM gammapace_internal_mapping
  WHERE sno = 10;
+
+
+/* ------------------------------------------------------------
+   5. SECURITY NOTE — REVIEW, THEN UNCOMMENT (recommended)
+   ------------------------------------------------------------
+   Verified 2026-09-28: the browser publishable ("anon") key CAN write
+   gammapace_internal_mapping (a PATCH against the sno=10 row returned 200
+   with the updated row).  Combined with run_mapping_sql() being
+   SECURITY DEFINER, that means anyone holding the publishable key could
+   store SQL in that table and have it executed as the table owner.
+
+   Nothing in the frontend writes this table (the reports only run
+   "select sql from gammapace_internal_mapping where sno = ..."), so the
+   REST write grants can be dropped safely - READS MUST STAY.
+
+   Uncomment the two statements below to close the hole:
+
+-- REVOKE INSERT, UPDATE, DELETE ON public.gammapace_internal_mapping FROM anon;
+-- REVOKE INSERT, UPDATE, DELETE ON public.gammapace_internal_mapping FROM authenticated;
+
+   If the project instead relies on RLS, verify the policy on that table
+   with:
+       SELECT polname, polcmd, polroles::regrole[] FROM pg_policy
+        WHERE polrelid = 'public.gammapace_internal_mapping'::regclass;
+   ============================================================ */
+
