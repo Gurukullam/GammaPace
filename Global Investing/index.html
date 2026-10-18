@@ -400,6 +400,56 @@
             transform: rotate(180deg);
         }
 
+        /* Portfolio Submenu styles (same pattern as Gamma Report) */
+        .portfolio-submenu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 0.5rem 0;
+            min-width: 200px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .portfolio-submenu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .portfolio-submenu a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            color: #3c2d1f;
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            border-radius: 0;
+        }
+
+        .portfolio-submenu a:hover {
+            background: rgba(139, 69, 19, 0.1);
+            color: #8b4513;
+            transform: translateX(5px);
+        }
+
+        .portfolio-arrow {
+            transition: transform 0.3s ease;
+        }
+
+        .portfolio-menu.active .portfolio-arrow {
+            transform: rotate(180deg);
+        }
+
         /* Main content area */
         .main-content {
             margin-top: 120px;
@@ -726,6 +776,12 @@
                             <a href="Intraday_Steady_Growth_Stocks.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradaySteadyGrowth')"><i class="fas fa-chart-line"></i> Intraday Steady Growth</a>
                             <a href="Intraday_Trend.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradayTrend')"><i class="fas fa-wave-square"></i> Intraday Trend</a>
                             <a href="Intraday_Inception.html" target="_blank" rel="noopener" onclick="selectGammaReportOption('IntradayInception')"><i class="fas fa-rocket"></i> Intraday Inception</a>
+                        </div>
+                    </li>
+                    <li class="portfolio-menu" onmouseenter="cancelSubmenuTimeout('portfolio')" onmouseleave="startSubmenuTimeout('portfolio')">
+                        <a href="#portfolio" onclick="togglePortfolioSubmenu(event)"><i class="fas fa-briefcase"></i> Portfolio <i class="fas fa-chevron-down portfolio-arrow"></i></a>
+                        <div class="portfolio-submenu" id="portfolioSubmenu" onmouseenter="cancelSubmenuTimeout('portfolio')" onmouseleave="startSubmenuTimeout('portfolio')">
+                            <a href="GammaPorfolio.html" target="_blank" rel="noopener" onclick="selectPortfolioOption('GammapaceIntraday')"><i class="fas fa-chart-line"></i> Gammapace Intraday</a>
                         </div>
                     </li>
                     <li><a href="#about" onclick="selectAbout()"><i class="fas fa-lightbulb"></i> About</a></li>
@@ -1092,12 +1148,12 @@
 
         // Close all submenus globally except the specified one
         function closeAllSubmenusGlobally(exceptSubmenuId) {
-            const allSubmenus = ['nasdaqIntelligenceSubmenu', 'gammaReportSubmenu'];
+            const allSubmenus = ['nasdaqIntelligenceSubmenu', 'gammaReportSubmenu', 'portfolioSubmenu'];
 
             allSubmenus.forEach(submenuId => {
                 if (submenuId !== exceptSubmenuId) {
                     const submenu = document.getElementById(submenuId);
-                    const menuParent = submenu?.closest('.nasdaq-intelligence-menu');
+                    const menuParent = submenu?.closest('li');
 
                     if (submenu) submenu.classList.remove('show');
                     if (menuParent) menuParent.classList.remove('active');
@@ -1209,6 +1265,52 @@
 
             if (option === 'IntradayInception') {
                 window.location.href = 'Intraday_Inception.html';
+                return;
+            }
+        }
+
+        // Portfolio Submenu Functions (same pattern as Gamma Report)
+        function togglePortfolioSubmenu(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const submenu = document.getElementById('portfolioSubmenu');
+            const menuParent = submenu.closest('.portfolio-menu');
+            const isCurrentlyOpen = submenu.classList.contains('show');
+
+            // Cancel any pending timeout for this menu
+            if (window.cancelSubmenuTimeout) {
+                window.cancelSubmenuTimeout('portfolio');
+            }
+
+            if (isCurrentlyOpen) {
+                submenu.classList.remove('show');
+                menuParent.classList.remove('active');
+            } else {
+                closeAllSubmenusGlobally('portfolioSubmenu');
+                submenu.classList.add('show');
+                menuParent.classList.add('active');
+            }
+        }
+
+        // Portfolio Option Selection Function
+        function selectPortfolioOption(option) {
+
+            // Hide about content and show default content
+            hideAboutContent();
+            showDefaultContent();
+
+            // Close the submenu first
+            const submenu = document.getElementById('portfolioSubmenu');
+            const menuParent = submenu.closest('.portfolio-menu');
+            submenu.classList.remove('show');
+            menuParent.classList.remove('active');
+
+            // Handle specific navigation for Portfolio options
+            // NOTE: relative filenames only — works both locally and on GitHub Pages.
+            // "GammaPorfolio.html" spelling matches the file on disk.
+            if (option === 'GammapaceIntraday') {
+                window.location.href = 'GammaPorfolio.html';
                 return;
             }
         }

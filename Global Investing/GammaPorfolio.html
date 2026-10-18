@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GammaPortfolio | Gammapace</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; line-height:1.6; color:#3c2d1f; background:linear-gradient(135deg,#d4af37 0%,#b8860b 50%,#cd853f 100%); min-height:100vh; -webkit-font-smoothing:antialiased; touch-action:manipulation; }
+button,a { touch-action:manipulation; }
+.header { background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); box-shadow:0 2px 20px rgba(0,0,0,0.1); position:fixed; top:0; left:0; right:0; z-index:1001; min-height:80px; }
+.navbar { display:flex; flex-direction:column; padding:0.5rem 1.5rem; max-width:1200px; margin:0 auto; gap:0.5rem; }
+.nav-top-row { display:flex; justify-content:space-between; align-items:center; width:100%; min-height:45px; }
+.nav-bottom-row { display:flex; justify-content:flex-start; align-items:center; width:100%; padding-top:0.3rem; }
+.logo { text-decoration:none; color:inherit; }
+.master-guruvammal-logo { position:relative !important; display:inline-flex !important; align-items:center !important; justify-content:center !important; width:40px !important; height:40px !important; font-family:'Century Gothic',sans-serif !important; font-size:24px !important; font-weight:900 !important; color:#5d3a0a !important; background:linear-gradient(135deg,rgba(212,175,55,0.15) 0%,rgba(139,69,19,0.25) 50%,rgba(205,133,63,0.2) 100%) !important; border-radius:4px !important; padding:8px !important; box-shadow:0 4px 12px rgba(139,69,19,0.2),0 0 20px rgba(212,175,55,0.1) !important; }
+.master-guruvammal-logo .musical-corner { position:absolute !important; top:2px !important; right:3px !important; width:8px !important; height:8px !important; border-radius:50% !important; border:0.8px solid #5d3a0a !important; color:#5d3a0a !important; font-size:4.5px !important; font-weight:900 !important; display:flex !important; align-items:center !important; justify-content:center !important; }
+.mobile-menu-toggle { display:none; background:none; border:none; font-size:1.5rem; color:#8b4513; cursor:pointer; padding:0.5rem; }
+.nav-menu { display:flex; list-style:none; align-items:center; gap:1.2rem; margin:0; padding:0; }
+.nav-menu a { color:#3c2d1f; text-decoration:none; font-weight:500; font-size:0.85rem; transition:all 0.3s ease; padding:0.3rem 0.6rem; border-radius:4px; display:flex; align-items:center; gap:0.5rem; white-space:nowrap; }
+.nav-menu a:hover, .nav-menu a.active { color:#8b4513; background:rgba(139,69,19,0.1); }
+.main-content { margin-top:120px; padding:1rem 1.5rem; max-width:1200px; margin-left:auto; margin-right:auto; }
+.refresh-info { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; background:rgba(255,255,255,0.9); border-radius:10px; padding:0.8rem 1.2rem; box-shadow:0 2px 10px rgba(0,0,0,0.08); font-size:0.85rem; }
+.refresh-info .refresh-label { display:flex; align-items:center; gap:0.4rem; font-weight:500; }
+.spinner-small { width:14px; height:14px; border:2px solid #f3f3f3; border-top:2px solid #8b4513; border-radius:50%; animation:spin 0.8s linear infinite; display:inline-block; }
+@keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
+.chart-container { background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); border-radius:15px; box-shadow:0 5px 20px rgba(0,0,0,0.1); padding:2rem; margin-bottom:2rem; }
+.chart-container h2 { font-size:1.2rem; color:#8b4513; margin-bottom:1rem; font-family:'Century Gothic',sans-serif; display:flex; align-items:center; gap:0.5rem; }
+.chart-wrapper { position:relative; width:100%; height:500px; overflow-y:auto; overflow-x:hidden; border:1px solid rgba(0,0,0,0.05); border-radius:8px; }
+.chart-scroll-inner { position:relative; width:100%; }
+.chart-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; height:480px; gap:1rem; color:#999; font-size:1rem; }
+.chart-placeholder .spinner-large { width:40px; height:40px; border:3px solid #f3f3f3; border-top:3px solid #8b4513; border-radius:50%; animation:spin 1s linear infinite; }
+.table-container { background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); border-radius:15px; box-shadow:0 5px 20px rgba(0,0,0,0.1); padding:2rem; margin-bottom:3rem; overflow-x:auto; }
+.table-container h2 { font-size:1.2rem; color:#8b4513; margin-bottom:1rem; font-family:'Century Gothic',sans-serif; display:flex; align-items:center; gap:0.5rem; }
+.data-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.data-table th { background:linear-gradient(135deg,#8b4513,#d4af37); color:white; padding:0.6rem 0.8rem; text-align:left; font-weight:500; white-space:nowrap; position:sticky; top:0; z-index:10; }
+.data-table td { padding:0.45rem 0.8rem; border-bottom:1px solid #eee; white-space:nowrap; }
+.data-table tbody tr:nth-child(even) { background:rgba(212,175,55,0.03); }
+.data-table tbody tr:hover { background:rgba(139,69,19,0.05); }
+.table-placeholder { text-align:center; padding:2rem; color:#999; font-size:1rem; }
+.legend { display:flex; gap:1.5rem; margin-bottom:0.8rem; font-size:0.8rem; color:#666; flex-wrap:wrap; }
+.legend-item { display:flex; align-items:center; gap:0.4rem; }
+.legend-swatch { width:14px; height:14px; border-radius:2px; }
+.status-pill { display:inline-block; padding:0.15rem 0.6rem; border-radius:999px; font-size:0.72rem; font-weight:700; }
+.status-safe { background:rgba(39,174,96,0.15); color:#1e8449; border:1px solid rgba(39,174,96,0.5); }
+.status-near { background:rgba(243,156,18,0.18); color:#9a6b0f; border:1px solid rgba(243,156,18,0.6); }
+.status-hit { background:rgba(231,76,60,0.15); color:#c0392b; border:1px solid rgba(231,76,60,0.6); }
+@keyframes blinkRed { 0%,100% { opacity:1; } 50% { opacity:0.25; } }
+.blink { animation:blinkRed 0.6s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .blink { animation:none; } }
+tr.row-danger { background:rgba(231,76,60,0.06) !important; }
+.sql-box { background:rgba(255,255,255,0.9); border-radius:10px; padding:0.8rem 1.2rem; margin-bottom:1.5rem; font-size:0.78rem; box-shadow:0 2px 10px rgba(0,0,0,0.08); }
+.sql-box code { font-family:Consolas,monospace; color:#5d3a0a; word-break:break-all; }
+@media (max-width:768px) { .mobile-menu-toggle { display:block; } .nav-menu { display:none; position:absolute; top:100%; left:0; right:0; background:rgba(255,255,255,0.98); flex-direction:column; padding:1rem; box-shadow:0 5px 20px rgba(0,0,0,0.1); border-radius:0 0 8px 8px; } .nav-menu.active { display:flex; } .nav-menu li { width:100%; } .nav-menu a { width:100%; justify-content:flex-start; padding:0.8rem; } .main-content { margin-top:100px; } .chart-container,.table-container { padding:1rem; } .chart-wrapper { height:350px; } .data-table { font-size:0.72rem; } .data-table th,.data-table td { padding:0.3rem 0.5rem; } .refresh-info { font-size:0.78rem; } .legend { gap:0.8rem; } }
+</style>
+</head>
+<body>
+<header class="header">
+<nav class="navbar">
+<div class="nav-top-row">
+<a href="index.html" class="logo"><div class="master-guruvammal-logo">Ga<span class="musical-corner">P</span></div></a>
+<span style="font-size:1.3rem;font-weight:600;color:#8b4513;"><i class="fas fa-shield-alt" style="margin-right:0.5rem;"></i>GammaPortfolio</span>
+<button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle mobile menu" aria-expanded="false"><i class="fas fa-bars" aria-hidden="true"></i></button>
+</div>
+<div class="nav-bottom-row">
+<ul class="nav-menu" id="navMenu">
+<li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+<li><a href="Stop Loss Report.html" class="active"><i class="fas fa-shield-alt"></i> GammaPortfolio</a></li>
+</ul>
+</div>
+</nav>
+</header>
+<main class="main-content">
+<div class="refresh-info">
+<span class="refresh-label"><span class="spinner-small" id="refreshSpinner" style="display:none;"></span><i class="fas fa-sync-alt" style="color:#8b4513;"></i> Auto-refresh every 3s (live SQL)</span>
+<span class="last-updated"><span id="lastUpdatedText"><i class="fas fa-info-circle" style="color:#8b4513;"></i> Initializing...</span></span>
+<span class="last-updated"><span id="lastSqlExecutedText"><i class="fas fa-database" style="color:#8b4513;"></i> SQL pipeline: not yet run</span></span>
+</div>
+<div class="sql-box" style="display:none;"><i class="fas fa-database" style="color:#8b4513;margin-right:0.4rem;"></i><strong>Source SQL (sno=11):</strong> <code id="sqlText">loading...</code></div>
+<section class="chart-container">
+<h2><i class="fas fa-chart-bar"></i> GammaPortfolio — Profit Target vs Stop Loss vs Current Profit % (per symbol)</h2>
+<div class="legend">
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(39,174,96,0.85);"></div> Profit target distance %</div>
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(52,152,219,0.85);"></div> Current profit %</div>
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(243,156,18,0.9);"></div> Stop loss distance % (safe)</div>
+<div class="legend-item"><div class="legend-swatch blink" style="background:rgba(231,76,60,1);"></div> Stop loss distance % — NEAR / HIT (blinks red)</div>
+</div>
+<div style="font-size:0.75rem;color:#666;margin-bottom:0.5rem;"><i class="fas fa-arrows-up-down"></i> Scroll up / down inside the chart to see all symbols. Chart + table refresh every 3s.</div>
+<div class="chart-wrapper" id="chartWrapper">
+<div class="chart-placeholder" id="chartPlaceholder"><div class="spinner-large"></div><span>Loading market data...</span></div>
+<div class="chart-scroll-inner" id="chartScrollInner" style="display:none;"><canvas id="stopLossChart"></canvas></div>
+</div>
+</section>
+<section class="table-container">
+<h2><i class="fas fa-table"></i> GammaPortfolio — Full Data Table</h2>
+<table class="data-table" id="stopLossTable">
+<thead><tr><th>#</th><th>Symbol</th><th id="thDyn">Loading columns...</th></tr></thead>
+<tbody id="stopLossTableBody"><tr><td colspan="20" class="table-placeholder">Loading data...</td></tr></tbody>
+</table>
+</section>
+</main>
+<script>
+var SUPABASE_URL = 'https://mushchoxbywxcpfmgavj.supabase.co';
+var SUPABASE_ANON_KEY = 'sb_publishable_woqRTM1AEtpbM5AVVNT0KA_7eAbe0BS';
+var SUPABASE_SQL_MAPPING_TABLE = 'gammapace_internal_mapping';
+var SQL_MAPPING_TITLE = 'Stop Loss Report';
+var SQL_MAPPING_SNO = 11;
+/* RPC (created by setup_run_mapping_sqls.sql) that executes EVERY statement of
+   the stored script, in order and inside ONE transaction:
+     (1) the fluctuation-% CTE, (2) INSERT INTO nasdaq_fluctuation,
+     (3) UPDATE gammapace_buy_sell_rules, (4) INSERT INTO gammapace_trade_snapshot,
+     (5) the final SELECT  -> whose rows are returned to this page.
+   Called on EVERY refresh tick so the database pipeline — not a JS
+   re-implementation of it — produces the numbers we display. */
+var RPC_FUNCTION_NAME = 'run_mapping_sql';
+var REFRESH_INTERVAL_MS = 3000;
+var CANONICAL_SQL_QUERY = null;
+// Final statement of the canonical SQL (sno=11) is:
+//   SELECT g.* FROM public.gammapace_trade_snapshot g
+//   WHERE (g.symbol, g.timestamp) IN (SELECT symbol, MAX(timestamp) ... GROUP BY symbol)
+//   ORDER BY profit_target_distance_pct ASC, symbol;
+var DATA_SOURCE_TABLE = 'gammapace_trade_snapshot';
+var DATA_ORDER_BY = 'profit_target_distance_pct.asc,symbol.asc';
+// The pipeline appends one snapshot row per symbol on each run, so the newest
+// rows are always at the top of a `timestamp.desc` read. A few hundred rows is
+// orders of magnitude more than the symbol count, which keeps each 3-second
+// payload small even as the history table keeps growing.
+var ROW_FETCH_LIMIT = 500;
+// Column order used to present `SELECT g.*`; unknown extra columns are appended.
+var SNAPSHOT_COLS = ['symbol', 'profit_target_usd', 'commission_usd', 'bought_qty', 'last_bought_amount', 'current_price', 'highest_price', 'stop_loss', 'target_price', 'current_profit_usd', 'current_profit_pct', 'profit_target_distance_pct', 'stop_loss_distance_pct', 'fluctuating_percentage', 'load_date', 'timestamp'];
+var SUPABASE_HEADERS = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Accept': 'application/json', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' };
+var PROXIMITY_DOLLARS = 3.0;
+var PROXIMITY_PCT = 0.05;
+var chartInstance = null;
+var latestRows = [];
+var latestCols = [];
+var blinkOn = false;
+var REDUCE_MOTION = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || false;
+var BAR_PROFIT = 'rgba(39,174,96,0.85)';
+var BAR_CURRENT = 'rgba(52,152,219,0.85)';
+var BAR_CURRENT_BORDER = 'rgba(41,128,185,1)';
+var BAR_STOP_SAFE = 'rgba(243,156,18,0.9)';
+var BAR_STOP_A = 'rgba(231,76,60,1)';
+var BAR_STOP_B = 'rgba(231,76,60,0.22)';
+function thresholdFor(current) {
+  if (!isFinite(current) || current <= 0) return PROXIMITY_DOLLARS;
+  return Math.min(PROXIMITY_DOLLARS, PROXIMITY_PCT * current);
+}
+function classifyRow(current, stop) {
+  var diff = current - stop;
+  var thr = thresholdFor(current);
+  var pct = (isFinite(current) && current !== 0) ? (diff / current * 100) : NaN;
+  var status = 'SAFE';
+  if (diff <= 0) status = 'HIT';
+  else if (diff <= thr) status = 'NEAR';
+  return { diff: diff, pct: pct, status: status, danger: (status !== 'SAFE') };
+}
+function stopBg(danger) {
+  if (!danger) return BAR_STOP_SAFE;
+  if (REDUCE_MOTION) return BAR_STOP_A;
+  return blinkOn ? BAR_STOP_A : BAR_STOP_B;
+}
+/* The canonical SQL (sno=11) is a multi-statement script:
+     1. WITH ...        -> fluctuation % CTE
+     2. INSERT nasdaq_fluctuation
+     3. UPDATE gammapace_buy_sell_rules
+     4. INSERT gammapace_trade_snapshot
+     5. SELECT g.*      -> the report's data
+   ALL of them are executed on the database by runCanonicalSql() (run_mapping_sql
+   RPC) on every refresh. The helpers below parse the script text ONLY to detect
+   the result table, its ORDER BY and its columns for presentation. */
+function lastStatement(sqlText) {
+  var clean = stripSqlComments(String(sqlText || '')).trim();
+  if (!clean) return '';
+  var parts = clean.split(';');
+  for (var i = parts.length - 1; i >= 0; i--) {
+    var p = (parts[i] || '').trim();
+    if (p) return p;
+  }
+  return '';
+}
+function extractOrderBy(sqlText) {
+  var stmt = lastStatement(sqlText);
+  var low = stmt.toLowerCase();
+  var idx = low.lastIndexOf('order by');
+  if (idx < 0) return null;
+  var tail = stmt.slice(idx + 8).trim().replace(/;[\s\S]*$/, '').trim();
+  if (!tail) return null;
+  var parts = tail.split(',');
+  var out = [];
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i].trim();
+    if (!p) continue;
+    var tok = p.split(/\s+/);
+    var first = tok[0] || '';
+    var segs = first.split('.');
+    var col = segs[segs.length - 1].replace(/[^A-Za-z0-9_]/g, '');
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(col)) continue;
+    var dir = (tok[1] || 'asc').toLowerCase().replace(/[^a-z]/g, '');
+    if (dir !== 'asc' && dir !== 'desc') dir = 'asc';
+    out.push(col + '.' + dir);
+  }
+  return out.length ? out.join(',') : null;
+}
+async function fetchCanonicalSql() {
+  // Fetched for traceability / column & ordering detection only — the SQL
+  // itself is executed server-side by runCanonicalSql() via run_mapping_sql.
+  var url = SUPABASE_URL + '/rest/v1/' + SUPABASE_SQL_MAPPING_TABLE + '?select=sql'
+    + '&title=eq.' + encodeURIComponent(SQL_MAPPING_TITLE)
+    + '&sno=eq.' + encodeURIComponent(SQL_MAPPING_SNO);
+  var resp = await fetch(url, { method: 'GET', headers: SUPABASE_HEADERS });
+  if (!resp.ok) { throw new Error('SQL mapping fetch failed: ' + resp.status + ' ' + resp.statusText); }
+  var rows = await resp.json();
+  if (!rows || !rows.length || !rows[0].sql) {
+    throw new Error("No sql found for title='" + SQL_MAPPING_TITLE + "', sno=" + SQL_MAPPING_SNO);
+  }
+  return rows[0].sql;
+}
+function stripSqlComments(sqlText) {
+  var s = String(sqlText || '');
+  var o = '', i = 0;
+  while (i < s.length) {
+    var a = s.indexOf('/*', i);
+    if (a < 0) { o += s.slice(i); break; }
+    o += s.slice(i, a);
+    var b = s.indexOf('*/', a + 2);
+    if (b < 0) break;
+    i = b + 2;
+  }
+  o = o.replace(/--[^\r\n]*/g, ' ');
+  return o;
+}
+function extractTable(sqlText) {
+  var stmt = lastStatement(sqlText);
+  var low = stmt.toLowerCase();
+  var idx = low.indexOf(' from ');
+  if (idx < 0) return null;
+  var tail = stmt.slice(idx + 6).trim().split(/\s+/)[0] || '';
+  tail = tail.split('.')[tail.split('.').length - 1];
+  tail = tail.replace(/[^A-Za-z0-9_]/g, '');
+  if (!tail) return null;
+  return tail;
+}
+async function fetchJsonWithRetry(url) {
+  var maxAttempts = 4;
+  for (var a = 1; a <= maxAttempts; a++) {
+    try {
+      var r = await fetch(url, { method: 'GET', headers: SUPABASE_HEADERS });
+      if (!r.ok) { var t = await r.text(); throw new Error('Supabase error ' + r.status + ': ' + t); }
+      return await r.json();
+    } catch (e) {
+      var msg = String((e && e.message) || e);
+      var transient = /57014|statement timeout| 500 |Failed to fetch|NetworkError|network/i.test(msg);
+      if (a >= maxAttempts || !transient) throw e;
+      await new Promise(function (res) { setTimeout(res, 800 * a + Math.floor(Math.random() * 400)); });
+    }
+  }
+}
+function splitOrderBy(orderStr) {
+  if (!orderStr) return [];
+  var parts = String(orderStr).split(',');
+  var out = [];
+  for (var i = 0; i < parts.length; i++) {
+    var kv = parts[i].split('.');
+    if (kv.length < 2) continue;
+    var dir = kv.pop();
+    var col = kv.join('.');
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(col)) continue;
+    if (dir !== 'asc' && dir !== 'desc') dir = 'asc';
+    out.push({ col: col, dir: dir });
+  }
+  return out;
+}
+function cmpVal(a, b, dir) {
+  var an = (a === null || a === undefined || a !== a), bn = (b === null || b === undefined || b !== b);
+  if (an && bn) return 0;
+  // Postgres default: NULLS LAST for ASC, NULLS FIRST for DESC.
+  if (an) return (dir === 'desc') ? -1 : 1;
+  if (bn) return (dir === 'desc') ? 1 : -1;
+  if (typeof a === 'number' && typeof b === 'number') {
+    if (a === b) return 0;
+    return ((a < b) ? -1 : 1) * (dir === 'desc' ? -1 : 1);
+  }
+  var sa = String(a), sb = String(b);
+  if (sa === sb) return 0;
+  return ((sa < sb) ? -1 : 1) * (dir === 'desc' ? -1 : 1);
+}
+function stableSortByKeys(arr, keys) {
+  if (!keys || !keys.length) return arr;
+  for (var i = 0; i < arr.length; i++) arr[i]._ord = i;
+  arr.sort(function (x, y) {
+    for (var k = 0; k < keys.length; k++) {
+      var c = cmpVal(x[keys[k].col], y[keys[k].col], keys[k].dir);
+      if (c !== 0) return c;
+    }
+    return x._ord - y._ord;
+  });
+  for (var j = 0; j < arr.length; j++) arr[j]._ord = j;
+  return arr;
+}
+/* ------------------------------------------------------------------
+   EXECUTE THE CANONICAL SQL (sno=11) ON THE DATABASE
+   ------------------------------------------------------------------
+   POST /rest/v1/rpc/run_mapping_sql with { p_title, p_sno }.
+
+   The RPC reads the script text from gammapace_internal_mapping itself
+   (nothing is hard-coded here) and runs EVERY statement in sequence in
+   a single transaction:
+       1. WITH ...            -> fluctuation % CTE
+       2. INSERT nasdaq_fluctuation
+       3. UPDATE gammapace_buy_sell_rules
+       4. INSERT gammapace_trade_snapshot
+       5. SELECT g.*          -> returned to us as JSON
+
+   Returns an array of the final SELECT's rows (may be empty if the
+   final statement yields nothing).
+   ------------------------------------------------------------------ */
+async function runCanonicalSql() {
+  var url = SUPABASE_URL + '/rest/v1/rpc/' + RPC_FUNCTION_NAME;
+  console.log('[GammaPortfolio] runCanonicalSql: POSTing to ' + url + ' with p_title=' + SQL_MAPPING_TITLE + ', p_sno=' + SQL_MAPPING_SNO);
+  var response = await fetch(url, {
+    method: 'POST',
+    headers: Object.assign({}, SUPABASE_HEADERS, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+    body: JSON.stringify({ p_title: SQL_MAPPING_TITLE, p_sno: SQL_MAPPING_SNO })
+  });
+
+  if (!response.ok) {
+    var errorBody = await response.text();
+    console.error('[GammaPortfolio] runCanonicalSql: RPC error status=' + response.status + ' body=' + errorBody);
+    // Supabase aborts long scripts with 57014 (query_canceled).
+    if (String(errorBody).indexOf('57014') !== -1) {
+      throw new Error('SQL script exceeded the database statement timeout. '
+        + 'Raise it in the Supabase SQL Editor: '
+        + "ALTER FUNCTION public.run_mapping_sql(text, integer) SET statement_timeout = '120s';");
+    }
+    throw new Error('run_mapping_sql RPC error: ' + response.status + ' '
+      + response.statusText + ' - ' + errorBody);
+  }
+
+  var text = await response.text();
+  if (!text) {
+    console.warn('[GammaPortfolio] runCanonicalSql: RPC returned empty body');
+    return [];
+  }
+  var data = JSON.parse(text);
+  var rows = Array.isArray(data) ? data : [data];
+  console.log('[GammaPortfolio] runCanonicalSql: RPC returned ' + rows.length + ' row(s) from final SELECT');
+  return rows;
+}
+
+/* Read the freshly-written snapshot rows for display.
+   Newest-first, so the first row seen per symbol IS its MAX(timestamp)
+   row — exactly what the canonical final SELECT returns:
+     WHERE (g.symbol, g.timestamp) IN
+       (SELECT symbol, MAX(timestamp) ... GROUP BY symbol) */
+function fetchLatestSnapshotRows() {
+  var tbl = 'gammapace_trade_snapshot';
+  var url = SUPABASE_URL + '/rest/v1/' + tbl + '?select=*'
+    + '&order=' + encodeURIComponent('timestamp.desc')
+    + '&limit=' + ROW_FETCH_LIMIT;
+  console.log('[GammaPortfolio] fetchLatestSnapshotRows: GET ' + url);
+  return fetchJsonWithRetry(url);
+}
+
+async function fetchStopLossData() {
+  // STEP 1 — ALWAYS run the full SQL pipeline on the database via the RPC.
+  // This executes every statement in the canonical script (sno=11) inside one transaction:
+  //   (1) fluctuation-% CTE, (2) INSERT nasdaq_fluctuation, (3) UPDATE gammapace_buy_sell_rules,
+  //   (4) INSERT gammapace_trade_snapshot, (5) final SELECT.
+  console.log('[GammaPortfolio] fetchStopLossData: STEP 1 — executing canonical SQL pipeline via run_mapping_sql RPC');
+  var rpcRows = await runCanonicalSql();
+  console.log('[GammaPortfolio] fetchStopLossData: STEP 1 — RPC executed, returned ' + rpcRows.length + ' row(s) from final SELECT');
+
+  // STEP 2 — ALWAYS read the snapshot table directly to get the freshest rows
+  // that the pipeline just wrote. This guarantees we display live data regardless
+  // of whether PostgREST returns the RPC's SELECT results.
+  console.log('[GammaPortfolio] fetchStopLossData: STEP 2 — reading freshly-written snapshot table directly');
+  var rows = await fetchLatestSnapshotRows();
+  console.log('[GammaPortfolio] fetchStopLossData: STEP 2 — direct read returned ' + rows.length + ' row(s)');
+
+  return normalizeRows(rows);
+}
+
+/* Keep the newest row per symbol, fill in any column the SQL left NULL, and
+   apply the canonical ORDER BY (profit_target_distance_pct ASC, symbol). */
+function normalizeRows(rows) {
+  var out = [], seen = {}, filtered = 0;
+  console.log('[GammaPortfolio] normalizeRows: input ' + rows.length + ' row(s)');
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r || !r.symbol) { filtered++; continue; }
+    var sym = String(r.symbol);
+    if (seen[sym]) { filtered++; continue; }
+    seen[sym] = 1;
+    var pt = parseFloat(r.profit_target_usd), cm = parseFloat(r.commission_usd), q = parseFloat(r.bought_qty);
+    var last = parseFloat(r.last_bought_amount), cur = parseFloat(r.current_price);
+    var hi = parseFloat(r.highest_price), sl = parseFloat(r.stop_loss);
+    // Mirror the canonical INSERT..SELECT WHERE filter.
+    if (!isFinite(q) || !(q > 0)) { filtered++; continue; }
+    if (!isFinite(cur) || !isFinite(sl)) { filtered++; continue; }
+    // Prefer the SQL-computed values (single source of truth); recompute only if NULL.
+    var row = {
+      symbol: r.symbol, profit_target_usd: pt, commission_usd: cm, bought_qty: q,
+      last_bought_amount: last, current_price: cur, highest_price: hi, stop_loss: sl,
+      target_price: numOr(r.target_price, function () {
+        return (isFinite(last) && isFinite(cm) && isFinite(pt)) ? roundTo((last + cm + pt) / q, 4) : null;
+      }),
+      current_profit_usd: numOr(r.current_profit_usd, function () {
+        return isFinite(last) ? roundTo(cur * q - last - cm, 2) : null;
+      }),
+      current_profit_pct: numOr(r.current_profit_pct, function () {
+        return (isFinite(last) && last !== 0) ? roundTo((cur * q - last - cm) / last * 100, 2) : null;
+      }),
+      profit_target_distance_pct: numOr(r.profit_target_distance_pct, null),
+      stop_loss_distance_pct: numOr(r.stop_loss_distance_pct, function () {
+        return cur !== 0 ? roundTo((cur - sl) / cur * 100, 2) : null;
+      }),
+      fluctuating_percentage: numOr(r.fluctuating_percentage, null),
+      load_date: r.load_date === undefined ? null : r.load_date,
+      timestamp: r.timestamp === undefined ? null : r.timestamp
+    };
+    var c = classifyRow(cur, sl);
+    row.diff = c.diff; row.pct = c.pct; row.status = c.status; row.danger = c.danger; row._ord = out.length;
+    out.push(row);
+    console.log('[GammaPortfolio] normalizeRows: ' + sym + ' ts=' + row.timestamp + ' cur=' + cur + ' sl=' + sl + ' q=' + q);
+  }
+  console.log('[GammaPortfolio] normalizeRows: ' + out.length + ' row(s) kept, ' + filtered + ' filtered out');
+  // ORDER BY profit_target_distance_pct ASC, symbol  (all real columns now)
+  stableSortByKeys(out, splitOrderBy(DATA_ORDER_BY));
+  return out;
+}
+function numOr(v, fallback) {
+  var n = parseFloat(v);
+  if (isFinite(n)) return n;
+  return (typeof fallback === 'function') ? fallback() : fallback;
+}
+function roundTo(v, n) {
+  if (!isFinite(v)) return null;
+  var f = Math.pow(10, n);
+  return Math.round((v + Number.EPSILON) * f) / f;
+}
+function extractSelectColumns(sqlText) {
+  var stmt = lastStatement(sqlText);
+  var low = stmt.toLowerCase();
+  var selIdx = low.indexOf('select');
+  var fromIdx = low.indexOf(' from ');
+  if (selIdx < 0 || fromIdx < 0 || fromIdx <= selIdx) return null;
+  var list = stmt.slice(selIdx + 6, fromIdx).trim();
+  // Canonical SQL ends with `SELECT g.*` -> cannot enumerate aliases statically.
+  // Signal "all columns" so the caller derives them from the actual response.
+  if (/\*/.test(list)) return null;
+  var parts = [], depth = 0, cur = '';
+  for (var i = 0; i < list.length; i++) {
+    var ch = list[i];
+    if (ch === '(') depth++;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  if (cur.trim()) parts.push(cur);
+  var cols = [];
+  for (var j = 0; j < parts.length; j++) {
+    var p = parts[j].replace(/\s+/g, ' ').trim();
+    if (!p) continue;
+    var am = p.match(/\bas\s+([A-Za-z_][A-Za-z0-9_$]*)\s*$/i);
+    if (am) { cols.push(am[1].toLowerCase()); continue; }
+    var cm2 = p.match(/^([A-Za-z_][A-Za-z0-9_$]*)$/);
+    if (cm2) { cols.push(cm2[1].toLowerCase()); continue; }
+  }
+  if (!cols.length) return null;
+  var seen = {}, uniq = [];
+  for (var k = 0; k < cols.length; k++) { if (!seen[cols[k]]) { seen[cols[k]] = 1; uniq.push(cols[k]); } }
+  if (uniq.indexOf('profit_target_distance_pct') < 0) uniq.push('profit_target_distance_pct');
+  if (uniq.indexOf('stop_loss_distance_pct') < 0) uniq.push('stop_loss_distance_pct');
+  if (uniq.indexOf('current_profit_pct') < 0) uniq.push('current_profit_pct');
+  return uniq;
+}
+var COLOR_CURRENT = 'rgba(52,152,219,0.85)';
+var COLOR_HIGHEST = 'rgba(212,175,55,0.9)';
+var COLOR_STOP_SAFE = 'rgba(39,174,96,0.85)';
+var COLOR_STOP_DANGER_A = 'rgba(231,76,60,1)';
+var COLOR_STOP_DANGER_B = 'rgba(231,76,60,0.22)';
+function stopBgClassic(danger) {
+  if (!danger) return COLOR_STOP_SAFE;
+  if (REDUCE_MOTION) return COLOR_STOP_DANGER_A;
+  return blinkOn ? COLOR_STOP_DANGER_A : COLOR_STOP_DANGER_B;
+}
+function initChart() {
+  var ctx = document.getElementById('stopLossChart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: [], datasets: [
+      { label: 'Profit target distance %', data: [], backgroundColor: [], borderColor: 'rgba(30,132,73,1)', borderWidth: 1 },
+      { label: 'Current profit %', data: [], backgroundColor: [], borderColor: 'rgba(41,128,185,1)', borderWidth: 1 },
+      { label: 'Stop loss distance %', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }
+    ]},
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { color: '#3c2d1f', font: { size: 11 } } },
+        tooltip: { callbacks: { label: function (c) { return ' ' + c.dataset.label + ': ' + Number(c.raw).toFixed(2) + '%'; } } } },
+      scales: {
+        x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#3c2d1f', font: { size: 11 }, callback: function (v) { return v + '%'; } } },
+        y: { grid: { display: false }, ticks: { color: '#3c2d1f', font: { size: 11, weight: 'bold' }, autoSkip: false } }
+      }
+    }
+  });
+}
+function repaintStopColors() {
+  if (!chartInstance || !latestRows.length) return;
+  var bg = [], bd = [];
+  for (var i = 0; i < latestRows.length; i++) {
+    bg.push(stopBg(latestRows[i].danger));
+    bd.push(latestRows[i].danger ? 'rgba(192,57,43,1)' : 'rgba(155,107,15,1)');
+  }
+  chartInstance.data.datasets[2].backgroundColor = bg;
+  chartInstance.data.datasets[2].borderColor = bd;
+  chartInstance.update('none');
+}
+function sizeChartToRows(n) {
+  var inner = document.getElementById('chartScrollInner');
+  var canvas = document.getElementById('stopLossChart');
+  var perRow = 62;
+  var h = Math.max(320, (n || 0) * perRow + 90);
+  if (inner) inner.style.height = h + 'px';
+  if (canvas) { canvas.style.height = h + 'px'; }
+  if (chartInstance) chartInstance.resize();
+}
+function updateChart(rows) {
+  latestRows = rows;
+  var labels = [], pv = [], cv = [], sv = [], pvBg = [], cvBg = [], svBg = [], svBd = [];
+  for (var i = 0; i < rows.length; i++) {
+    labels.push(rows[i].symbol);
+    pv.push(rows[i].profit_target_distance_pct !== null ? rows[i].profit_target_distance_pct : 0);
+    cv.push(rows[i].current_profit_pct !== null ? rows[i].current_profit_pct : 0);
+    sv.push(rows[i].stop_loss_distance_pct !== null ? rows[i].stop_loss_distance_pct : 0);
+    pvBg.push(BAR_PROFIT);
+    cvBg.push(BAR_CURRENT);
+    svBg.push(stopBg(rows[i].danger)); svBd.push(rows[i].danger ? 'rgba(192,57,43,1)' : 'rgba(155,107,15,1)');
+  }
+  chartInstance.data.labels = labels;
+  chartInstance.data.datasets[0].data = pv; chartInstance.data.datasets[0].backgroundColor = pvBg;
+  chartInstance.data.datasets[1].data = cv; chartInstance.data.datasets[1].backgroundColor = cvBg; chartInstance.data.datasets[1].borderColor = BAR_CURRENT_BORDER;
+  chartInstance.data.datasets[2].data = sv; chartInstance.data.datasets[2].backgroundColor = svBg; chartInstance.data.datasets[2].borderColor = svBd;
+  sizeChartToRows(rows.length);
+  chartInstance.update();
+  document.getElementById('chartPlaceholder').style.display = 'none';
+  document.getElementById('chartScrollInner').style.display = 'block';
+}
+function fmtCell(col, v) {
+  if (v === null || v === undefined) return '-';
+  if (typeof v === 'string' && col === 'timestamp') return v.replace('T', ' ').replace(/\.\d+$/, '').slice(0, 19);
+  if (typeof v === 'string' && col === 'load_date') return String(v).slice(0, 10);
+  if (typeof v === 'number') {
+    var neg = v < 0 ? '-' : '';
+    var a = Math.abs(v);
+    if (col === 'target_price') return neg + '$' + a.toFixed(4);
+    if (col === 'fluctuating_percentage') return neg + a.toFixed(4) + '%';
+    if (/(_usd|_amount|_price|_loss)$/.test(col)) return neg + '$' + a.toFixed(2);
+    if (/(_pct|pct)$/.test(col)) return neg + a.toFixed(2) + '%';
+    if (col === 'bought_qty') return String(Math.round(a * 10000) / 10000);
+    return String(Math.round(v * 10000) / 10000);
+  }
+  return String(v);
+}
+function prettyCol(col) {
+  var map = { symbol: 'Symbol', profit_target_usd: 'Profit Target ($)', commission_usd: 'Commission ($)', bought_qty: 'Bought Qty', last_bought_amount: 'Last Bought ($)', current_price: 'Current Price', highest_price: 'Highest Price', stop_loss: 'Stop Loss', target_price: 'Target Price', current_profit_usd: 'Current Profit ($)', current_profit_pct: 'Current Profit %', profit_target_distance_pct: 'Profit Target Dist %', stop_loss_distance_pct: 'Stop Loss Dist %', fluctuating_percentage: 'Fluctuation %', load_date: 'Load Date', timestamp: 'Snapshot Time' };
+  if (map[col]) return map[col];
+  return col.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+}
+function renderTableHead(cols) {
+  var th = document.getElementById('thDyn');
+  if (!th || !th.parentNode) return;
+  var tr = th.parentNode;
+  tr.innerHTML = '<th>#</th><th>Symbol</th>';
+  for (var i = 0; i < cols.length; i++) {
+    if (cols[i] === 'symbol') continue;
+    var el = document.createElement('th');
+    el.textContent = prettyCol(cols[i]);
+    tr.appendChild(el);
+  }
+  var st = document.createElement('th');
+  st.textContent = 'Status';
+  tr.appendChild(st);
+}
+function updateTable(rows) {
+  var tb = document.getElementById('stopLossTableBody');
+  if (!rows || !rows.length) { tb.innerHTML = '<tr><td colspan="20" class="table-placeholder">No data available</td></tr>'; return; }
+  // `SELECT g.*` -> derive the visible columns from the actual response keys,
+  // using SNAPSHOT_COLS for a stable, meaningful order and appending any extras.
+  if (!latestCols.length) {
+    var keys = [];
+    for (var k in rows[0]) { if (Object.prototype.hasOwnProperty.call(rows[0], k)) keys.push(k); }
+    latestCols = [];
+    for (var a = 0; a < SNAPSHOT_COLS.length; a++) if (keys.indexOf(SNAPSHOT_COLS[a]) >= 0) latestCols.push(SNAPSHOT_COLS[a]);
+    for (var b = 0; b < keys.length; b++) if (latestCols.indexOf(keys[b]) < 0) latestCols.push(keys[b]);
+    latestCols = latestCols.filter(function (c) { return c !== 'diff' && c !== 'pct' && c !== 'status' && c !== 'danger' && c !== '_ord'; });
+  }
+  renderTableHead(latestCols);
+  var html = '';
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var pill = r.status === 'HIT' ? '<span class="status-pill status-hit blink">HIT</span>' : (r.status === 'NEAR' ? '<span class="status-pill status-near blink">NEAR</span>' : '<span class="status-pill status-safe">SAFE</span>');
+    html += '<tr' + (r.danger ? ' class="row-danger"' : '') + '><td>' + (i + 1) + '</td><td><strong>' + r.symbol + '</strong></td>';
+    for (var j = 0; j < latestCols.length; j++) {
+      var c = latestCols[j];
+      if (c === 'symbol') continue;
+      html += '<td>' + fmtCell(c, r[c]) + '</td>';
+    }
+    html += '<td>' + pill + '</td></tr>';
+  }
+  tb.innerHTML = html;
+}
+var isRefreshing = false;
+var lastPipelineRunMs = 0;
+function setSpin(on) { document.getElementById('refreshSpinner').style.display = on ? 'block' : 'none'; }
+async function refreshData() {
+  if (isRefreshing) return;
+  isRefreshing = true; setSpin(true);
+  var startMs = Date.now();
+  try {
+    console.log('[GammaPortfolio] refreshData: starting full SQL pipeline execution at ' + new Date().toLocaleTimeString());
+    var rows = await fetchStopLossData();
+    lastPipelineRunMs = Date.now();
+    console.log('[GammaPortfolio] refreshData: pipeline returned ' + rows.length + ' rows in ' + (Date.now() - startMs) + 'ms');
+    updateChart(rows); updateTable(rows);
+    var lastSqlEl = document.getElementById('lastSqlExecutedText');
+    if (lastSqlEl) {
+      lastSqlEl.innerHTML = '<i class="fas fa-database" style="color:#8b4513;"></i> Last SQL pipeline run: ' + new Date(lastPipelineRunMs).toLocaleTimeString() + ' (' + rows.length + ' symbols)';
+    }
+    document.getElementById('lastUpdatedText').innerHTML = '<i class="fas fa-check-circle" style="color:green;"></i> Updated: ' + new Date().toLocaleTimeString() + ' (' + rows.length + ' symbols)';
+  } catch (e) {
+    console.error('[GammaPortfolio] refreshData error:', e);
+    document.getElementById('lastUpdatedText').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> Error: ' + String(e.message || e);
+  } finally { isRefreshing = false; setSpin(false); }
+}
+function scheduleNextRefresh() {
+  setTimeout(refreshAndReschedule, REFRESH_INTERVAL_MS);
+}
+async function refreshAndReschedule() {
+  await refreshData();
+  scheduleNextRefresh();
+}
+document.addEventListener('DOMContentLoaded', async function () {
+  initChart();
+  try {
+    CANONICAL_SQL_QUERY = await fetchCanonicalSql();
+    var t = extractTable(CANONICAL_SQL_QUERY);
+    if (t) DATA_SOURCE_TABLE = t;
+    var ob = extractOrderBy(CANONICAL_SQL_QUERY);
+    if (ob) DATA_ORDER_BY = ob;
+    var cols = extractSelectColumns(CANONICAL_SQL_QUERY);
+    if (cols && cols.length) latestCols = cols;
+    var sqlEl = document.getElementById('sqlText');
+    if (sqlEl) sqlEl.textContent = lastStatement(CANONICAL_SQL_QUERY);
+  } catch (e) { console.warn('canonical SQL fallback:', String(e.message || e)); }
+  await refreshData();
+  scheduleNextRefresh();
+  if (!REDUCE_MOTION) { setInterval(function () { blinkOn = !blinkOn; repaintStopColors(); }, 600); }
+});
+function toggleMobileMenu() {
+  var m = document.getElementById('navMenu'); if (!m) return;
+  m.classList.toggle('active');
+  var b = document.querySelector('.mobile-menu-toggle');
+  if (b) { var i = b.querySelector('i'); if (m.classList.contains('active')) { i.className = 'fas fa-times'; b.setAttribute('aria-expanded', 'true'); } else { i.className = 'fas fa-bars'; b.setAttribute('aria-expanded', 'false'); } }
+}
+document.addEventListener('click', function (e) {
+  var m = document.getElementById('navMenu'), nav = document.querySelector('.navbar');
+  if (nav && m && !nav.contains(e.target) && m.classList.contains('active')) { m.classList.remove('active'); var b = document.querySelector('.mobile-menu-toggle'); if (b) { b.querySelector('i').className = 'fas fa-bars'; b.setAttribute('aria-expanded', 'false'); } }
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { var m = document.getElementById('navMenu'); if (m && m.classList.contains('active')) { m.classList.remove('active'); var b = document.querySelector('.mobile-menu-toggle'); if (b) { b.querySelector('i').className = 'fas fa-bars'; b.setAttribute('aria-expanded', 'false'); } } }
+});
+</script>
+
+
+</body>
+</html>
