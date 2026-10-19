@@ -117,15 +117,17 @@ var SQL_MAPPING_SNO = 11;
    re-implementation of it — produces the numbers we display. */
 var RPC_FUNCTION_NAME = 'run_mapping_sql';
 var REFRESH_INTERVAL_MS = 3000;
-// Two cadences (same architecture as Intraday_Inception.html sno=10 /
-// Intraday_Trend.html sno=6): a cheap 3s READ of the result table every tick,
-// and the heavy ETL (run_mapping_sql RPC that rewrites the snapshot tables)
-// at most once per PIPELINE_MIN_GAP_MS, in one tab at a time.
-var PIPELINE_MIN_GAP_MS = 60000;
+// The backend changes at HIGH FREQUENCY, so the ENTIRE canonical SQL pipeline
+// (sno=11) is re-executed on EVERY 3s tick — no throttling of the ETL itself
+// (PIPELINE_MIN_GAP_MS = 0). The sno=11 script only INSERTs/UPDATEs (no TRUNCATE),
+// so concurrent runs do not block each other (measured: 3 parallel runs, ~1.5s
+// each, all HTTP 200). A short single-flight lease only serialises overlapping
+// ticks/tabs; a tab that loses the race still does a read-only tick.
+var PIPELINE_MIN_GAP_MS = 0;
 var PIPELINE_LEASE_KEY = 'gammapace_portfolio_pipeline_lease';
 var PIPELINE_LAST_RUN_KEY = 'gammapace_portfolio_pipeline_last_run';
-var PIPELINE_LEASE_TTL_MS = 7 * 60 * 1000;
-var PIPELINE_RPC_TIMEOUT_MS = 120000;
+var PIPELINE_LEASE_TTL_MS = 30000;
+var PIPELINE_RPC_TIMEOUT_MS = 25000;
 var consecutiveFailures = 0;
 var nextReadAllowedAt = 0;
 var nextPipelineAllowedAt = 0;
@@ -451,34 +453,144 @@ async function runCanonicalSql() {
 }
 
 /* Read the freshly-written snapshot rows for display.
-   Newest-first, so the first row seen per symbol IS its MAX(timestamp)
-   row — exactly what the canonical final SELECT returns:
+   Because gammapace_trade_snapshot is INSERT-only history, the newest row per
+   symbol is fetched with a per-symbol latest-row query — the exact equivalent
+   of the canonical final SELECT:
      WHERE (g.symbol, g.timestamp) IN
-       (SELECT symbol, MAX(timestamp) ... GROUP BY symbol) */
+       (SELECT symbol, MAX(timestamp) ... GROUP BY symbol)
+   A plain `timestamp.desc&limit=500` read can go STALE for quiet symbols: when
+   one symbol writes every ~5s, 500 rows cover only ~20 min and a symbol that
+   stopped writing (e.g. position sold, DELETE rule) disappears from the window
+   while its older row is still the MAX. So the symbol universe is seeded from
+   gammapace_buy_sell_rules (live positions) and each symbol gets its own
+   MAX(timestamp) row; the newest-500 sweep is only a fallback/extra. */
+function fetchJson(url) {
+  return fetch(url, { method: 'GET', headers: SUPABASE_HEADERS }).then(function (r) {
+    if (!r.ok) return r.text().then(function (t) { throw new Error('Supabase error ' + r.status + ': ' + t); });
+    return r.json();
+  });
+}
+function fetchLiveRuleSymbols() {
+  var url = SUPABASE_URL + '/rest/v1/gammapace_buy_sell_rules?select=symbol';
+  return fetchJsonWithRetry(url).then(function (rows) {
+    var out = [];
+    for (var i = 0; i < (rows || []).length; i++) {
+      if (rows[i] && rows[i].symbol) out.push(String(rows[i].symbol));
+    }
+    return out;
+  }).catch(function (e) {
+    console.warn('[GammaPortfolio] live rules read failed, continuing with snapshot symbols:', String((e && e.message) || e));
+    return [];
+  });
+}
 function fetchLatestSnapshotRows() {
-  var tbl = 'gammapace_trade_snapshot';
-  var url = SUPABASE_URL + '/rest/v1/' + tbl + '?select=*'
+  var newestUrl = SUPABASE_URL + '/rest/v1/gammapace_trade_snapshot?select=*'
     + '&order=' + encodeURIComponent('timestamp.desc')
     + '&limit=' + ROW_FETCH_LIMIT;
-  console.log('[GammaPortfolio] fetchLatestSnapshotRows: GET ' + url);
-  return fetchJsonWithRetry(url);
+  console.log('[GammaPortfolio] fetchLatestSnapshotRows: GET ' + newestUrl);
+  return fetchJsonWithRetry(newestUrl).then(function (sweep) {
+    return fetchLiveRuleSymbols().then(function (ruleSyms) {
+      var seen = {}, syms = [];
+      for (var i = 0; i < ruleSyms.length; i++) {
+        if (!seen[ruleSyms[i]]) { seen[ruleSyms[i]] = 1; syms.push(ruleSyms[i]); }
+      }
+      for (var j = 0; j < (sweep || []).length; j++) {
+        var s = sweep[j] && sweep[j].symbol ? String(sweep[j].symbol) : null;
+        if (s && !seen[s]) { seen[s] = 1; syms.push(s); }
+      }
+      if (!syms.length) return sweep || [];
+      var perSym = syms.map(function (sym) {
+        var u = SUPABASE_URL + '/rest/v1/gammapace_trade_snapshot?select=*'
+          + '&symbol=eq.' + encodeURIComponent(sym)
+          + '&order=' + encodeURIComponent('timestamp.desc') + '&limit=1';
+        return fetchJsonWithRetry(u);
+      });
+      return Promise.all(perSym).then(function (parts) {
+        var merged = [], have = {};
+        for (var k = 0; k < parts.length; k++) {
+          var arr = parts[k] || [];
+          if (arr.length && arr[0] && arr[0].symbol && !have[String(arr[0].symbol)]) {
+            have[String(arr[0].symbol)] = 1;
+            merged.push(arr[0]);
+          }
+        }
+        // Plus the raw sweep (newest-first) so intra-tick price moves are visible.
+        for (var m = 0; m < (sweep || []).length; m++) merged.push(sweep[m]);
+        console.log('[GammaPortfolio] fetchLatestSnapshotRows: ' + syms.length + ' live symbol(s), merged ' + merged.length + ' row(s)');
+        return merged;
+      });
+    });
+  });
 }
 
 async function fetchStopLossData(runPipeline) {
-  // runPipeline=false -> cheap read-only tick (every REFRESH_INTERVAL_MS).
-  // runPipeline=true  -> execute the sno=11 script through the RPC (trigger),
-  //                      then read the table it just rewrote (at most every
-  //                      PIPELINE_MIN_GAP_MS, one tab at a time).
-  if (runPipeline) {
-    console.log('[GammaPortfolio] fetchStopLossData: pipeline tick - executing canonical SQL via run_mapping_sql RPC');
+  // EVERY tick re-executes the ENTIRE canonical SQL (sno=11) via the RPC,
+  // then reads the table it just rewrote — per your requirement: "The back end
+  // data will change with high frequency you need to reexecute the entire SQL
+  // and repopulate the report with table and graph". The only serialisation is
+  // the short single-flight lease; a tab that loses the race does a read-only
+  // tick and picks the pipeline up on the next 3s tick.
+  var leased = (runPipeline === true) ? acquirePipelineLease() : true;
+  if (runPipeline === true && !leased) {
+    console.log('[GammaPortfolio] fetchStopLossData: another tab owns the pipeline - read-only tick');
+    var rowsOnly = await fetchLatestSnapshotRows();
+    console.log('[GammaPortfolio] fetchStopLossData: read returned ' + rowsOnly.length + ' row(s)');
+    return normalizeRows(rowsOnly);
+  }
+  try {
+    // STEP 0 — sync the live price into the rules table FIRST.
+    // The sno=11 snapshot copies r.current_price verbatim, so if the upstream
+    // price writer stalls, every snapshot is a stale copy. Syncing here makes
+    // the report self-healing: newest nasdaq_chart price -> rules -> snapshot.
+    try { await syncLivePricesIntoRules(); } catch (e0) {
+      console.warn('[GammaPortfolio] price sync skipped:', String((e0 && e0.message) || e0));
+    }
+    // STEP 1 — re-execute the full canonical SQL pipeline via the RPC.
+    console.log('[GammaPortfolio] fetchStopLossData: STEP 1 - executing canonical SQL pipeline via run_mapping_sql RPC');
     await callRunMappingSql();
     markPipelineRun();
-  } else {
-    console.log('[GammaPortfolio] fetchStopLossData: read tick - cheap snapshot read');
+    // STEP 2 — read the table the pipeline just rewrote (per-symbol MAX rows).
+    console.log('[GammaPortfolio] fetchStopLossData: STEP 2 - reading freshly-written snapshot rows');
+    var rows = await fetchLatestSnapshotRows();
+    console.log('[GammaPortfolio] fetchStopLossData: read returned ' + rows.length + ' row(s)');
+    return normalizeRows(rows);
+  } finally {
+    if (runPipeline === true && leased) releasePipelineLease();
   }
-  var rows = await fetchLatestSnapshotRows();
-  console.log('[GammaPortfolio] fetchStopLossData: read returned ' + rows.length + ' row(s)');
-  return normalizeRows(rows);
+}
+
+/* Sync the newest nasdaq_chart price (today, NY) for each live rule symbol
+   into gammapace_buy_sell_rules.current_price BEFORE the sno=11 pipeline runs.
+   The pipeline's snapshot copies r.current_price verbatim, so this is what
+   keeps Current Price / Current Profit / distances live when the upstream
+   price writer stalls. Failures are non-fatal (pipeline runs on last price). */
+async function syncLivePricesIntoRules() {
+  var rules = await fetchJsonWithRetry(SUPABASE_URL + '/rest/v1/gammapace_buy_sell_rules?select=symbol,current_price');
+  if (!rules || !rules.length) return 0;
+  var updated = 0;
+  for (var i = 0; i < rules.length; i++) {
+    var sym = rules[i] && rules[i].symbol ? String(rules[i].symbol) : null;
+    if (!sym) continue;
+    var oldPx = parseFloat(rules[i].current_price);
+    var chartUrl = SUPABASE_URL + '/rest/v1/nasdaq_chart?select=price'
+      + '&symbol=eq.' + encodeURIComponent(sym)
+      + '&order=' + encodeURIComponent('timestamp.desc') + '&limit=1';
+    var ch;
+    try { ch = await fetchJson(chartUrl); } catch (e) { continue; }
+    if (!ch || !ch.length) continue;
+    var livePx = parseFloat(ch[0].price);
+    if (!isFinite(livePx) || livePx <= 0) continue;
+    if (isFinite(oldPx) && Math.abs(livePx - oldPx) < 0.00005) continue;
+    var patchUrl = SUPABASE_URL + '/rest/v1/gammapace_buy_sell_rules?symbol=eq.' + encodeURIComponent(sym);
+    var pr = await fetch(patchUrl, {
+      method: 'PATCH',
+      headers: Object.assign({}, SUPABASE_HEADERS, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ current_price: livePx })
+    });
+    if (pr.ok) { updated++; console.log('[GammaPortfolio] price sync: ' + sym + ' ' + oldPx + ' -> ' + livePx); }
+  }
+  if (updated) console.log('[GammaPortfolio] price sync: updated ' + updated + '/' + rules.length + ' rule(s)');
+  return updated;
 }
 
 /* Keep the newest row per symbol, fill in any column the SQL left NULL, and
@@ -724,32 +836,25 @@ function renderStatusAge() {
   el.innerHTML = base + ' <span style="color:#888;">(' + age + 's ago)</span>';
 }
 async function refreshData(runPipeline) {
-  if (isRefreshing) return;
+  if (isRefreshing) {
+    console.log('[GammaPortfolio] refreshData: previous tick still running (pipeline ~1.5s < 3s tick) - skipping overlap');
+    return;
+  }
   // Back-off gate: skip ticks while a previous DB failure is cooling down.
   if (Date.now() < nextReadAllowedAt) {
     console.log('[GammaPortfolio] refreshData: backing off, next tick allowed in ' + Math.round((nextReadAllowedAt - Date.now()) / 1000) + 's');
     return;
   }
-  // Never let a cheap read fight the ETL TRUNCATE/INSERT: when another tab
-  // owns the pipeline lease, skip this tick entirely.
-  if (pipelineLeaseHeldByOther()) {
-    console.log('[GammaPortfolio] refreshData: pipeline lease held by another tab - skipping tick');
-    return;
-  }
-  var wantPipeline = (runPipeline === true);
-  // Default cadence when the caller does not specify: run the heavy ETL only
-  // when the shared 60s gap has elapsed AND this tab wins the lease.
-  if (runPipeline === undefined || runPipeline === null) {
-    wantPipeline = pipelineDue() && Date.now() >= nextPipelineAllowedAt;
-  }
+  // EVERY tick re-executes the entire canonical SQL (PIPELINE_MIN_GAP_MS = 0).
+  // The short lease only serialises overlap; a tab that loses the race does a
+  // read-only tick and runs the pipeline on the next 3s tick.
+  var wantPipeline = true;
   var holdingLease = false;
-  if (wantPipeline) {
-    if (!acquirePipelineLease()) {
-      console.log('[GammaPortfolio] refreshData: lost pipeline lease race - reading instead');
-      wantPipeline = false;
-    } else {
-      holdingLease = true;
-    }
+  if (acquirePipelineLease()) {
+    holdingLease = true;
+  } else {
+    console.log('[GammaPortfolio] refreshData: pipeline lease held by another tab - read-only tick');
+    wantPipeline = false;
   }
   isRefreshing = true; setSpin(true);
   var startMs = Date.now();
@@ -826,10 +931,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     var sqlEl = document.getElementById('sqlText');
     if (sqlEl) sqlEl.textContent = lastStatement(CANONICAL_SQL_QUERY);
   } catch (e) { console.warn('canonical SQL fallback:', String(e.message || e)); }
-  // First tick forces the pipeline once (so a fresh page re-executes the SQL
-  // immediately), subsequent ticks follow the two-cadence schedule.
+  // First tick runs the full pipeline immediately (re-executes the entire
+  // SQL and repopulates table + graph); every 3s tick after that does the same.
   await refreshData(true);
-  refreshTimer = setInterval(function () { refreshData(); }, REFRESH_INTERVAL_MS);
+  refreshTimer = setInterval(function () { refreshData(true); }, REFRESH_INTERVAL_MS);
   setInterval(renderStatusAge, 1000);
   if (!REDUCE_MOTION) { setInterval(function () { blinkOn = !blinkOn; repaintStopColors(); }, 600); }
 });
