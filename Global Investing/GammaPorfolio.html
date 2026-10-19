@@ -453,73 +453,113 @@ async function runCanonicalSql() {
 }
 
 /* Read the freshly-written snapshot rows for display.
-   Because gammapace_trade_snapshot is INSERT-only history, the newest row per
-   symbol is fetched with a per-symbol latest-row query — the exact equivalent
-   of the canonical final SELECT:
-     WHERE (g.symbol, g.timestamp) IN
-       (SELECT symbol, MAX(timestamp) ... GROUP BY symbol)
-   A plain `timestamp.desc&limit=500` read can go STALE for quiet symbols: when
-   one symbol writes every ~5s, 500 rows cover only ~20 min and a symbol that
-   stopped writing (e.g. position sold, DELETE rule) disappears from the window
-   while its older row is still the MAX. So the symbol universe is seeded from
-   gammapace_buy_sell_rules (live positions) and each symbol gets its own
-   MAX(timestamp) row; the newest-500 sweep is only a fallback/extra. */
+   SOURCE OF TRUTH is gammapace_buy_sell_rules (live positions): when it holds
+   no qualifying rows, the report MUST show "No data" — never history. The
+   snapshot table is INSERT-only history, so its rows are displayed ONLY for
+   symbols that still have a live rule row. This exactly matches the canonical
+   final SELECT semantics: the snapshot INSERT selects FROM the rules table, so
+   an empty rules table means the next snapshot batch is empty and the report
+   converges to "No data" as each symbol's rule row disappears. */
 function fetchJson(url) {
   return fetch(url, { method: 'GET', headers: SUPABASE_HEADERS }).then(function (r) {
     if (!r.ok) return r.text().then(function (t) { throw new Error('Supabase error ' + r.status + ': ' + t); });
     return r.json();
   });
 }
-function fetchLiveRuleSymbols() {
-  var url = SUPABASE_URL + '/rest/v1/gammapace_buy_sell_rules?select=symbol';
-  return fetchJsonWithRetry(url).then(function (rows) {
-    var out = [];
-    for (var i = 0; i < (rows || []).length; i++) {
-      if (rows[i] && rows[i].symbol) out.push(String(rows[i].symbol));
-    }
-    return out;
-  }).catch(function (e) {
-    console.warn('[GammaPortfolio] live rules read failed, continuing with snapshot symbols:', String((e && e.message) || e));
-    return [];
+function fetchLiveRules() {
+  var url = SUPABASE_URL + '/rest/v1/gammapace_buy_sell_rules?select=*';
+  return fetchJsonWithRetry(url).catch(function (e) {
+    console.warn('[GammaPortfolio] live rules read failed:', String((e && e.message) || e));
+    return null; // null = unknown (read failed); [] = known-empty
   });
 }
 function fetchLatestSnapshotRows() {
-  var newestUrl = SUPABASE_URL + '/rest/v1/gammapace_trade_snapshot?select=*'
-    + '&order=' + encodeURIComponent('timestamp.desc')
-    + '&limit=' + ROW_FETCH_LIMIT;
-  console.log('[GammaPortfolio] fetchLatestSnapshotRows: GET ' + newestUrl);
-  return fetchJsonWithRetry(newestUrl).then(function (sweep) {
-    return fetchLiveRuleSymbols().then(function (ruleSyms) {
-      var seen = {}, syms = [];
-      for (var i = 0; i < ruleSyms.length; i++) {
-        if (!seen[ruleSyms[i]]) { seen[ruleSyms[i]] = 1; syms.push(ruleSyms[i]); }
-      }
-      for (var j = 0; j < (sweep || []).length; j++) {
-        var s = sweep[j] && sweep[j].symbol ? String(sweep[j].symbol) : null;
-        if (s && !seen[s]) { seen[s] = 1; syms.push(s); }
-      }
-      if (!syms.length) return sweep || [];
-      var perSym = syms.map(function (sym) {
-        var u = SUPABASE_URL + '/rest/v1/gammapace_trade_snapshot?select=*'
-          + '&symbol=eq.' + encodeURIComponent(sym)
-          + '&order=' + encodeURIComponent('timestamp.desc') + '&limit=1';
-        return fetchJsonWithRetry(u);
-      });
-      return Promise.all(perSym).then(function (parts) {
-        var merged = [], have = {};
-        for (var k = 0; k < parts.length; k++) {
-          var arr = parts[k] || [];
-          if (arr.length && arr[0] && arr[0].symbol && !have[String(arr[0].symbol)]) {
-            have[String(arr[0].symbol)] = 1;
-            merged.push(arr[0]);
-          }
-        }
-        // Plus the raw sweep (newest-first) so intra-tick price moves are visible.
-        for (var m = 0; m < (sweep || []).length; m++) merged.push(sweep[m]);
-        console.log('[GammaPortfolio] fetchLatestSnapshotRows: ' + syms.length + ' live symbol(s), merged ' + merged.length + ' row(s)');
-        return merged;
+  return fetchLiveRules().then(function (rules) {
+    if (rules === null) {
+      // Rules read failed: fall back to newest sweep so a transient read error
+      // does not blank a healthy report. The tick's error path handles it.
+      var fbUrl = SUPABASE_URL + '/rest/v1/gammapace_trade_snapshot?select=*'
+        + '&order=' + encodeURIComponent('timestamp.desc')
+        + '&limit=' + ROW_FETCH_LIMIT;
+      console.log('[GammaPortfolio] fetchLatestSnapshotRows: rules unreadable, fallback GET ' + fbUrl);
+      return fetchJsonWithRetry(fbUrl);
+    }
+    // Keep only LIVE rule symbols (mirror the snapshot INSERT's WHERE filter:
+    // bought_qty > 0 AND current_price + stop_loss NOT NULL). Anything else —
+    // blank, zero-qty, NULL-price, or already-sold rows — must NOT seed the
+    // report. NOTE: this is intentionally the FULL row evaluation, not just
+    // symbol presence, so a placeholder row (e.g. side='buy' with NULLs, or a
+    // TEST row with no price) still yields "No data" exactly as the canonical
+    // snapshot INSERT would insert nothing for it.
+    var seen = {}, syms = [];
+    var liveCount = 0;
+    for (var i = 0; i < rules.length; i++) {
+      var r = rules[i];
+      if (!r || !r.symbol) continue;
+      var q = parseFloat(r.bought_qty), c = parseFloat(r.current_price), s = parseFloat(r.stop_loss);
+      if (!isFinite(q) || !(q > 0)) continue;
+      if (!isFinite(c) || !isFinite(s)) continue;
+      liveCount++;
+      var sym = String(r.symbol);
+      if (!seen[sym]) { seen[sym] = 1; syms.push(sym); }
+    }
+    if (!liveCount) {
+      console.log('[GammaPortfolio] fetchLatestSnapshotRows: ' + rules.length + ' rule row(s) but 0 live (no qty+price+stop) -> report shows No data');
+      return [];
+    }
+    var perSym = syms.map(function (sym) {
+      var u = SUPABASE_URL + '/rest/v1/gammapace_trade_snapshot?select=*'
+        + '&symbol=eq.' + encodeURIComponent(sym)
+        + '&order=' + encodeURIComponent('timestamp.desc') + '&limit=1';
+      return fetchJsonWithRetry(u).catch(function (e) {
+        console.warn('[GammaPortfolio] snapshot read failed for ' + sym + ':', String((e && e.message) || e));
+        return [];
       });
     });
+    return Promise.all(perSym).then(function (parts) {
+      var merged = [], have = {};
+      for (var k = 0; k < parts.length; k++) {
+        var arr = parts[k] || [];
+        if (arr.length && arr[0] && arr[0].symbol && !have[String(arr[0].symbol)]) {
+          have[String(arr[0].symbol)] = 1;
+          merged.push(arr[0]);
+        }
+      }
+      // A live rule symbol with NO snapshot row yet (fresh position, pipeline
+      // hasn't written it) contributes its rule row mapped onto snapshot shape
+      // so the report shows it immediately instead of dropping it.
+      for (var m = 0; m < rules.length; m++) {
+        var rr = rules[m];
+        if (!rr || !rr.symbol || have[String(rr.symbol)]) continue;
+        var qq = parseFloat(rr.bought_qty), cc = parseFloat(rr.current_price), ss = parseFloat(rr.stop_loss);
+        if (!isFinite(qq) || !(qq > 0) || !isFinite(cc) || !isFinite(ss)) continue;
+        var last = parseFloat(rr.last_bought_amount), cm = parseFloat(rr.commission_usd), pt = parseFloat(rr.profit_target_usd);
+        merged.push({
+          symbol: rr.symbol, profit_target_usd: rr.profit_target_usd, commission_usd: rr.commission_usd,
+          bought_qty: rr.bought_qty, last_bought_amount: rr.last_bought_amount,
+          current_price: rr.current_price, highest_price: rr.highest_price, stop_loss: rr.stop_loss,
+          target_price: (isFinite(last) && isFinite(cm) && isFinite(pt) && qq) ? Math.round(((last + cm + pt) / qq + Number.EPSILON) * 10000) / 10000 : null,
+          current_profit_usd: isFinite(last) ? Math.round((cc * qq - last - (isFinite(cm) ? cm : 0) + Number.EPSILON) * 100) / 100 : null,
+          current_profit_pct: (isFinite(last) && last !== 0) ? Math.round((((cc * qq - last - (isFinite(cm) ? cm : 0)) / last * 100) + Number.EPSILON) * 100) / 100 : null,
+          profit_target_distance_pct: (isFinite(cc) && cc !== 0 && isFinite(last) && isFinite(cm) && isFinite(pt) && qq) ? Math.round((((((last + cm + pt) / qq) - cc) / cc * 100) + Number.EPSILON) * 100) / 100 : null,
+          stop_loss_distance_pct: (isFinite(cc) && cc !== 0) ? Math.round((((cc - ss) / cc * 100) + Number.EPSILON) * 100) / 100 : null,
+          fluctuating_percentage: rr.fluctuating_percentage, load_date: rr.load_date === undefined ? null : rr.load_date,
+          timestamp: (rr.last_trigger_ts || rr.load_date_utc || new Date().toISOString())
+        });
+      }
+      console.log('[GammaPortfolio] fetchLatestSnapshotRows: ' + syms.length + ' live rule symbol(s), merged ' + merged.length + ' row(s)');
+      return merged;
+    });
+  });
+}
+function fetchLiveRuleSymbols() {
+  return fetchLiveRules().then(function (rules) {
+    if (!rules) return [];
+    var out = [];
+    for (var i = 0; i < rules.length; i++) {
+      if (rules[i] && rules[i].symbol) out.push(String(rules[i].symbol));
+    }
+    return out;
   });
 }
 
@@ -795,9 +835,23 @@ function renderTableHead(cols) {
   st.textContent = 'Status';
   tr.appendChild(st);
 }
+function showEmptyReport(reason) {
+  if (chartInstance) {
+    chartInstance.data.labels = [];
+    chartInstance.data.datasets[0].data = [];
+    chartInstance.data.datasets[1].data = [];
+    chartInstance.data.datasets[2].data = [];
+    chartInstance.update();
+  }
+  document.getElementById('chartPlaceholder').style.display = 'flex';
+  document.getElementById('chartPlaceholder').innerHTML = '<i class="fas fa-inbox" style="font-size:2rem;color:#b8860b;"></i><span>No open positions — no data to display</span><span style="font-size:0.75rem;color:#999;">' + reason + '</span>';
+  document.getElementById('chartScrollInner').style.display = 'none';
+  var tb = document.getElementById('stopLossTableBody');
+  tb.innerHTML = '<tr><td colspan="20" class="table-placeholder"><i class="fas fa-inbox" style="margin-right:0.4rem;"></i>No data available — no open positions in gammapace_buy_sell_rules (' + reason + ')</td></tr>';
+}
 function updateTable(rows) {
   var tb = document.getElementById('stopLossTableBody');
-  if (!rows || !rows.length) { tb.innerHTML = '<tr><td colspan="20" class="table-placeholder">No data available</td></tr>'; return; }
+  if (!rows || !rows.length) { showEmptyReport('source table empty'); return; }
   // `SELECT g.*` -> derive the visible columns from the actual response keys,
   // using SNAPSHOT_COLS for a stable, meaningful order and appending any extras.
   if (!latestCols.length) {
