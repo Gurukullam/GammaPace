@@ -117,6 +117,71 @@ var SQL_MAPPING_SNO = 11;
    re-implementation of it — produces the numbers we display. */
 var RPC_FUNCTION_NAME = 'run_mapping_sql';
 var REFRESH_INTERVAL_MS = 3000;
+// Two cadences (same architecture as Intraday_Inception.html sno=10 /
+// Intraday_Trend.html sno=6): a cheap 3s READ of the result table every tick,
+// and the heavy ETL (run_mapping_sql RPC that rewrites the snapshot tables)
+// at most once per PIPELINE_MIN_GAP_MS, in one tab at a time.
+var PIPELINE_MIN_GAP_MS = 60000;
+var PIPELINE_LEASE_KEY = 'gammapace_portfolio_pipeline_lease';
+var PIPELINE_LAST_RUN_KEY = 'gammapace_portfolio_pipeline_last_run';
+var PIPELINE_LEASE_TTL_MS = 7 * 60 * 1000;
+var PIPELINE_RPC_TIMEOUT_MS = 120000;
+var consecutiveFailures = 0;
+var nextReadAllowedAt = 0;
+var nextPipelineAllowedAt = 0;
+function dbError(message, code) {
+  var e = new Error(message);
+  e.code = code || null;
+  return e;
+}
+function acquirePipelineLease() {
+  try {
+    var raw = localStorage.getItem(PIPELINE_LEASE_KEY);
+    var now = Date.now();
+    if (raw) {
+      try {
+        var lease = JSON.parse(raw);
+        if (lease && lease.expiresAt && lease.expiresAt > now) return false;
+      } catch (e) { /* corrupt lease -> overwrite */ }
+    }
+    localStorage.setItem(PIPELINE_LEASE_KEY, JSON.stringify({ owner: 'tab-' + Math.random().toString(36).slice(2), startedAt: now, expiresAt: now + PIPELINE_LEASE_TTL_MS }));
+    return true;
+  } catch (e) { return true; }
+}
+function releasePipelineLease() {
+  try { localStorage.removeItem(PIPELINE_LEASE_KEY); } catch (e) {}
+}
+function pipelineLeaseHeldByOther() {
+  try {
+    var raw = localStorage.getItem(PIPELINE_LEASE_KEY);
+    if (!raw) return false;
+    var lease = JSON.parse(raw);
+    return !!(lease && lease.expiresAt && lease.expiresAt > Date.now());
+  } catch (e) { return false; }
+}
+function markPipelineRun() {
+  try { localStorage.setItem(PIPELINE_LAST_RUN_KEY, String(Date.now())); } catch (e) {}
+}
+function pipelineDue() {
+  try {
+    var last = parseInt(localStorage.getItem(PIPELINE_LAST_RUN_KEY) || '0', 10) || 0;
+    return (Date.now() - last) >= PIPELINE_MIN_GAP_MS;
+  } catch (e) { return true; }
+}
+function computeBackoffMs() {
+  var exp = Math.min(consecutiveFailures, 5);
+  return Math.min(60000, 3000 * Math.pow(2, exp)) + Math.floor(Math.random() * 500);
+}
+function dataAgeSeconds(rows) {
+  if (!rows || !rows.length) return null;
+  var newest = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var t = Date.parse(rows[i].timestamp);
+    if (isFinite(t) && t > newest) newest = t;
+  }
+  if (!newest) return null;
+  return Math.max(0, Math.round((Date.now() - newest) / 1000));
+}
 var CANONICAL_SQL_QUERY = null;
 // Final statement of the canonical SQL (sno=11) is:
 //   SELECT g.* FROM public.gammapace_trade_snapshot g
@@ -318,37 +383,71 @@ function stableSortByKeys(arr, keys) {
    Returns an array of the final SELECT's rows (may be empty if the
    final statement yields nothing).
    ------------------------------------------------------------------ */
-async function runCanonicalSql() {
+async function callRunMappingSql() {
   var url = SUPABASE_URL + '/rest/v1/rpc/' + RPC_FUNCTION_NAME;
-  console.log('[GammaPortfolio] runCanonicalSql: POSTing to ' + url + ' with p_title=' + SQL_MAPPING_TITLE + ', p_sno=' + SQL_MAPPING_SNO);
-  var response = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, SUPABASE_HEADERS, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-    body: JSON.stringify({ p_title: SQL_MAPPING_TITLE, p_sno: SQL_MAPPING_SNO })
-  });
+  console.log('[GammaPortfolio] callRunMappingSql: POSTing to ' + url + ' with p_title=' + SQL_MAPPING_TITLE + ', p_sno=' + SQL_MAPPING_SNO);
+  var timer = null;
+  var response;
+  try {
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    if (ctrl) timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, PIPELINE_RPC_TIMEOUT_MS);
+    response = await fetch(url, {
+      method: 'POST',
+      headers: Object.assign({}, SUPABASE_HEADERS, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+      body: JSON.stringify({ p_title: SQL_MAPPING_TITLE, p_sno: SQL_MAPPING_SNO }),
+      signal: ctrl ? ctrl.signal : undefined
+    });
+  } catch (netErr) {
+    if (netErr && netErr.name === 'AbortError') {
+      throw dbError('The SQL pipeline (sno=' + SQL_MAPPING_SNO + ') timed out after ' + Math.round(PIPELINE_RPC_TIMEOUT_MS / 1000) + 's and the RPC call was aborted.', 'TIMEOUT');
+    }
+    throw dbError('Network error calling ' + RPC_FUNCTION_NAME + ': ' + ((netErr && netErr.message) || netErr), 'NETWORK');
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 
   if (!response.ok) {
     var errorBody = await response.text();
-    console.error('[GammaPortfolio] runCanonicalSql: RPC error status=' + response.status + ' body=' + errorBody);
+    console.error('[GammaPortfolio] callRunMappingSql: RPC error status=' + response.status + ' body=' + errorBody);
+    if (response.status === 404) {
+      throw dbError('RPC "' + RPC_FUNCTION_NAME + '" is not installed yet. Please run setup_run_mapping_sqls.sql once in the Supabase SQL Editor.', '404');
+    }
+    if (String(errorBody).indexOf('55P03') !== -1) {
+      throw dbError('The SQL pipeline could not get its table lock (SQLSTATE 55P03 - another run was holding the tables, e.g. gammapace_trade_snapshot). The page backs off and retries automatically.', '55P03');
+    }
+    if (String(errorBody).indexOf('40P01') !== -1) {
+      throw dbError('The SQL pipeline hit a database deadlock (SQLSTATE 40P01). It is retried automatically.', '40P01');
+    }
     // Supabase aborts long scripts with 57014 (query_canceled).
     if (String(errorBody).indexOf('57014') !== -1) {
-      throw new Error('SQL script exceeded the database statement timeout. '
+      throw dbError('SQL script exceeded the database statement timeout (SQLSTATE 57014). '
         + 'Raise it in the Supabase SQL Editor: '
-        + "ALTER FUNCTION public.run_mapping_sql(text, integer) SET statement_timeout = '120s';");
+        + "ALTER FUNCTION public.run_mapping_sql(text, integer) SET statement_timeout = '120s';", '57014');
     }
-    throw new Error('run_mapping_sql RPC error: ' + response.status + ' '
-      + response.statusText + ' - ' + errorBody);
+    throw dbError('run_mapping_sql RPC error: ' + response.status + ' '
+      + response.statusText + ' - ' + errorBody, null);
   }
 
-  var text = await response.text();
-  if (!text) {
-    console.warn('[GammaPortfolio] runCanonicalSql: RPC returned empty body');
-    return [];
-  }
-  var data = JSON.parse(text);
-  var rows = Array.isArray(data) ? data : [data];
-  console.log('[GammaPortfolio] runCanonicalSql: RPC returned ' + rows.length + ' row(s) from final SELECT');
-  return rows;
+  // The RPC is a TRIGGER, not a row source: the deployed run_mapping_sql()
+  // returns [] for every sno (see GammaPace.MD tracker #10). Rows are read
+  // from gammapace_trade_snapshot over PostgREST instead, so an empty payload
+  // here is expected and is NOT an error.
+  try {
+    var text = await response.text();
+    if (!text) { console.log('[GammaPortfolio] callRunMappingSql: trigger OK (empty body, expected)'); return; }
+    var data = JSON.parse(text);
+    var n = Array.isArray(data) ? data.length : 1;
+    console.log('[GammaPortfolio] callRunMappingSql: trigger OK, RPC payload had ' + n + ' row(s) (rows are read from the table)');
+  } catch (e) { console.log('[GammaPortfolio] callRunMappingSql: trigger OK (unparsed body, expected)'); }
+}
+
+/* EXECUTE THE CANONICAL SQL (sno=11) ON THE DATABASE
+   Legacy wrapper: triggers the pipeline then reads the table. Kept so any
+   external caller still works; the refresh loop below calls
+   refreshData(false) / refreshData(true) directly. */
+async function runCanonicalSql() {
+  await callRunMappingSql();
+  return fetchLatestSnapshotRows();
 }
 
 /* Read the freshly-written snapshot rows for display.
@@ -365,22 +464,20 @@ function fetchLatestSnapshotRows() {
   return fetchJsonWithRetry(url);
 }
 
-async function fetchStopLossData() {
-  // STEP 1 — ALWAYS run the full SQL pipeline on the database via the RPC.
-  // This executes every statement in the canonical script (sno=11) inside one transaction:
-  //   (1) fluctuation-% CTE, (2) INSERT nasdaq_fluctuation, (3) UPDATE gammapace_buy_sell_rules,
-  //   (4) INSERT gammapace_trade_snapshot, (5) final SELECT.
-  console.log('[GammaPortfolio] fetchStopLossData: STEP 1 — executing canonical SQL pipeline via run_mapping_sql RPC');
-  var rpcRows = await runCanonicalSql();
-  console.log('[GammaPortfolio] fetchStopLossData: STEP 1 — RPC executed, returned ' + rpcRows.length + ' row(s) from final SELECT');
-
-  // STEP 2 — ALWAYS read the snapshot table directly to get the freshest rows
-  // that the pipeline just wrote. This guarantees we display live data regardless
-  // of whether PostgREST returns the RPC's SELECT results.
-  console.log('[GammaPortfolio] fetchStopLossData: STEP 2 — reading freshly-written snapshot table directly');
+async function fetchStopLossData(runPipeline) {
+  // runPipeline=false -> cheap read-only tick (every REFRESH_INTERVAL_MS).
+  // runPipeline=true  -> execute the sno=11 script through the RPC (trigger),
+  //                      then read the table it just rewrote (at most every
+  //                      PIPELINE_MIN_GAP_MS, one tab at a time).
+  if (runPipeline) {
+    console.log('[GammaPortfolio] fetchStopLossData: pipeline tick - executing canonical SQL via run_mapping_sql RPC');
+    await callRunMappingSql();
+    markPipelineRun();
+  } else {
+    console.log('[GammaPortfolio] fetchStopLossData: read tick - cheap snapshot read');
+  }
   var rows = await fetchLatestSnapshotRows();
-  console.log('[GammaPortfolio] fetchStopLossData: STEP 2 — direct read returned ' + rows.length + ' row(s)');
-
+  console.log('[GammaPortfolio] fetchStopLossData: read returned ' + rows.length + ' row(s)');
   return normalizeRows(rows);
 }
 
@@ -616,26 +713,97 @@ function updateTable(rows) {
 }
 var isRefreshing = false;
 var lastPipelineRunMs = 0;
+var lastReadMs = 0;
 function setSpin(on) { document.getElementById('refreshSpinner').style.display = on ? 'block' : 'none'; }
-async function refreshData() {
+function renderStatusAge() {
+  var el = document.getElementById('lastUpdatedText');
+  if (!el || !lastReadMs) return;
+  var age = Math.max(0, Math.round((Date.now() - lastReadMs) / 1000));
+  var base = el.getAttribute('data-base') || el.innerHTML;
+  el.setAttribute('data-base', base);
+  el.innerHTML = base + ' <span style="color:#888;">(' + age + 's ago)</span>';
+}
+async function refreshData(runPipeline) {
   if (isRefreshing) return;
+  // Back-off gate: skip ticks while a previous DB failure is cooling down.
+  if (Date.now() < nextReadAllowedAt) {
+    console.log('[GammaPortfolio] refreshData: backing off, next tick allowed in ' + Math.round((nextReadAllowedAt - Date.now()) / 1000) + 's');
+    return;
+  }
+  // Never let a cheap read fight the ETL TRUNCATE/INSERT: when another tab
+  // owns the pipeline lease, skip this tick entirely.
+  if (pipelineLeaseHeldByOther()) {
+    console.log('[GammaPortfolio] refreshData: pipeline lease held by another tab - skipping tick');
+    return;
+  }
+  var wantPipeline = (runPipeline === true);
+  // Default cadence when the caller does not specify: run the heavy ETL only
+  // when the shared 60s gap has elapsed AND this tab wins the lease.
+  if (runPipeline === undefined || runPipeline === null) {
+    wantPipeline = pipelineDue() && Date.now() >= nextPipelineAllowedAt;
+  }
+  var holdingLease = false;
+  if (wantPipeline) {
+    if (!acquirePipelineLease()) {
+      console.log('[GammaPortfolio] refreshData: lost pipeline lease race - reading instead');
+      wantPipeline = false;
+    } else {
+      holdingLease = true;
+    }
+  }
   isRefreshing = true; setSpin(true);
   var startMs = Date.now();
   try {
-    console.log('[GammaPortfolio] refreshData: starting full SQL pipeline execution at ' + new Date().toLocaleTimeString());
-    var rows = await fetchStopLossData();
-    lastPipelineRunMs = Date.now();
-    console.log('[GammaPortfolio] refreshData: pipeline returned ' + rows.length + ' rows in ' + (Date.now() - startMs) + 'ms');
+    console.log('[GammaPortfolio] refreshData: ' + (wantPipeline ? 'PIPELINE tick (ETL + read)' : 'READ tick (cheap snapshot read)') + ' at ' + new Date().toLocaleTimeString());
+    var rows = await fetchStopLossData(wantPipeline);
+    consecutiveFailures = 0;
+    nextReadAllowedAt = Date.now() + REFRESH_INTERVAL_MS;
+    if (wantPipeline) {
+      lastPipelineRunMs = Date.now();
+      nextPipelineAllowedAt = Date.now() + PIPELINE_MIN_GAP_MS;
+    }
+    lastReadMs = Date.now();
+    console.log('[GammaPortfolio] refreshData: ' + (wantPipeline ? 'pipeline' : 'read') + ' returned ' + rows.length + ' rows in ' + (Date.now() - startMs) + 'ms');
     updateChart(rows); updateTable(rows);
     var lastSqlEl = document.getElementById('lastSqlExecutedText');
     if (lastSqlEl) {
-      lastSqlEl.innerHTML = '<i class="fas fa-database" style="color:#8b4513;"></i> Last SQL pipeline run: ' + new Date(lastPipelineRunMs).toLocaleTimeString() + ' (' + rows.length + ' symbols)';
+      var age = dataAgeSeconds(rows);
+      lastSqlEl.innerHTML = '<i class="fas fa-database" style="color:#8b4513;"></i> Last SQL pipeline run: '
+        + (lastPipelineRunMs ? new Date(lastPipelineRunMs).toLocaleTimeString() : 'not yet run')
+        + ' (' + rows.length + ' symbols' + (age !== null ? ', data ' + age + 's old' : '') + ')';
     }
-    document.getElementById('lastUpdatedText').innerHTML = '<i class="fas fa-check-circle" style="color:green;"></i> Updated: ' + new Date().toLocaleTimeString() + ' (' + rows.length + ' symbols)';
+    var updatedEl = document.getElementById('lastUpdatedText');
+    updatedEl.innerHTML = '<i class="fas fa-check-circle" style="color:green;"></i> Updated: ' + new Date().toLocaleTimeString() + ' (' + rows.length + ' symbols)';
+    updatedEl.setAttribute('data-base', updatedEl.innerHTML);
   } catch (e) {
-    console.error('[GammaPortfolio] refreshData error:', e);
-    document.getElementById('lastUpdatedText').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> Error: ' + String(e.message || e);
-  } finally { isRefreshing = false; setSpin(false); }
+    consecutiveFailures++;
+    var waitMs = computeBackoffMs();
+    nextReadAllowedAt = Date.now() + waitMs;
+    if (wantPipeline) nextPipelineAllowedAt = Date.now() + Math.max(waitMs, PIPELINE_MIN_GAP_MS);
+    console.error('[GammaPortfolio] refreshData error (failure #' + consecutiveFailures + ', retry in ' + Math.round(waitMs / 1000) + 's):', e);
+    // Non-fatal while the table still holds rows: keep last-good chart/table
+    // on screen with a warning instead of blanking the report.
+    var hasRows = false;
+    try {
+      var cached = await fetchLatestSnapshotRows();
+      var norm = normalizeRows(cached);
+      if (norm && norm.length) {
+        hasRows = true;
+        updateChart(norm); updateTable(norm);
+        lastReadMs = Date.now();
+        document.getElementById('lastUpdatedText').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e67e22;"></i> Pipeline retry in '
+          + Math.round(waitMs / 1000) + 's - showing last good data (' + norm.length + ' symbols). ' + String(e.message || e);
+        document.getElementById('lastUpdatedText').setAttribute('data-base', document.getElementById('lastUpdatedText').innerHTML);
+      }
+    } catch (e2) { console.warn('[GammaPortfolio] cached-read fallback failed:', String((e2 && e2.message) || e2)); }
+    if (!hasRows) {
+      document.getElementById('lastUpdatedText').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> Error: ' + String(e.message || e) + ' (retry in ' + Math.round(waitMs / 1000) + 's)';
+      document.getElementById('lastUpdatedText').setAttribute('data-base', document.getElementById('lastUpdatedText').innerHTML);
+    }
+  } finally {
+    if (holdingLease) releasePipelineLease();
+    isRefreshing = false; setSpin(false);
+  }
 }
 function scheduleNextRefresh() {
   setTimeout(refreshAndReschedule, REFRESH_INTERVAL_MS);
@@ -644,6 +812,7 @@ async function refreshAndReschedule() {
   await refreshData();
   scheduleNextRefresh();
 }
+var refreshTimer = null;
 document.addEventListener('DOMContentLoaded', async function () {
   initChart();
   try {
@@ -657,8 +826,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     var sqlEl = document.getElementById('sqlText');
     if (sqlEl) sqlEl.textContent = lastStatement(CANONICAL_SQL_QUERY);
   } catch (e) { console.warn('canonical SQL fallback:', String(e.message || e)); }
-  await refreshData();
-  scheduleNextRefresh();
+  // First tick forces the pipeline once (so a fresh page re-executes the SQL
+  // immediately), subsequent ticks follow the two-cadence schedule.
+  await refreshData(true);
+  refreshTimer = setInterval(function () { refreshData(); }, REFRESH_INTERVAL_MS);
+  setInterval(renderStatusAge, 1000);
   if (!REDUCE_MOTION) { setInterval(function () { blinkOn = !blinkOn; repaintStopColors(); }, 600); }
 });
 function toggleMobileMenu() {
