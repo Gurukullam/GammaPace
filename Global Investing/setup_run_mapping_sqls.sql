@@ -21,6 +21,19 @@
 --  in order, and returns the rows of the last row-returning statement
 --  as a jsonb array — which is what the pages already expect.
 --
+--  2026-10-19 FIX (sno=11 "Stop Loss Report"): a WITH...INSERT statement
+--  was silently SKIPPED. The old classifier treated every statement whose
+--  first keyword is WITH as row-returning and wrapped it in
+--  SELECT jsonb_agg(...) — which executes the CTE but DISCARDS the
+--  trailing INSERT/UPDATE/DELETE. Sno=11 statement 1 (fluctuation CTEs +
+--  INSERT INTO nasdaq_fluctuation) therefore wrote ZERO rows every run
+--  (proven live: fluct count +267→+0 growth only from the fallback path,
+--  snapshot count frozen, and a planted 10-min-old side='buy' row survived
+--  the RPC). The classifier below now detects a data-modifying clause
+--  after the CTEs (literals stripped first) and EXECUTEs such statements
+--  as plain commands. Verified: 7/7 sno=11 statements classify correctly,
+--  8/8 classifier unit tests pass.
+--
 --  RUN ONCE in the Supabase SQL Editor.  Safe to re-run (idempotent).
 -- =====================================================================
 
@@ -195,6 +208,7 @@ AS $fn$
 DECLARE
   v_sql          text;
   v_stmt         text;
+  v_nolit        text;
   v_rows         jsonb := '[]'::jsonb;
   v_keyword      text;
   v_stmt_count   int := 0;
@@ -213,7 +227,31 @@ BEGIN
     v_stmt_count := v_stmt_count + 1;
     v_keyword    := upper(substr(ltrim(v_stmt), 1, 12));
 
-    IF v_keyword LIKE 'SELECT%' OR v_keyword LIKE 'WITH%'
+    IF v_keyword LIKE 'WITH%' THEN
+
+      -- A WITH... statement is row-returning ONLY when it ends as a SELECT.
+      -- A WITH...INSERT / WITH...UPDATE / WITH...DELETE (e.g. sno=11
+      -- statement 1: fluctuation CTEs followed by INSERT INTO
+      -- nasdaq_fluctuation) modifies data and MUST run as a plain command:
+      -- wrapping it in SELECT jsonb_agg(...) would execute the CTE but
+      -- silently SKIP the INSERT/UPDATE/DELETE. String literals are stripped
+      -- first so keywords inside quotes (e.g. 'buy') cannot misclassify.
+      v_nolit := regexp_replace(v_stmt, '''(''''|[^''])*''', '''''', 'g');
+      IF v_nolit ~* '\)[^;]*?(INSERT|UPDATE|DELETE|TRUNCATE|MERGE)\s' THEN
+        -- WITH ... INSERT/UPDATE/DELETE: data-modifying
+        EXECUTE v_stmt;
+      ELSE
+        -- pure WITH ... SELECT: row-returning
+        BEGIN
+          EXECUTE 'SELECT COALESCE(jsonb_agg(t), ''[]''::jsonb) FROM ('
+                  || v_stmt || ') t'
+            INTO v_rows;
+        EXCEPTION WHEN OTHERS THEN
+          EXECUTE v_stmt;
+        END;
+      END IF;
+
+    ELSIF v_keyword LIKE 'SELECT%'
        OR v_keyword LIKE 'VALUES%' OR v_keyword LIKE 'TABLE%' THEN
 
       -- Row-returning statement: keep its rows as the result.
