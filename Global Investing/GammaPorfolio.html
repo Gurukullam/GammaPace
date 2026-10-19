@@ -570,9 +570,13 @@ async function fetchStopLossData(runPipeline) {
   // and repopulate the report with table and graph". The only serialisation is
   // the short single-flight lease; a tab that loses the race does a read-only
   // tick and picks the pipeline up on the next 3s tick.
-  var leased = (runPipeline === true) ? acquirePipelineLease() : true;
-  if (runPipeline === true && !leased) {
-    console.log('[GammaPortfolio] fetchStopLossData: another tab owns the pipeline - read-only tick');
+  // The pipeline lease is ALREADY held by refreshData for this tick, so we must
+  // NOT re-acquire it here. Re-acquiring would fail (lease still held) and force
+  // this function into the read-only branch, silently skipping the data-modifying
+  // statements (INSERT/UPDATE/DELETE) below.
+  if (runPipeline === false) {
+    // read-only tick: another tab owns the pipeline lease; just read the table
+    console.log('[GammaPortfolio] fetchStopLossData: pipeline lease held by another tab - read-only tick');
     var rowsOnly = await fetchLatestSnapshotRows();
     console.log('[GammaPortfolio] fetchStopLossData: read returned ' + rowsOnly.length + ' row(s)');
     return normalizeRows(rowsOnly);
@@ -595,7 +599,7 @@ async function fetchStopLossData(runPipeline) {
     console.log('[GammaPortfolio] fetchStopLossData: read returned ' + rows.length + ' row(s)');
     return normalizeRows(rows);
   } finally {
-    if (runPipeline === true && leased) releasePipelineLease();
+    // lease is held by refreshData for the whole tick; refreshData releases it
   }
 }
 
