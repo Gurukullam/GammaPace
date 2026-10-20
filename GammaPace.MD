@@ -84,6 +84,9 @@ GammaPace-main/
 ├── index.html                  -> root/home page
 ├── deploy-global-investing.ps1 -> GitHub Pages deploy script (Global Investing + index)
 ├── .github/workflows/deploy.yml-> GitHub Actions Pages deploy
+├── trend_harness_test.js       -> Node vm harness validating Intraday_Trend.html's
+│                                  SQL -> read -> repaint -> chain cycle (LOCAL ONLY —
+│                                  not in the deploy script's $ITEMS, never published)
 │
 ├── CloudflareWorker/           <- **** THE LIVE NASDAQ PROXY (see section 4b) ****
 │   ├── worker.js               -> proxy + v2 pacing/circuit-breaker (2026-10-20)
@@ -97,7 +100,8 @@ GammaPace-main/
 │   ├── MarketTradingData.html      -> Market & Trading Data page   (Bridge: musho...)
 │   ├── CompanyFundamentalData.html -> Company Fundamental page     (Bridge: ppdm...)
 │   ├── index.html / Intraday.html / MarketMoversAdvanced.html / MarketMoversDollarVol.html
-│   ├──  Intraday_Trend.html  -> stored-SQL report (sno=6 -> trend_analysis)
+│   ├──  Intraday_Trend.html  -> stored-SQL report (sno=6 -> trend_analysis) — BACK-TO-BACK
+│   │                            full-SQL cycles + run timer (see 3b/3c, tracker #17)
 │   ├──  Intraday_Inception.html  -> stored-SQL report (sno=10 -> inception_stock_intraday)
 │   ├──  Intraday_Steady_Growth_Stocks.html -> REST paged report (nasdaq_chart)
 │   ├──  setup_run_mapping_sqls.sql  -> installs/repairs run_mapping_sql()  (RUN ONCE)
@@ -148,8 +152,49 @@ Both pages show a countdown in the status bar; only Inception still uses the rea
 
 Cross-tab coordination uses two `localStorage` keys per report:
 `gammapace_<report>_pipeline_lease` (single-flight, ~7 min TTL) and
-`gammapace_<report>_pipeline_last_run` (the shared 60s gap - without it, releasing the
-lease let the next tab re-fire the ETL immediately, which is what flooded the DB).
+`gammapace_<report>_pipeline_last_run` (epoch of the last ETL start):
+- **Inception:** the `last_run` stamp enforces the shared 60s gap — without it,
+  releasing the lease let the next tab re-fire the ETL immediately (what flooded the DB).
+- **Trend (since #17):** the gap is 0 (back-to-back), so the `last_run` stamp is written
+  for diagnostics only; the **lease is the sole concurrency guard**. It is released after
+  every cycle and re-claimed after `CHAIN_DELAY_MS` (250ms), so open tabs naturally
+  rotate who drives the pipeline — and every tab repaints only after a run IT completed.
+
+### 3c. `Intraday_Trend.html` — back-to-back full-SQL cycle (since 2026-10-20, tracker #17)
+
+The page repaints the chart + table **only after the complete sno=6 script executed**,
+then immediately starts the next cycle. Constants (config block at the top of the script):
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `PIPELINE_MIN_GAP_MS` | **0** | back-to-back: next cycle due the moment the previous one COMPLETED |
+| `CHAIN_DELAY_MS` | **250ms** | settle after success so the browser paints before the next TRUNCATE |
+| `REFRESH_INTERVAL_MS` | 3000 | scheduler tick only (back-off gate + safety net) — **not** a repaint cadence |
+| `RPC_TIMEOUT_MS` | 120000 | `AbortController` on the RPC (hung runs are aborted, loop never freezes) |
+| `BACKOFF_BASE_MS` / `BACKOFF_MAX_MS` | 3000 / 60000 | exponential retry after a failed run |
+
+**One cycle — the only code path that may repaint:**
+1. `claimPipelineLease()` — if another tab owns the pipeline, skip (status shows
+   "Another tab … running the SQL pipeline") — no read, no repaint.
+2. `callRunMappingSql()` — runs the WHOLE stored script in one transaction
+   (TRUNCATE → INSERT → …). Any error (55P03 / 57014 / 40P01 / TIMEOUT) **throws** →
+   no read, no repaint, back-off arms; status shows the SQLSTATE + "report NOT refreshed".
+3. `readResultTable()` — only after the RPC completed (the deployed RPC answers `[]`,
+   see #10, so the rows always come from this table read).
+4. `updateChart()` + `updateTable()` — the repaint, strictly step-3-after-step-2.
+5. Release the lease; **on success** → `setTimeout(refreshData, CHAIN_DELAY_MS)` chains
+   the next full cycle; **on failure** → nothing is chained, the 3s tick retries when
+   the back-off countdown ends.
+
+**Timer `#nextRunTimer` (1s tick, in the refresh bar):**
+`SQL executing now… Ns` (running) → `Next SQL run: starting now` (between cycles) →
+`Next SQL run in Ns (after failure)` (back-off) → `Other tab executing SQL… Ns` (lease held).
+
+**Validation:** `node trend_harness_test.js` (repo root; Node vm, mocked Supabase —
+runs the page's own inline script): **19/19 assertions** — no read/repaint while SQL is
+in flight; read+repaint strictly after RPC success; the chained 2nd cycle re-runs the
+full SQL; failure = no repaint + countdown + no chain + back-off respected. `node --check`
+on the extracted script is clean.
 
 ---
 
@@ -397,7 +442,7 @@ Each per-symbol endpoint has **mode chips**: `ALL NASDAQ` / `Single Symbol` /
 | 14 | DONE | Frontend fail-fast on 403 + bulk-loader throttling (2026-10-20) | `fetchSymbolChart` / `fetchSymbolBasic` / `fetchSymbolTrades` / `fetchQuote` (Quote Info) no longer sleep-retry on 403/429/503 — one attempt, log `skipped, moving on`, count in `failCount`/skip counter, continue instantly (403 is a per-IP block; per-symbol retries could never clear it and stalled every run). All bulk loaders throttled to concurrency 6 / 150ms (Quote Info watchlist was 16/20ms). Frontend-only; deployed to GitHub Pages (commit `dc1651d`). |
 | 15 | DONE | Server root-cause fix: Worker v2 — pacing + circuit breaker (2026-10-20) | The remaining 403 waves AND the `Request timeout after 20000ms` batches were server-side: Akamai burst-rate-limits the worker's shared egress IP (verified: burst-of-40 from idle produced a 403, singles always 200), and worker v1 amplified blocks with 4x retries + no upstream timeout (held requests >20s -> frontend AbortController timeouts). v2 adds PACE (adaptive 4–20 rps slot queue), instant-429 FAST-FAIL, CIRCUIT (5 fails/10s -> 20–60s cooldown + single probe), 2-attempt cap, 6s upstream timeout, full first-party headers — see section 4b. Deployed via `wrangler deploy` to the SAME URL (version `b0c65e8f`; repo commit `b943b61`). Verified live: 40-burst = 38x200 + 2x403 fast-skips in 2.5s, zero timeouts. |
 | 16 | DONE | Wrangler auth + repo hygiene (2026-10-20) | `wrangler login` completed (OAuth token in `%APPDATA%\.wrangler\config\default.toml`), so future worker deploys are one command from `CloudflareWorker/`: `wrangler deploy`. `wrangler.toml` re-targeted to the LIVE worker name (`workers-playground-summer-field-8601`, + `workers_dev = true`) — deploying any other name creates a different URL and the frontend must be re-pointed. Added `CloudflareWorker/.gitignore` excluding `.wrangler/` (wrangler's local account cache had ridden along into commit `b943b61`; removed in `c7c1f71`, gitignore in `61a4b36`). |
-| 17 | DONE | Intraday Trend: repaint ONLY after a complete SQL run + back-to-back cycles + run timer (2026-10-20) | `Global Investing/Intraday_Trend.html` reworked per requirement "repopulate the chart/table only after the complete SQL executed; start the next cycle as soon as the previous completes; show a timer for the next execution". **Before:** two cadences (3s read-only repaint + 60s ETL) — the table/graph were repopulated by plain reads between SQL runs, and a failed RPC still rendered the (stale) table with a warning. **Now:** single cadence — every cycle = `run_mapping_sql` (whole sno=6 script) → read `trend_analysis` → repaint, strictly in that order; `fetchTrendData()` no longer swallows RPC errors, so a failed run NEVER repaints (last good chart/table stays; status says "report NOT refreshed"); success chains the next cycle immediately via `setTimeout(refreshData, CHAIN_DELAY_MS=250)` (`PIPELINE_MIN_GAP_MS` 60000→0 = back-to-back); the 3s `setInterval` remains only as the scheduler tick/back-off gate (exponential 3s→60s unchanged). New countdown in the refresh bar (`#nextRunTimer`, 1s tick): "SQL executing now… Ns" while running / "Next SQL run in Ns (after failure)" during back-off / "Other tab executing SQL…" while waiting for the lease. Removed: `nextReadAllowedAt`, `lastPipelineWarning`, the read-only `fetchTrendData(false)` path, "Data read ·" status branch. **Validated** with `trend_harness_test.js` (repo root, Node vm harness running the page's own inline script against a mocked Supabase): 19/19 assertions — no read/repaint while SQL in flight, read+repaint strictly after RPC success, 2nd chained cycle re-runs full SQL, failure = no repaint + countdown + no chain + back-off respected. |
+| 17 | DONE | Intraday Trend: repaint ONLY after a complete SQL run + back-to-back cycles + run timer (2026-10-20) | `Global Investing/Intraday_Trend.html` reworked per requirement "repopulate the chart/table only after the complete SQL executed; start the next cycle as soon as the previous completes; show a timer for the next execution". **Before:** two cadences (3s read-only repaint + 60s ETL) — the table/graph were repopulated by plain reads between SQL runs, and a failed RPC still rendered the (stale) table with a warning. **Now:** single cadence — every cycle = `run_mapping_sql` (whole sno=6 script) → read `trend_analysis` → repaint, strictly in that order; `fetchTrendData()` no longer swallows RPC errors, so a failed run NEVER repaints (last good chart/table stays; status says "report NOT refreshed"); success chains the next cycle immediately via `setTimeout(refreshData, CHAIN_DELAY_MS=250)` (`PIPELINE_MIN_GAP_MS` 60000→0 = back-to-back); the 3s `setInterval` remains only as the scheduler tick/back-off gate (exponential 3s→60s unchanged). New countdown in the refresh bar (`#nextRunTimer`, 1s tick): "SQL executing now… Ns" while running / "Next SQL run in Ns (after failure)" during back-off / "Other tab executing SQL…" while waiting for the lease. Removed: `nextReadAllowedAt`, `lastPipelineWarning`, the read-only `fetchTrendData(false)` path, "Data read ·" status branch. **Validated** with `trend_harness_test.js` (repo root, Node vm harness running the page's own inline script against a mocked Supabase): 19/19 assertions — no read/repaint while SQL in flight, read+repaint strictly after RPC success, 2nd chained cycle re-runs full SQL, failure = no repaint + countdown + no chain + back-off respected. **Deployed** to GitHub Pages via `deploy-global-investing.ps1 -Commit` (repo commit `93ab5af`); live verified at `https://www.gammapace.com/Global%20Investing/Intraday_Trend.html` — HTTP 200, markers `nextRunTimer` / `CHAIN_DELAY_MS` / `PIPELINE_MIN_GAP_MS = 0` present, old `nextReadAllowedAt` / `PIPELINE_MIN_GAP_MS = 60000` absent. NOTE: `trend_harness_test.js` is LOCAL-ONLY — the deploy script's `$ITEMS` does not include it, so it is never published. Full mechanics in **section 3c**. |
 
 
 ---
@@ -413,12 +458,20 @@ vercel --prod
 ```
 
 ### B. Frontend -> GitHub Pages (via the deploy script)
-`deploy-global-investing.ps1` overlays `"Global Investing"` + `index.html` into the
-`Gurukullam/GammaPace` repo (GitHub Pages rebuild in ~60-90 s). It validates the change
-set before committing. Dry-run without `-Commit`; add `-Commit` to actually push:
+`deploy-global-investing.ps1` overlays `"Global Investing"` + `index.html` + `GammaPace.MD`
+into the `Gurukullam/GammaPace` repo (GitHub Pages rebuild in ~60-90 s). It validates the
+change set before committing. Dry-run without `-Commit`; add `-Commit` to actually push:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy-global-investing.ps1          # dry run (audit)
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy-global-investing.ps1 -Commit  # commit + push
 ```
-powershell -File deploy-global-investing.ps1 -Commit
-```
+> NOTE (hit 2026-10-20): plain `powershell -File ...` fails on this machine with
+> *"running scripts is disabled on this system"* — **always pass
+> `-NoProfile -ExecutionPolicy Bypass`** (or run from an already-open elevated shell).
+
+The script only publishes `$ITEMS` = `Global Investing`, `CloudflareWorker`, `index.html`,
+`GammaPace.MD`. Anything else in the repo root (e.g. `trend_harness_test.js`) is **never**
+pushed by it — commit such files manually with plain `git` if they should be versioned.
 (Alternative: the GitHub Actions workflow `.github/workflows/deploy.yml` auto-deploys on
 push to `main`.)
 
@@ -486,6 +539,20 @@ $tasks = 1..40 | ForEach-Object { $c = [System.Net.Http.StringContent]::new($bod
 $tasks | ForEach-Object { [int]$_.Result.StatusCode } | Group-Object | Sort-Object Name | Format-Table Name,Count
 ```
 
+Validate the Intraday Trend back-to-back cycle after ANY edit to `Intraday_Trend.html`
+(must print `RESULT: ALL ASSERTIONS PASSED`; see tracker #17 / section 3c):
+```powershell
+cd $root
+node trend_harness_test.js
+```
+
+Confirm the published Trend page carries the current logic (expect HTTP 200 and all True;
+remember the page lives under the `Global Investing/` subpath — the root URL 404s):
+```powershell
+$c = (Invoke-WebRequest 'https://www.gammapace.com/Global%20Investing/Intraday_Trend.html' -UseBasicParsing).Content
+@('nextRunTimer','CHAIN_DELAY_MS','PIPELINE_MIN_GAP_MS = 0') | ForEach-Object { $_ + ': ' + ($c -match [regex]::Escape($_)) }
+```
+
 ---
 
 ## 11. How to Resume (for the next developer/AI)
@@ -498,5 +565,8 @@ $tasks | ForEach-Object { [int]$_.Result.StatusCode } | Group-Object | Sort-Obje
 3. Check **Status / Tracker** (8) - pick up the first `TODO` / `BUG` item (e.g. the IPO
    field-mapping fix, or verifying end-to-end on each page).
 4. When you make/verify a change, **update 8** here so the file always reflects reality.
-5. If editing the worker, read **section 4b** first — the pacing/circuit layering is
+5. If you edit `Global Investing/Intraday_Trend.html`, re-run `node trend_harness_test.js`
+   (section 10) — its assertions pin the "SQL completes first, then repaint, then chain"
+   contract (section 3c / tracker #17); redeploy with procedure B afterwards.
+6. If editing the worker, read **section 4b** first — the pacing/circuit layering is
    load-bearing; re-verify with the 40-burst stress check after every deploy.
