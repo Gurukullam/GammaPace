@@ -1,5 +1,4 @@
 # ⚡ GammaPace — Master Implementation & Tracking Document
-# ⚡ GammaPace — Master Implementation & Tracking Document
 
 > **PURPOSE OF THIS FILE**
 > This is the single source of truth for the GammaPace project. It records the architecture,
@@ -18,8 +17,11 @@
 
 **GammaPace** is a NASDAQ market-data platform that:
 1. Serves **static HTML frontends** from **GitHub Pages**.
-2. Fetches free **NASDAQ API** data server-to-server through a **Vercel serverless proxy**
-   (the browser cannot call `api.nasdaq.com` directly because of CORS + no-auth restrictions).
+2. Fetches free **NASDAQ API** data server-to-server through a **proxy** — the LIVE backend
+   is a **Cloudflare Worker** (`CloudflareWorker/worker.js`; the browser cannot call
+   `api.nasdaq.com` directly because of CORS + no-auth restrictions). The original
+   **Vercel** proxy (`nasdaq-historical-api`) is **SUSPENDED (HTTP 402
+   DEPLOYMENT_DISABLED)**; its source is kept at `Global Investing/backend/api/nasdaq-proxy.js`.
 3. Persists the fetched data into **Supabase** (PostgreSQL) via the browser anon key, and
    lets the user **download each dataset as CSV**.
 
@@ -54,7 +56,8 @@
 **Three key layers:**
 | Layer | Where | Auth |
 |-------|-------|------|
-| **Backend proxy** | Vercel project `nasdaq-historical-api` | No auth (public) |
+| **Backend proxy (LIVE)** | Cloudflare Worker `workers-playground-summer-field-8601.emailtochand.workers.dev` | No auth (public) |
+| **Backend proxy (legacy)** | Vercel project `nasdaq-historical-api` — **suspended (402)** | No auth (public) |
 | **NASDAQ data** | `api.nasdaq.com` | Free, no key |
 | **Persistence (Bridge)** | Supabase project (per page) | Browser **anon key** (`sb_publishable_...`) |
 
@@ -63,6 +66,12 @@
 > Opening the HTML from **`file://`** sends `Origin: null`, which was NOT allowed -> the
 > browser blocked every response as **`Failed to fetch`**. This was the root cause of the
 > reported errors. Fix detailed in section 4.
+
+> **Live proxy note (2026-10-20):** the diagram above shows the original Vercel fn for
+> history, but the LIVE backend is the **Cloudflare Worker** in `CloudflareWorker/worker.js`
+> — same protocol (`POST /api/nasdaq-proxy` + `GET /` health probe), so the frontend works
+> against either proxy unchanged. Worker **v2** (2026-10-20) added rate-limit protection
+> (pacing + circuit breaker + instant-429 fast-fail) — full details in **section 4b**.
 
 ---
 
@@ -75,6 +84,12 @@ GammaPace-main/
 ├── index.html                  -> root/home page
 ├── deploy-global-investing.ps1 -> GitHub Pages deploy script (Global Investing + index)
 ├── .github/workflows/deploy.yml-> GitHub Actions Pages deploy
+│
+├── CloudflareWorker/           <- **** THE LIVE NASDAQ PROXY (see section 4b) ****
+│   ├── worker.js               -> proxy + v2 pacing/circuit-breaker (2026-10-20)
+│   ├── wrangler.toml           -> name = LIVE worker name (deploy via `wrangler deploy`)
+│   ├── README.md               -> deploy recipes (dashboard paste-in / wrangler CLI)
+│   └── .gitignore              -> excludes .wrangler/ local cache
 │
 ├── Global Investing/
 │   ├── backend/                <- the Vercel proxy source (deploy separately to Vercel)
@@ -93,9 +108,9 @@ GammaPace-main/
 ```
 
 > WARNING: Do **not** confuse the folders `Backend-Setup/` and `VercelDeploymentSetup/` with
-> the actual Nasdaq proxy. Those are **Stripe** backends. The Nasdaq proxy lives ONLY in
-> `Global Investing/backend/api/nasdaq-proxy.js` and deploys to the `nasdaq-historical-api`
-> Vercel project.
+> the actual Nasdaq proxy. Those are **Stripe** backends. The LIVE Nasdaq proxy is
+> `CloudflareWorker/worker.js` (Cloudflare Worker). `Global Investing/backend/api/nasdaq-proxy.js`
+> is the legacy Vercel version — its project (`nasdaq-historical-api`) is **suspended (402)**.
 
 ---
 
@@ -135,7 +150,7 @@ lease let the next tab re-fire the ETL immediately, which is what flooded the DB
 
 ---
 
-## 4. Backend Proxy - THE CORS FIX (IMPORTANT)
+## 4. Backend Proxy - THE CORS FIX (Vercel version — LEGACY; the LIVE proxy is section 4b)
 
 **File:** `Global Investing/backend/api/nasdaq-proxy.js`
 
@@ -174,6 +189,70 @@ Live URL: `https://nasdaq-historical-api.vercel.app`  (also a raw
 ```
 curl -s -i -X OPTIONS "https://nasdaq-historical-api.vercel.app/api/nasdaq-proxy" -H "Origin: null"
 ```
+
+---
+
+## 4b. Live Proxy — Cloudflare Worker + the 2026-10-20 Rate-Limit Fix (IMPORTANT)
+
+**File:** `CloudflareWorker/worker.js` — **LIVE** at
+`https://workers-playground-summer-field-8601.emailtochand.workers.dev`
+(used by `MarketTradingData.html` as `DEFAULT_BACKEND_URL`; Settings "Backend key" is
+overridable and persisted to localStorage).
+
+**Same protocol as the Vercel fn** (the frontend works against either proxy unchanged):
+- `GET /` -> `{ "status": "healthy", ... }` (backend probe at page init)
+- `POST /api/nasdaq-proxy` body `{ "path": "/api/quote/..." }` -> upstream
+  `https://api.nasdaq.com{path}`, streamed back with CORS `*`.
+
+### The problem this fixed (root-caused 2026-10-20)
+Bulk loads showed waves of `HTTP 403` and `Request timeout after 20000ms`. Root cause:
+**NASDAQ/Akamai rate-limits the worker's shared egress IP during request bursts** —
+verified live: single requests always returned 200, while a simultaneous burst of 40 from
+an idle state produced a 403. Worker **v1 amplified every block**: each request re-hit the
+upstream up to **4x with sleeps and NO upstream timeout**, so a 403 wave became a
+self-sustaining stampede AND each blocked symbol held the browser connection >20s
+(frontend AbortController) -> the `Request timeout after 20000ms` waves. (Per-symbol
+sleep-retries in the frontend could never fix this: a 403 block is per-IP, not per-symbol.)
+
+### Worker v2 protection layers (deployed 2026-10-20, version b0c65e8f)
+| Layer | Behavior |
+|-------|----------|
+| PACE | Slot queue smooths upstream calls to ~10 req/s (jittered). Adaptive AIMD rate 4–20 rps: +1 per 250 clean responses, halved on every 403/429/503 seen. State is per-isolate (best-effort, module scope). |
+| FAST-FAIL | Pacing queue >4s deep, or circuit open -> **instant 429** (no upstream call, no sleeping) so the frontend skip-and-continue engages immediately. |
+| CIRCUIT | 5 upstream 403/429/503 within 10s -> OPEN for 20–60s (escalating on re-trips); ZERO upstream traffic during the window lets Akamai's per-IP limit clear; after expiry ONE probe request closes the circuit on success. |
+| RETRY | Max 2 upstream attempts (was 4), 300–700ms jitter, only while the circuit is closed; 6s `AbortSignal.timeout` on every upstream fetch. |
+| HEADERS | Full first-party browser header set: UA + `Accept`/`Accept-Language` + `Referer https://www.nasdaq.com/` + `sec-ch-ua*` + `Sec-Fetch-Site/Mode/Dest`. |
+
+**Diagnostic response headers** on every proxied response:
+`X-Retried-Attempts`, `X-Circuit` (`open | half-open | closed | queued`), `X-Pace-Rps`.
+Fast-fail bodies are JSON `{ error: "... (HTTP 429)", circuit, rps }` + `Retry-After: N` —
+the frontend's fail-fast regex (`403|429|503|rate|limit|block`) matches them instantly.
+
+### Frontend companion changes (same day, `MarketTradingData.html`)
+- `fetchSymbolChart` / `fetchSymbolBasic` / `fetchSymbolTrades` / `fetchQuote` (Quote Info)
+  are **fail-fast**: single attempt on 403/429/503 (client sleep-retries removed) -> log
+  `HTTP 403 — skipped, moving on`, count into `failCount`, continue to the next symbol
+  immediately. A **skip counter** is surfaced in the final totals; Loop mode re-attempts
+  skipped symbols on the next pass.
+- All bulk loaders throttled to **concurrency 6 / 150ms** (incl. the Quote Info Gamma
+  watchlist path, previously 16/20ms ≈ 5x too fast). Request rate dropped from ~1,600/s
+  to ~40/s client-side; the worker then smooths it to ≤20/s upstream.
+
+### Verified live (2026-10-20)
+- Single request: `HTTP 200`, `X-Circuit: closed`, `X-Pace-Rps: 10`.
+- 40-symbol simultaneous burst: **38x200 + 2x403 fast-skips in 2.5s, ZERO timeouts**
+  (v1 hung >20s per blocked symbol).
+- Node harness with mocked upstream: 50-burst -> 39x200 + 11x instant `429 queued`;
+  15x403 storm -> circuit tripped after exactly 5 upstream calls (v1 would have made ~60),
+  remaining 14 got instant 429s in 1.5s; circuit-open probe answered in 1ms with 0
+  upstream calls.
+
+### Known limits / behavior to expect
+- Pacing state is **per Cloudflare isolate** (no Durable Objects): multiple warm isolates
+  can briefly exceed the target aggregate rate, so occasional single 403s still occur —
+  they take the 2-attempt fast path (<1s) and the symbol is skipped, never stalled.
+- If all symbols 403 in a burst (full IP-block window), the circuit opens and requests
+  fast-fail until it clears; Loop mode recovers the skipped symbols next pass.
 
 ---
 
@@ -312,13 +391,16 @@ Each per-symbol endpoint has **mode chips**: `ALL NASDAQ` / `Single Symbol` /
 | 11 | DONE | Intraday Trend (sno=6) had none of the item-9 guards and no working row source | `Intraday_Trend.html` calls the same `run_mapping_sql()` (so it also received `[]`) and its direct read was only a *fallback* that could never be reached, while the heavy ETL was re-fired every 3s from every tab with no lease, no back-off and no AbortController - `trend_analysis_hist` showed three runs stamped `16:00:16` (3 clients, one instant). **Fixed 2026-09-28** with the same architecture as item 10: new `readResultTable()` is the primary row source, the RPC is trigger-only, two cadences (3s read / 60s ETL), a cross-tab lease + shared last-run stamp, exponential back-off, a 120s AbortController timeout, SQLSTATE-specific errors (55P03/57014/40P01), a non-fatal pipeline warning while the table still has rows, and the `analysis_timestamp` double-shift fix. The empty-state message now names the real cause. Verified with a Node harness: read returns rows, the read gate arms, the lease is released after each tick, and a foreign lease is honoured. **NOTE:** `trend_analysis` was legitimately EMPTY at the time of the fix - traced to the stored SQL's own filters (`WHERE trend_signal IN (4 bullish signals)` plus `minute_count >= 178 AND max_gap_minutes <= 3` and `symbol IN (SELECT symbol FROM gammapace_intraday)`), not to the page. |
 | 12 | DONE | `setup_run_mapping_sqls.sql` was missing; lock-fix file restored | `setup_run_mapping_sqls.sql` (which CREATES `run_mapping_sql()`) was cited by the pages, by the error messages and by tracker #9, but did not exist anywhere in the repo - so the DB could not be rebuilt from source, and the cause of #10 was not documented anywhere. Recreated under `Global Investing/`: adds `public.gp_split_statements(text)`, a state-machine splitter that ignores comments and respects single/double quotes and dollar-quoted bodies, then redefines `run_mapping_sql(text,integer)` to execute every statement in order and **return the final SELECT rows as jsonb** (the defect behind #10), with `lock_timeout=60s`, `statement_timeout=300s` and anon/authenticated grants. Idempotent, documented as "run once in the Supabase SQL Editor". **Not yet executed against the live database** - the pages work without it (they read the table directly), so it is optional server-side cleanup. **Correction:** `setup_inception_pipeline_lock_fix.sql` DID already exist in the GitHub repo (136 lines, incl. a security note that the anon key can WRITE `gammapace_internal_mapping`) - it was simply never present in the local working copy, so a local `*.sql` search wrongly concluded no `.sql` files existed. An over-eager rewrite was caught in the `deploy-global-investing.ps1` dry run (`M` not `A` in git status) and the original was restored verbatim, with only a new "6. ETL SCAN INDEXES" section appended. **Lesson: verify repo state with `git ls-tree -r HEAD -- "*.sql"` in the cloned repo, not a local filesystem search.** |
 | 13 | DONE | Portfolio menu + Gammapace Intraday link (2026-10-18) | Added top-level `Portfolio` menu before `About` in `Global Investing/index.html` (same hover/click dropdown pattern as Gamma Report: `.portfolio-submenu`, `togglePortfolioSubmenu()`, `selectPortfolioOption()`; registered in `closeAllSubmenusGlobally()`). Submenu `Gammapace Intraday` links (relative, `target=_blank`) to `Global Investing/GammaPorfolio.html` (exact on-disk spelling). Deployed to `Gurukullam/GammaPace` prod via `deploy-global-investing.ps1 -Commit`. |
+| 14 | DONE | Frontend fail-fast on 403 + bulk-loader throttling (2026-10-20) | `fetchSymbolChart` / `fetchSymbolBasic` / `fetchSymbolTrades` / `fetchQuote` (Quote Info) no longer sleep-retry on 403/429/503 — one attempt, log `skipped, moving on`, count in `failCount`/skip counter, continue instantly (403 is a per-IP block; per-symbol retries could never clear it and stalled every run). All bulk loaders throttled to concurrency 6 / 150ms (Quote Info watchlist was 16/20ms). Frontend-only; deployed to GitHub Pages (commit `dc1651d`). |
+| 15 | DONE | Server root-cause fix: Worker v2 — pacing + circuit breaker (2026-10-20) | The remaining 403 waves AND the `Request timeout after 20000ms` batches were server-side: Akamai burst-rate-limits the worker's shared egress IP (verified: burst-of-40 from idle produced a 403, singles always 200), and worker v1 amplified blocks with 4x retries + no upstream timeout (held requests >20s -> frontend AbortController timeouts). v2 adds PACE (adaptive 4–20 rps slot queue), instant-429 FAST-FAIL, CIRCUIT (5 fails/10s -> 20–60s cooldown + single probe), 2-attempt cap, 6s upstream timeout, full first-party headers — see section 4b. Deployed via `wrangler deploy` to the SAME URL (version `b0c65e8f`; repo commit `b943b61`). Verified live: 40-burst = 38x200 + 2x403 fast-skips in 2.5s, zero timeouts. |
+| 16 | DONE | Wrangler auth + repo hygiene (2026-10-20) | `wrangler login` completed (OAuth token in `%APPDATA%\.wrangler\config\default.toml`), so future worker deploys are one command from `CloudflareWorker/`: `wrangler deploy`. `wrangler.toml` re-targeted to the LIVE worker name (`workers-playground-summer-field-8601`, + `workers_dev = true`) — deploying any other name creates a different URL and the frontend must be re-pointed. Added `CloudflareWorker/.gitignore` excluding `.wrangler/` (wrangler's local account cache had ridden along into commit `b943b61`; removed in `c7c1f71`, gitignore in `61a4b36`). |
 
 
 ---
 
 ## 9. Deployment Procedures
 
-### A. Backend Proxy -> Vercel (Nasdaq)
+### A. Backend Proxy -> Vercel (Nasdaq — LEGACY / SUSPENDED)
 ```
 cd "Global Investing\backend"
 vercel --prod
@@ -338,6 +420,26 @@ push to `main`.)
 
 > WARNING: The Vercel backend is deployed **independently** (not through Git). After editing
 > `nasdaq-proxy.js`, you MUST run `vercel --prod` again to make it live.
+> NOTE: the Vercel project is currently **suspended (402)** — the LIVE proxy is the
+> Cloudflare Worker (procedure C below).
+
+### C. Live Proxy -> Cloudflare Worker
+```powershell
+cd CloudflareWorker
+wrangler deploy       # wrangler already logged in (token in %APPDATA%\.wrangler\config\default.toml)
+# first-time on a new machine: wrangler login  (browser OAuth, ~5 min window to click Allow)
+```
+- `wrangler.toml` `name` **MUST equal the live worker name**
+  (`workers-playground-summer-field-8601`) — the frontend's `DEFAULT_BACKEND_URL` hard-codes
+  that URL. Deploying a different name creates a different URL -> the Settings "Backend key"
+  would have to be re-pointed.
+- Alternative without any CLI: Cloudflare Dashboard -> Workers & Pages ->
+  `workers-playground-summer-field-8601` -> **Edit code** -> paste the full contents of
+  `worker.js` -> **Deploy**.
+- No Git coupling for the worker itself; `deploy-global-investing.ps1` only syncs the
+  `CloudflareWorker/` SOURCE into this repo (commit it whenever worker.js changes).
+- Verify after deploy: `GET <worker-url>/` returns `{"status":"healthy",...}` and a proxied
+  response carries `X-Circuit` / `X-Pace-Rps` headers (see section 10).
 
 ---
 
@@ -358,13 +460,39 @@ Check the live CORS header:
 curl.exe -s -i -X OPTIONS "https://nasdaq-historical-api.vercel.app/api/nasdaq-proxy" -H "Origin: null"
 ```
 
+Test the LIVE Cloudflare Worker proxy (health probe):
+```powershell
+curl.exe -s --max-time 20 "https://workers-playground-summer-field-8601.emailtochand.workers.dev/"
+```
+
+Test the LIVE proxy data path (`-i` shows the diagnostic headers
+`X-Retried-Attempts` / `X-Circuit` / `X-Pace-Rps`):
+```powershell
+curl.exe -s -i --max-time 20 -X POST "https://workers-playground-summer-field-8601.emailtochand.workers.dev/api/nasdaq-proxy" -H "Content-Type: application/json" -d "{\"path\":\"/api/quote/AAPL/info?assetclass=stocks\"}"
+```
+
+Stress sanity-check (40 simultaneous; expect mostly 200 with at most a couple of fast
+403/429 skips and NO multi-second hangs):
+```powershell
+$client = [System.Net.Http.HttpClient]::new(); $client.Timeout = [TimeSpan]::FromSeconds(60)
+$uri = 'https://workers-playground-summer-field-8601.emailtochand.workers.dev/api/nasdaq-proxy'
+$body = '{"path":"/api/quote/AAPL/chart?assetclass=stocks&charttype=rs"}'
+$tasks = 1..40 | ForEach-Object { $c = [System.Net.Http.StringContent]::new($body, [Text.Encoding]::UTF8, 'application/json'); $client.PostAsync($uri, $c) }
+[System.Threading.Tasks.Task]::WaitAll([System.Threading.Tasks.Task[]]$tasks)
+$tasks | ForEach-Object { [int]$_.Result.StatusCode } | Group-Object | Sort-Object Name | Format-Table Name,Count
+```
+
 ---
 
 ## 11. How to Resume (for the next developer/AI)
 
 1. Read **this file** from top to bottom.
-2. Confirm the backend is live: run 10 proxy test -> expect `rCode:200` + real data, and
-   the CORS check returns `Access-Control-Allow-Origin: *`.
+2. Confirm the LIVE backend (Cloudflare Worker) is up: `GET` the worker `/` health
+   endpoint -> expect `{"status":"healthy",...}`, then a POST proxy call -> `rCode:200` +
+   real data with `X-Circuit` / `X-Pace-Rps` headers (section 10). Do NOT use the Vercel
+   URL as the liveness check — it is suspended (402).
 3. Check **Status / Tracker** (8) - pick up the first `TODO` / `BUG` item (e.g. the IPO
    field-mapping fix, or verifying end-to-end on each page).
 4. When you make/verify a change, **update 8** here so the file always reflects reality.
+5. If editing the worker, read **section 4b** first — the pacing/circuit layering is
+   load-bearing; re-verify with the 40-burst stress check after every deploy.
