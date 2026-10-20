@@ -1564,17 +1564,21 @@ function getActiveModeForAPI(apiId) {
 // fetchFn: async (symbol) => data   — should throw on failure
 // options: { concurrency, delayMs, label, onBatch, onProgress, maxRounds, logEvery }
 //
+// FAIL-FAST POLICY (server-side 403/429/503): the NASDAQ/Akamai rate-limit is
+// on the proxy IP, NOT the symbol — retrying the same symbol immediately never
+// helps and only burns time. So a rate-limited symbol is SKIPPED (counted in
+// failCount) and the worker moves to the next symbol. Skipped symbols are
+// picked up on the next Loop run. Only genuine per-symbol errors (bad symbol,
+// malformed response) are still re-queued for retry rounds.
 // SPEED: starts at `concurrency` and keeps it while symbols resolve cleanly;
 // on a 403/429/503 rate-limit block it halves concurrency (min 2) and doubles
 // the gap to ride out the throttle, then re-ramps after 40 clean symbols.
-// INTEGRITY: a symbol that fails is QUEUED for the next retry round (up to
-// maxRounds extra passes) and re-fetched — only symbols that fail every round
-// are counted as failures, so no data is ever dropped silently.
 async function parallelFetchAll(symbols, fetchFn, options = {}) {
-  const { concurrency = 8, delayMs = 150, label = 'Fetch', onBatch, onProgress, maxRounds = 2, logEvery = 20 } = options;
+  const { concurrency = 8, delayMs = 150, label = 'Fetch', onBatch, onProgress, maxRounds = 0, logEvery = 20 } = options;
   const results = [];
   let successCount = 0;
   let failCount = 0;
+  let failSkipped = 0; // rate-limited (403/429/503) symbols skipped fail-fast
   const total = symbols.length;
   let curCon = Math.max(2, concurrency);
   let curDelay = delayMs;
@@ -1604,9 +1608,18 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
           cleanSeen++;
         } else {
           const msg = res.reason?.message || String(res.reason || 'unknown error');
-          if (warned < 8) { log(`${label} [${symbol}]: ${msg}`, 'warn'); warned++; }
-          todo.push(symbol); // DATA SAFETY: retried next round
-          if (/403|429|503|rate|limit|block/i.test(msg)) {
+          const isRateLimit = /403|429|503|rate|limit|block/i.test(msg);
+          if (isRateLimit) {
+            // FAIL-FAST: server-side rate-limit, not a symbol problem — SKIP it
+            // (count as failure) and move on. Retrying now only wastes time.
+            // The symbol will be picked up on the next Loop run.
+            failSkipped++;
+            if (warned < 8) { log(`${label} [${symbol}]: ${msg} — skipped, moving on`, 'warn'); warned++; }
+          } else {
+            if (warned < 8) { log(`${label} [${symbol}]: ${msg}`, 'warn'); warned++; }
+            todo.push(symbol); // genuine per-symbol error: retried next round
+          }
+          if (isRateLimit) {
             curCon = Math.max(2, Math.floor(curCon / 2));
             curDelay = Math.min(1200, curDelay * 2);
             cleanSeen = 0;
@@ -1621,12 +1634,12 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
       }
 
       if (onBatch) onBatch(batchResults, batch, doneBefore + cursor - batch.length);
-      const processed = Math.min(doneBefore + cursor, total);
+      const processed = Math.min(doneBefore + cursor + failSkipped, total);
       if (onProgress) onProgress(processed, total, successCount, todo.length);
       if (processed % logEvery === 0 || processed >= total) {
         const pct = Math.min(100, Math.round((successCount / total) * 100));
-        setProgress(pct, `${label} ${successCount}/${total} · ${todo.length} retry`);
-        log(`${label}: ${successCount}/${total} ok · ${todo.length} queued for retry`);
+        setProgress(pct, `${label} ${successCount}/${total} · ${failSkipped} skipped`);
+        log(`${label}: ${successCount}/${total} ok · ${failSkipped} skipped (rate-limited)`);
       }
 
       if (cursor < roundTotal && !cancelRequested) await new Promise(r => setTimeout(r, curDelay));
@@ -1637,8 +1650,8 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
     }
   }
 
-  failCount = todo.length;
-  log(`${label}: ${successCount} succeeded · ${failCount} failed after retries · ${results.length} total`);
+  failCount = todo.length + failSkipped;
+  log(`${label}: ${successCount} succeeded · ${failSkipped} skipped (rate-limited) · ${todo.length} failed · ${results.length} total`);
   return { results, successCount, failCount };
 }
 // ============================================================
@@ -1962,25 +1975,11 @@ async function loadBasicQuotes() {
 
   const fetchSymbolBasic = async (symbol) => {
     const path = `/api/quote/basic?symbol=${encodeURIComponent(symbol + '|stocks')}`;
-    let json;
-    let lastErr;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        json = await fetchNasdaq(path);
-        break;
-      } catch (e) {
-        lastErr = e;
-        const transient = /403|429|503|rate|limit|block/i.test(e.message);
-        if (transient && attempt < 3) {
-          const backoff = 800 * attempt;
-          log(`Basic Quote [${symbol}]: ${e.message} — retrying in ${backoff}ms (attempt ${attempt}/3)`, 'warn');
-          await new Promise(r => setTimeout(r, backoff));
-          continue;
-        }
-        throw e;
-      }
-    }
-    if (!json) throw lastErr || new Error('empty response');
+    // FAIL-FAST: HTTP 403/429/503 is a server-side NASDAQ/Akamai rate-limit on the
+    // proxy IP — not fixable per-symbol. Single attempt, NO sleep/retry: throw
+    // immediately so parallelFetchAll moves to the next symbol. Skipped symbols
+    // are counted in failCount and picked up on the next Loop run.
+    const json = await fetchNasdaq(path);
 
     // OPTIMIZED (v1.0.6): direct property access on the known response root —
     // no recursive deepFind overhead (2-3× faster per symbol for ALL mode).
@@ -2175,25 +2174,11 @@ async function loadChart() {
 
   const fetchSymbolChart = async (symbol) => {
     const path = `/api/quote/${symbol}/chart?assetclass=stocks&charttype=rs`;
-    let json;
-    let lastErr;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        json = await fetchNasdaq(path);
-        break;
-      } catch (e) {
-        lastErr = e;
-        const transient = /403|429|503|rate|limit|block/i.test(e.message);
-        if (transient && attempt < 3) {
-          const backoff = 800 * attempt;
-          log(`Chart Data [${symbol}]: ${e.message} — retrying in ${backoff}ms (attempt ${attempt}/3)`, 'warn');
-          await new Promise(r => setTimeout(r, backoff));
-          continue;
-        }
-        throw e;
-      }
-    }
-    if (!json) throw lastErr || new Error('empty response');
+    // FAIL-FAST: HTTP 403/429/503 is a server-side NASDAQ/Akamai rate-limit on the
+    // proxy IP — not fixable per-symbol. Single attempt, NO sleep/retry: throw
+    // immediately so parallelFetchAll moves to the next symbol. Skipped symbols
+    // are counted in failCount and picked up on the next Loop run.
+    const json = await fetchNasdaq(path);
 
     // Defensive extraction: try data.chart, data array, chart array, or flat array roots
     let chart = json?.data?.chart;
@@ -2393,25 +2378,11 @@ async function loadRealtimeTrades() {
 
   const fetchSymbolTrades = async (symbol) => {
     const path = `/api/quote/${symbol}/realtime-trades`;
-    let json;
-    let lastErr;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        json = await fetchNasdaq(path);
-        break;
-      } catch (e) {
-        lastErr = e;
-        const transient = /403|429|503|rate|limit|block/i.test(e.message);
-        if (transient && attempt < 3) {
-          const backoff = 800 * attempt;
-          log(`Realtime Trades [${symbol}]: ${e.message} — retrying in ${backoff}ms (attempt ${attempt}/3)`, 'warn');
-          await new Promise(r => setTimeout(r, backoff));
-          continue;
-        }
-        throw e;
-      }
-    }
-    if (!json) throw lastErr || new Error('empty response');
+    // FAIL-FAST: HTTP 403/429/503 is a server-side NASDAQ/Akamai rate-limit on the
+    // proxy IP — not fixable per-symbol. Single attempt, NO sleep/retry: throw
+    // immediately so parallelFetchAll moves to the next symbol. Skipped symbols
+    // are counted in failCount and picked up on the next Loop run.
+    const json = await fetchNasdaq(path);
 
     const d = json?.data;
     if (!d) {
@@ -2574,39 +2545,32 @@ async function loadQuotes() {
   if (!supabaseClient) { log('Supabase not initialized', 'err'); return []; }
 
   const fetchQuote = async (sym) => {
-    let retries = 0;
-    while (retries < 3) {
-      try {
-        const json = await fetchNasdaq(`/api/quote/${sym}/info?assetclass=stocks`);
-        const d = json.data;
-        if (!d) return null;
-        const pd = d.primaryData || {};
-        const ks = d.keyStats || {};
-        return {
-          symbol: d.symbol || sym,
-          company_name: d.companyName || '',
-          stock_type: d.stockType || '',
-          exchange: d.exchange || '',
-          is_nasdaq_listed: d.isNasdaqListed === 'True' || d.isNasdaqListed === true,
-          is_nasdaq_100: d.isNasdaq100 === 'True' || d.isNasdaq100 === true,
-          last_sale_price: pd.lastSalePrice || '',
-          net_change: pd.netChange || '',
-          percentage_change: pd.percentageChange || '',
-          volume: pd.volume || '',
-          market_status: d.marketStatus || '',
-          asset_class: d.assetClass || '',
-          delta_indicator: pd.deltaIndicator || '',
-          last_trade_timestamp: pd.lastTradeTimestamp || '',
-          fifty_two_week_range: ks.fiftyTwoWeekHighLow?.value || '',
-          day_range: ks.dayrange?.value || ''
-        };
-      } catch (e) {
-        retries++;
-        if (retries < 3) await new Promise(r => setTimeout(r, 300 * retries));
-      }
-    }
-    log(`Quote fetch failed for ${sym} after 3 attempts`, 'error');
-    return null;
+    // FAIL-FAST: HTTP 403/429/503 is a server-side NASDAQ/Akamai rate-limit on the
+    // proxy IP — not fixable per-symbol. Single attempt, NO sleep/retry: throw
+    // immediately so the caller moves to the next symbol.
+    const json = await fetchNasdaq(`/api/quote/${sym}/info?assetclass=stocks`);
+    const d = json.data;
+    if (!d) return null;
+    const pd = d.primaryData || {};
+    const ks = d.keyStats || {};
+    return {
+      symbol: d.symbol || sym,
+      company_name: d.companyName || '',
+      stock_type: d.stockType || '',
+      exchange: d.exchange || '',
+      is_nasdaq_listed: d.isNasdaqListed === 'True' || d.isNasdaqListed === true,
+      is_nasdaq_100: d.isNasdaq100 === 'True' || d.isNasdaq100 === true,
+      last_sale_price: pd.lastSalePrice || '',
+      net_change: pd.netChange || '',
+      percentage_change: pd.percentageChange || '',
+      volume: pd.volume || '',
+      market_status: d.marketStatus || '',
+      asset_class: d.assetClass || '',
+      delta_indicator: pd.deltaIndicator || '',
+      last_trade_timestamp: pd.lastTradeTimestamp || '',
+      fifty_two_week_range: ks.fiftyTwoWeekHighLow?.value || '',
+      day_range: ks.dayrange?.value || ''
+    };
   };
 
   // ── SINGLE SYMBOL MODE ──
@@ -2679,12 +2643,12 @@ async function loadQuotes() {
     if (resumeIndex > 0 && resumeIndex < symbols.length) symbols = symbols.slice(resumeIndex);
     else resumeIndex = 0;
 
-    log(`Fetching quotes for ${symbols.length} symbols (total: ${totalAvailable}, start: #${resumeIndex + 1}) · 5 concurrent · 80ms gap`);
+    log(`Fetching quotes for ${symbols.length} symbols (total: ${totalAvailable}, start: #${resumeIndex + 1}) · 6 concurrent · 150ms gap (rate-limit safe)`);
     const quotes = [];
     const startTime = Date.now();
 
-    const CONCURRENCY = 12;
-    const DELAY_MS = 25;
+    const CONCURRENCY = 6;
+    const DELAY_MS = 150;
 
     for (let i = 0; i < symbols.length; i += CONCURRENCY) {
       if (cancelRequested) {
@@ -2729,7 +2693,7 @@ async function loadQuotes() {
     return [];
   }
 
-  log(`Starting: Quote Info for ${symbols.length} ${modeLabel} symbols · 5 concurrent · 80ms gap`);
+  log(`Starting: Quote Info for ${symbols.length} ${modeLabel} symbols · 6 concurrent · 150ms gap (rate-limit safe)`);
 
   const allRows = [];
 
@@ -2744,8 +2708,8 @@ async function loadQuotes() {
       return null;
     },
     {
-      concurrency: 16,
-      delayMs: 20,
+      concurrency: 6,
+      delayMs: 150,
       label: 'Quote Info',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
@@ -2869,7 +2833,7 @@ async function loadHistorical() {
     return [];
   }
 
-  log(`Starting: Historical Prices for ${symbols.length} ${modeLabel} symbols (${fromDate} to ${toDate}) · 8 concurrent · 40ms gap`);
+  log(`Starting: Historical Prices for ${symbols.length} ${modeLabel} symbols (${fromDate} to ${toDate}) · 6 concurrent · 150ms gap (rate-limit safe)`);
 
   const allRows = [];
 
@@ -2884,8 +2848,8 @@ async function loadHistorical() {
       return [];
     },
     {
-      concurrency: 16,
-      delayMs: 20,
+      concurrency: 6,
+      delayMs: 150,
       label: 'Historical Prices',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
@@ -2978,7 +2942,7 @@ async function loadSummary() {
     return [];
   }
 
-  log(`Starting: Quote Summary for ${symbols.length} ${modeLabel} symbols · 8 concurrent · 40ms gap`);
+  log(`Starting: Quote Summary for ${symbols.length} ${modeLabel} symbols · 6 concurrent · 150ms gap (rate-limit safe)`);
 
   const allRows = [];
 
@@ -2993,8 +2957,8 @@ async function loadSummary() {
       return null;
     },
     {
-      concurrency: 16,
-      delayMs: 20,
+      concurrency: 6,
+      delayMs: 150,
       label: 'Quote Summary',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
@@ -3166,7 +3130,7 @@ async function loadOptionChain() {
     return [];
   }
 
-  log(`Starting: Option Chain for ${symbols.length} ${modeLabel} symbols · 6 concurrent · 50ms gap`);
+  log(`Starting: Option Chain for ${symbols.length} ${modeLabel} symbols · 6 concurrent · 150ms gap (rate-limit safe)`);
 
   const allRows = [];
 
@@ -3181,8 +3145,8 @@ async function loadOptionChain() {
       return [];
     },
     {
-      concurrency: 12,
-      delayMs: 30,
+      concurrency: 6,
+      delayMs: 150,
       label: 'Option Chain',
       onProgress: (processed, total, ok, fail) => {
         const pct = Math.round((processed / total) * 100);
