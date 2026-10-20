@@ -137,11 +137,14 @@ over PostgREST** -> render the chart + table.
 > `[]` for every sno (see tracker #10), so both pages read the result table instead
 > (`readResultTable()`). `setup_run_mapping_sqls.sql` repairs the RPC server-side.
 
-**Two cadences per page** (identical design on both):
-| Cadence | What | Default |
-|---------|------|---------|
-| Read | `GET` the result table (~0.5s, 10 rows) | every `REFRESH_INTERVAL_MS` = 3s |
-| ETL | the RPC that TRUNCATEs + rebuilds that table | every `PIPELINE_MIN_GAP_MS` = 60s, one tab at a time |
+**Cadences (updated 2026-10-20 for `Intraday_Trend.html`, see tracker #17):**
+| Cadence | Intraday_Trend.html (NOW) | Intraday_Inception.html |
+|---------|--------------------------|-------------------------|
+| Cycle | **ONE cadence: full SQL → read result table → repaint, then the next cycle is chained immediately (back-to-back, `CHAIN_DELAY_MS`=250ms). No read-only repaints; a failed run never repaints.** | Read: `GET` the result table every `REFRESH_INTERVAL_MS` = 3s |
+| ETL | (same cycle as above — the RPC runs on **every** cycle) | the RPC that TRUNCATEs + rebuilds that table every `PIPELINE_MIN_GAP_MS` = 60s, one tab at a time |
+| Timer | `#nextRunTimer` countdown (1s tick): running elapsed / next-run-in / after-failure back-off | — |
+
+Both pages show a countdown in the status bar; only Inception still uses the read/ETL split.
 
 Cross-tab coordination uses two `localStorage` keys per report:
 `gammapace_<report>_pipeline_lease` (single-flight, ~7 min TTL) and
@@ -394,6 +397,7 @@ Each per-symbol endpoint has **mode chips**: `ALL NASDAQ` / `Single Symbol` /
 | 14 | DONE | Frontend fail-fast on 403 + bulk-loader throttling (2026-10-20) | `fetchSymbolChart` / `fetchSymbolBasic` / `fetchSymbolTrades` / `fetchQuote` (Quote Info) no longer sleep-retry on 403/429/503 — one attempt, log `skipped, moving on`, count in `failCount`/skip counter, continue instantly (403 is a per-IP block; per-symbol retries could never clear it and stalled every run). All bulk loaders throttled to concurrency 6 / 150ms (Quote Info watchlist was 16/20ms). Frontend-only; deployed to GitHub Pages (commit `dc1651d`). |
 | 15 | DONE | Server root-cause fix: Worker v2 — pacing + circuit breaker (2026-10-20) | The remaining 403 waves AND the `Request timeout after 20000ms` batches were server-side: Akamai burst-rate-limits the worker's shared egress IP (verified: burst-of-40 from idle produced a 403, singles always 200), and worker v1 amplified blocks with 4x retries + no upstream timeout (held requests >20s -> frontend AbortController timeouts). v2 adds PACE (adaptive 4–20 rps slot queue), instant-429 FAST-FAIL, CIRCUIT (5 fails/10s -> 20–60s cooldown + single probe), 2-attempt cap, 6s upstream timeout, full first-party headers — see section 4b. Deployed via `wrangler deploy` to the SAME URL (version `b0c65e8f`; repo commit `b943b61`). Verified live: 40-burst = 38x200 + 2x403 fast-skips in 2.5s, zero timeouts. |
 | 16 | DONE | Wrangler auth + repo hygiene (2026-10-20) | `wrangler login` completed (OAuth token in `%APPDATA%\.wrangler\config\default.toml`), so future worker deploys are one command from `CloudflareWorker/`: `wrangler deploy`. `wrangler.toml` re-targeted to the LIVE worker name (`workers-playground-summer-field-8601`, + `workers_dev = true`) — deploying any other name creates a different URL and the frontend must be re-pointed. Added `CloudflareWorker/.gitignore` excluding `.wrangler/` (wrangler's local account cache had ridden along into commit `b943b61`; removed in `c7c1f71`, gitignore in `61a4b36`). |
+| 17 | DONE | Intraday Trend: repaint ONLY after a complete SQL run + back-to-back cycles + run timer (2026-10-20) | `Global Investing/Intraday_Trend.html` reworked per requirement "repopulate the chart/table only after the complete SQL executed; start the next cycle as soon as the previous completes; show a timer for the next execution". **Before:** two cadences (3s read-only repaint + 60s ETL) — the table/graph were repopulated by plain reads between SQL runs, and a failed RPC still rendered the (stale) table with a warning. **Now:** single cadence — every cycle = `run_mapping_sql` (whole sno=6 script) → read `trend_analysis` → repaint, strictly in that order; `fetchTrendData()` no longer swallows RPC errors, so a failed run NEVER repaints (last good chart/table stays; status says "report NOT refreshed"); success chains the next cycle immediately via `setTimeout(refreshData, CHAIN_DELAY_MS=250)` (`PIPELINE_MIN_GAP_MS` 60000→0 = back-to-back); the 3s `setInterval` remains only as the scheduler tick/back-off gate (exponential 3s→60s unchanged). New countdown in the refresh bar (`#nextRunTimer`, 1s tick): "SQL executing now… Ns" while running / "Next SQL run in Ns (after failure)" during back-off / "Other tab executing SQL…" while waiting for the lease. Removed: `nextReadAllowedAt`, `lastPipelineWarning`, the read-only `fetchTrendData(false)` path, "Data read ·" status branch. **Validated** with `trend_harness_test.js` (repo root, Node vm harness running the page's own inline script against a mocked Supabase): 19/19 assertions — no read/repaint while SQL in flight, read+repaint strictly after RPC success, 2nd chained cycle re-runs full SQL, failure = no repaint + countdown + no chain + back-off respected. |
 
 
 ---

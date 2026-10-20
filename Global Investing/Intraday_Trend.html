@@ -381,9 +381,12 @@
             <span class="refresh-label">
                 <span class="spinner-small" id="refreshSpinner" style="display:none;"></span>
                 <i class="fas fa-sync-alt" style="color: #8b4513;"></i>
-                Auto-refresh every 3s — re-runs the SQL script, then reads the final SELECT
+                Report repopulates only after each complete SQL run — cycles run back-to-back
             </span>
             <span class="last-updated">
+                <span id="nextRunTimer" style="margin-right:1rem;font-weight:600;color:#8b4513;">
+                    <i class="fas fa-hourglass-half" style="color:#8b4513;"></i> Next SQL run: —
+                </span>
                 <span id="lastUpdatedText">
                     <i class="fas fa-info-circle" style="color: #8b4513;"></i> Initializing...
                 </span>
@@ -431,19 +434,26 @@
     <!-- ============================================================= -->
     <!-- INTRADAY TREND ANALYSIS — SQL-driven dashboard                -->
     <!--                                                               -->
-    <!-- Every 3 seconds this page:                                    -->
-    <!--   1. Every 3s it READS the result table (trend_analysis) and  -->
-    <!--      renders the chart + table from those rows.                -->
-    <!--   2. At most once a minute, and only in ONE tab at a time, it   -->
-    <!--      POSTs to the RPC run_mapping_sql(p_title, p_sno), which   -->
-    <!--      fetches the SQL script stored in                          -->
-    <!--      gammapace_internal_mapping                                -->
-    <!--      (title='Intraday Trend Analyis', sno=6) and executes EVERY -->
-    <!--      statement in sequence (truncate -> insert -> ...).        -->
-    <!--      That function is used only as the TRIGGER: it answers      -->
-    <!--      "[]" rather than the final SELECT's rows.                 -->
-    <!--   2. Renders a line chart (avg % momentum per symbol) and     -->
-    <!--      the full data table from that response.                  -->
+    <!-- BACK-TO-BACK FULL-SQL CYCLES:                                 -->
+    <!--   1. The page POSTs to the RPC run_mapping_sql(p_title, p_sno), -->
+    <!--      which fetches the SQL script stored in                     -->
+    <!--      gammapace_internal_mapping                                 -->
+    <!--      (title='Intraday Trend Analyis', sno=6) and executes EVERY  -->
+    <!--      statement in sequence (truncate -> insert -> ...).         -->
+    <!--   2. ONLY after that run COMPLETES successfully is the result   -->
+    <!--      table (trend_analysis) read. A failed run NEVER repaints   -->
+    <!--      the chart/table - the last good data stays on screen while -->
+    <!--      the status bar shows the error + retry countdown.          -->
+    <!--   3. The chart + table are repopulated from those rows, then    -->
+    <!--      the NEXT full-SQL cycle starts immediately (back-to-back,  -->
+    <!--      250ms settle so the browser can paint first). The timer in -->
+    <!--      the refresh bar shows the running / next-execution         -->
+    <!--      countdown. Only ONE tab runs the pipeline at a time        -->
+    <!--      (localStorage lease); after a failure the cycle backs off  -->
+    <!--      3s -> 60s.                                                 -->
+    <!--   Note: the deployed RPC answers "[]" (GammaPace.MD #10), so    -->
+    <!--      the rows always come from the result-table read that       -->
+    <!--      follows the completed run.                                 -->
     <!--                                                               -->
     <!-- No SQL text, table names or column lists are hard-coded —     -->
     <!-- everything is derived at runtime from the stored script and   -->
@@ -467,7 +477,7 @@
         // SELECT's rows.
         const RPC_FUNCTION_NAME = 'run_mapping_sql';
 
-        const REFRESH_INTERVAL_MS = 3000; // 3 seconds
+        const REFRESH_INTERVAL_MS = 3000; // scheduler tick (the run/next countdown ticks every 1s separately)
         const CHART_TOP_N = 10;           // symbols shown on the line chart
 
         // -- CONCURRENCY & RESILIENCE -------------------------------
@@ -489,7 +499,8 @@
         const PIPELINE_LEASE_TTL_MS = 400000;  // a dead tab's lease expires after ~7 min
         const BACKOFF_BASE_MS = 3000;
         const BACKOFF_MAX_MS = 60000;
-        const PIPELINE_MIN_GAP_MS = 60000;     // ETL at most once a minute
+        const PIPELINE_MIN_GAP_MS = 0;        // 0 = BACK-TO-BACK: the next full-SQL cycle starts as soon as the previous one COMPLETED
+        const CHAIN_DELAY_MS = 250;           // tiny settle between cycles so the browser paints the fresh rows first
         const TAB_ID = 'tab-' + String(Date.now()) + '-' +
             String(Math.floor(Math.random() * 1000000000));
 
@@ -498,7 +509,6 @@
         let DATA_SOURCE_TABLE = null;     // result table extracted from the script
         let RANK_COLUMN = null;           // ordering column (ends with '_rank')
         let COLUMN_ORDER = null;          // canonical column list from INSERT(...)
-        let lastPipelineWarning = null;   // non-fatal ETL problem (e.g. 55P03)
         let DIRECT_READ = null;           // "pipeline=.. | table=.. rows=N" diagnostic
 
         const SUPABASE_HEADERS = {
@@ -766,54 +776,40 @@
             }
         }
 
-        /** One refresh cycle: run the heavy ETL (only when due) and read back
-         *  the rows it produced.
+        /** One COMPLETE cycle: execute the whole sno=6 script through the
+         *  RPC FIRST; only when it completed without error is the result
+         *  table read and returned for rendering.
          *
-         *  runPipeline=false -> cheap read-only tick (every REFRESH_INTERVAL_MS)
-         *  runPipeline=true  -> execute the sno=6 script through the RPC, then
-         *                        read the table it just rewrote
-         *
-         *  An ETL failure is NOT fatal while the table still holds rows: the
-         *  report keeps rendering the last good data and the status bar
-         *  explains what went wrong. */
+         *  runPipeline=false never happens any more (kept for signature
+         *  compatibility): a read-only tick must NOT repaint the report —
+         *  only a completed SQL execution may.  Any RPC failure is thrown
+         *  to the caller, which then keeps the previous chart/table on
+         *  screen and shows the error + retry countdown. */
         async function fetchTrendData(runPipeline) {
-            var rpcError = null;
-            if (runPipeline) {
-                try {
-                    await callRunMappingSql();
-                } catch (err) {
-                    rpcError = err;
-                }
+            if (runPipeline !== false) {
+                await callRunMappingSql();   // throws on 55P03/57014/TIMEOUT/...
             }
 
             var read = await readResultTable();
 
-            DIRECT_READ = 'pipeline=' + (runPipeline
-                ? (rpcError ? 'error(' + (rpcError.dbCode || 'rpc') + ')' : 'ok')
-                : 'skipped(reading only)') +
+            DIRECT_READ = 'pipeline=' + (runPipeline === false ? 'skipped(reading only)' : 'ok') +
                 ' | table=' + (DATA_SOURCE_TABLE || '?') +
                 ' rows=' + read.rows.length +
                 (read.error ? ' read-error=' + (read.error.dbCode || 'http') : '');
 
-            lastPipelineWarning = rpcError
-                ? (rpcError.dbCode ? (rpcError.dbCode + ' - ' + rpcError.message) : rpcError.message)
-                : null;
-
             if (read.error) {
-                if (rpcError) {
-                    read.error.message = 'The SQL pipeline failed (' +
-                        (rpcError.dbCode || 'rpc') + '), so the result table could not be ' +
-                        'refreshed either: ' + read.error.message;
+                if (runPipeline !== false) {
+                    read.error.message = 'The SQL pipeline completed, but the result table ' +
+                        'could not be read: ' + read.error.message;
                 }
                 throw read.error;
             }
 
             if (read.rows.length === 0) {
-                if (rpcError) throw rpcError;      // the real reason for the empty report
-                throw dbError('No rows in ' + DATA_SOURCE_TABLE + ' yet.  The sno=' +
-                    SQL_MAPPING_SNO + ' script ran without error but matched no symbols ' +
-                    'today (it may be outside market hours, or the stored SQL criteria ' +
-                    'may need revisiting).', null);
+                // The script ran to completion but matched no symbols today —
+                // this IS a completed SQL execution, so the empty state is
+                // rendered (updateTable shows the explanatory message).
+                return [];
             }
 
             // The script inserts rows in ranked order; re-sort by the rank
@@ -1140,9 +1136,10 @@
         // └──────────────────────────────────────────────────────────┘
         let isRefreshing = false;
         let refreshTimer = null;
+        let countdownTimer = null;
         let consecutiveFailures = 0;      // reset by any successful run
-        let nextReadAllowedAt = 0;        // epoch ms - when the next table READ may run
-        let nextPipelineAllowedAt = 0;    // epoch ms - when the next ETL (RPC) may run
+        let nextPipelineAllowedAt = 0;    // epoch ms - when the next full-SQL cycle may start
+        let currentRunStartedAt = null;   // epoch ms - start of the RUNNING SQL execution (null = idle)
         let lastWaitingNotice = null;     // de-dupes the "other tab" status line
         let lastSuccessMsg = null;        // last "SQL executed ..." status line
 
@@ -1174,19 +1171,51 @@
                 age + 's ago) - showing the last data; this tab takes over next tick.');
         }
 
-        /** Automatic tick inside the read cadence / back-off window:
-         *  keep the last result and show the countdown. */
+        /** 1-second countdown shown in the refresh bar:
+         *  - while a full-SQL run is in flight: how long it has been running;
+         *  - otherwise: how long until the NEXT complete SQL execution starts
+         *    (0 = starting now / back-to-back). */
+        function updateRunTimer() {
+            var el = document.getElementById('nextRunTimer');
+            if (!el) return;
+
+            if (currentRunStartedAt !== null) {
+                var secs = Math.round((Date.now() - currentRunStartedAt) / 1000);
+                el.innerHTML = '<span class="spinner-small" style="display:inline-block;vertical-align:middle;"></span> ' +
+                    'SQL executing now… ' + secs + 's';
+                return;
+            }
+
+            var lease = readPipelineLease();
+            if (lease && lease.id !== TAB_ID) {
+                el.innerHTML = '<i class="fas fa-hourglass-half" style="color:#8b4513;"></i> ' +
+                    'Other tab executing SQL… ' + leaseAgeSeconds(lease) + 's';
+                return;
+            }
+
+            var waitMs = nextPipelineAllowedAt - Date.now();
+            if (waitMs <= 0) {
+                el.innerHTML = '<i class="fas fa-bolt" style="color:#8b4513;"></i> ' +
+                    'Next SQL run: starting now';
+            } else {
+                el.innerHTML = '<i class="fas fa-hourglass-half" style="color:#8b4513;"></i> ' +
+                    'Next SQL run in ' + Math.ceil(waitMs / 1000) + 's' +
+                    (consecutiveFailures > 0 ? ' (after failure)' : '');
+            }
+        }
+
+        /** Automatic tick while this tab may not start a cycle yet (back-off
+         *  window after a failure): keep the last result, no repaint. */
         function showSkippedTick() {
             if (!lastSuccessMsg) return;
-            var readSecs = Math.max(0, Math.round((nextReadAllowedAt - Date.now()) / 1000));
             var pipeSecs = Math.max(0, Math.round((nextPipelineAllowedAt - Date.now()) / 1000));
-            var notice = 'skip:' + readSecs + ':' + pipeSecs;
+            var notice = 'skip:' + pipeSecs;
             if (notice === lastWaitingNotice) return;
             lastWaitingNotice = notice;
             setStatusHtml(lastSuccessMsg +
-                ' · <span style="color:#666;">refreshing in ' + readSecs + 's' +
-                (PIPELINE_MIN_GAP_MS > 0 ? ' · next SQL pipeline in ' + pipeSecs + 's' : '') +
-                '</span>');
+                (PIPELINE_MIN_GAP_MS > 0
+                    ? ' · <span style="color:#666;">next SQL run in ' + pipeSecs + 's</span>'
+                    : ''));
         }
 
         async function refreshData(manual) {
@@ -1194,19 +1223,19 @@
 
             var now = Date.now();
 
-            // Two independent cadences:
-            //   READ  - a plain PostgREST GET of the result table: fast, so it
-            //           is safe on every 3s tick and keeps the report live.
-            //   ETL   - the RPC that TRUNCATEs + rebuilds the table: ~10s and
-            //           lock-contention prone, so at most once every
-            //           PIPELINE_MIN_GAP_MS and in ONE tab at a time.
-            var pipelineDue = manual || PIPELINE_MIN_GAP_MS <= 0 ||
-                (now >= nextPipelineAllowedAt);
-            var readDue = manual || (now >= nextReadAllowedAt);
+            // ONE cadence only: a complete full-SQL cycle.  There is NO
+            // read-only repaint any more — the chart/table are repopulated
+            // exclusively after run_mapping_sql finished successfully.
+            // With PIPELINE_MIN_GAP_MS = 0 the next cycle is due the moment
+            // the previous one completed (back-to-back); after a failure
+            // nextPipelineAllowedAt holds the back-off countdown.
+            var pipelineDue = manual || (now >= nextPipelineAllowedAt);
 
-            // Back-off window (after a DB-busy / timeout failure).
-            if (!readDue) {
+            // Back-off window (after a DB-busy / timeout failure): show the
+            // countdown, keep the last result, do not repaint.
+            if (!pipelineDue) {
                 showSkippedTick();
+                updateRunTimer();
                 return;
             }
 
@@ -1220,10 +1249,12 @@
             var lease = readPipelineLease();
             if (lease && lease.id !== TAB_ID) {
                 showWaitingForOtherTab(lease);
+                updateRunTimer();
                 return;
             }
-            if (pipelineDue && !claimPipelineLease()) {
+            if (!claimPipelineLease()) {
                 showWaitingForOtherTab(readPipelineLease());
+                updateRunTimer();
                 return;
             }
 
@@ -1231,31 +1262,34 @@
             lastWaitingNotice = null;
             setRefreshingState(true);
             var startedAt = Date.now();
-            if (pipelineDue) writeSharedLastRun(startedAt);
+            currentRunStartedAt = startedAt;
+            writeSharedLastRun(startedAt);
+            updateRunTimer();
 
+            var sqlCompleted = false;
             try {
-                const rows = await fetchTrendData(pipelineDue);
+                // 1) run the COMPLETE SQL script; 2) read the rows it
+                //    produced; 3) repaint — in that order, only on success.
+                const rows = await fetchTrendData(true);
+                sqlCompleted = true;
                 const columns = resolveColumns(rows);
 
                 updateChart(rows, columns);
                 updateTable(rows, columns);
 
                 consecutiveFailures = 0;
-                nextReadAllowedAt = Date.now() + REFRESH_INTERVAL_MS;
-                if (pipelineDue) {
-                    nextPipelineAllowedAt = Date.now() + PIPELINE_MIN_GAP_MS;
-                }
+                nextPipelineAllowedAt = Date.now() + PIPELINE_MIN_GAP_MS;
                 var lastRunMs = Date.now() - startedAt;
 
                 const now2 = new Date();
                 let msg = '<i class="fas fa-check-circle" style="color:green;"></i> ' +
-                    (pipelineDue ? 'SQL executed · ' : 'Data read · ') +
-                    rows.length + ' rows · ' + (DATA_SOURCE_TABLE || '?') +
+                    'SQL executed · ' + rows.length + ' rows · ' +
+                    (DATA_SOURCE_TABLE || '?') +
                     ' · Updated: ' + now2.toLocaleTimeString() +
                     ' · ' + (lastRunMs / 1000).toFixed(1) + 's' +
                     (PIPELINE_MIN_GAP_MS > 0
                         ? ' · pipeline every ' + Math.round(PIPELINE_MIN_GAP_MS / 1000) + 's'
-                        : '');
+                        : ' · back-to-back');
                 var age = dataAgeSeconds(rows[0]);
                 if (age >= 0) {
                     // Label the zone from the stored text: sno=10 writes New
@@ -1266,18 +1300,14 @@
                     msg += ' · Analysis: ' + fmtVal('analysis_timestamp', tsRaw) +
                         zone + ' (' + (age < 90 ? age + 's ago' : Math.round(age / 60) + 'm ago') + ')';
                 }
-                if (lastPipelineWarning) {
-                    msg = '<i class="fas fa-exclamation-circle" style="color:#e67e22;"></i> ' +
-                        'Pipeline warning: ' + lastPipelineWarning +
-                        ' - showing the last data · ' + msg;
-                }
                 setStatusHtml(msg);
                 lastSuccessMsg = msg;
             } catch (err) {
+                // The SQL did NOT complete → nothing was repainted; the last
+                // good chart/table stays on screen while we back off.
                 console.error('TrendAnalysis refresh error:', err);
                 consecutiveFailures++;
                 var delay = backoffDelayMs(consecutiveFailures);
-                nextReadAllowedAt = Date.now() + delay;
                 nextPipelineAllowedAt = Date.now() + delay;
 
                 var head;
@@ -1296,11 +1326,22 @@
                         'Error: ';
                 }
                 setStatusHtml(head + err.message +
-                    ' <span style="color:#666;">retrying in ' + Math.round(delay / 1000) + 's</span>' +
+                    ' <span style="color:#666;">retrying in ' + Math.round(delay / 1000) + 's' +
+                    (sqlCompleted ? '' : ' — report NOT refreshed') + '</span>' +
                     ' <span style="cursor:pointer;color:#8b4513;" onclick="refreshData(true)">Retry now</span>');
             } finally {
+                currentRunStartedAt = null;
                 releasePipelineLease();
                 setRefreshingState(false);
+                updateRunTimer();
+            }
+
+            // Back-to-back chaining: only after a COMPLETE SQL execution is
+            // the next cycle scheduled immediately (CHAIN_DELAY_MS lets the
+            // browser paint the fresh rows first).  After a failure the 3s
+            // scheduler tick picks it up when the back-off expires.
+            if (sqlCompleted && PIPELINE_MIN_GAP_MS <= 0) {
+                setTimeout(function () { refreshData(); }, CHAIN_DELAY_MS);
             }
         }
 
@@ -1319,6 +1360,11 @@
             refreshData();
 
             refreshTimer = setInterval(refreshData, REFRESH_INTERVAL_MS);
+
+            // 1-second countdown: shows how long the current SQL run has been
+            // going, or how long until the NEXT complete SQL execution starts.
+            updateRunTimer();
+            countdownTimer = setInterval(updateRunTimer, 1000);
         });
 
         // ┌──────────────────────────────────────────────────────────┐
