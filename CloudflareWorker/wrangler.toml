@@ -1,3 +1,7 @@
-name = "gammapace-nasdaq-proxy"
+# NOTE: the name below MUST match the live worker the frontend points at
+# (MarketTradingData.html DEFAULT_BACKEND_URL). Deploying updates that
+# exact URL — no Settings/frontend change needed.
+name = "workers-playground-summer-field-8601"
 main = "worker.js"
 compatibility_date = "2024-12-01"
+workers_dev = true

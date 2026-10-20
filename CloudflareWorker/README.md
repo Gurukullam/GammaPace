@@ -79,4 +79,5 @@ nothing breaks permanently and your Supabase data is unaffected.
 | `Backend probe failed ... unreachable` | Wrong URL in Settings, or worker not deployed yet. |
 | `HTTP 402 DEPLOYMENT_DISABLED` (old Vercel URL) | Settings still points at the suspended Vercel backend — swap in the worker URL. |
 | `HTTP 429 / quota` | Daily 100k limit reached — wait for the UTC reset. |
+| `HTTP 429 ... circuit OPEN/queued` | Worker fast-failing during a NASDAQ rate-limit window — expected; symbols are skipped and retried on the next Loop pass. |
 | `Origin not allowed (403)` | `ALLOWED_ORIGIN` in worker.js doesn't match your site's origin. |
