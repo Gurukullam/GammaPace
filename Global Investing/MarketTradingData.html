@@ -1574,14 +1574,13 @@ function getActiveModeForAPI(apiId) {
 // on a 403/429/503 rate-limit block it halves concurrency (min 2) and doubles
 // the gap to ride out the throttle, then re-ramps after 40 clean symbols.
 async function parallelFetchAll(symbols, fetchFn, options = {}) {
-  const { concurrency = 8, delayMs = 150, label = 'Fetch', onBatch, onProgress, maxRounds = 0, logEvery = 20 } = options;
+  const { concurrency = 32, delayMs = 0, label = 'Fetch', onBatch, onProgress, maxRounds = 2, logEvery = 20 } = options;
   const results = [];
   let successCount = 0;
   let failCount = 0;
   let failSkipped = 0; // rate-limited (403/429/503) symbols skipped fail-fast
   const total = symbols.length;
   let curCon = Math.max(2, concurrency);
-  let curDelay = delayMs;
   let cleanSeen = 0;
   let warned = 0;
   let todo = symbols.slice();
@@ -1621,7 +1620,6 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
           }
           if (isRateLimit) {
             curCon = Math.max(2, Math.floor(curCon / 2));
-            curDelay = Math.min(1200, curDelay * 2);
             cleanSeen = 0;
           }
         }
@@ -1629,7 +1627,6 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
 
       if (cleanSeen >= 40 && curCon < concurrency) {
         curCon = Math.min(concurrency, curCon + Math.max(2, Math.floor(concurrency / 8)));
-        curDelay = Math.max(delayMs, Math.floor(curDelay / 2));
         cleanSeen = 0;
       }
 
@@ -1642,7 +1639,10 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
         log(`${label}: ${successCount}/${total} ok · ${failSkipped} skipped (rate-limited)`);
       }
 
-      if (cursor < roundTotal && !cancelRequested) await new Promise(r => setTimeout(r, curDelay));
+      // NO DELAY between batches -- fire all requests in parallel; worker handles pacing
+      if (delayMs > 0 && cursor < roundTotal && !cancelRequested) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
     }
 
     if (todo.length > 0 && round < maxRounds) {
@@ -2270,8 +2270,8 @@ async function loadChart() {
       return [];
     },
     {
-      concurrency: 6,
-      delayMs: 150,
+      concurrency: 32,
+      delayMs: 0,
       label: 'Chart Data',
       logEvery: 50,
       onProgress: (processed, total, ok, fail) => {
