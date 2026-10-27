@@ -1584,6 +1584,9 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
   let cleanSeen = 0;
   let warned = 0;
   let smoothedLatency = delayMs * 0.2; // EWMA estimate of batch latency (ms) — start optimistic
+  // HIGH-CONCURRENCY MODE: 50 parallel symbols per batch for maximum throughput.
+  // Rate limits are per-proxy-IP (NASDAQ/Akamai), fail-fast skip + next-Loop recovery
+  // ensures zero data loss even with large batches.
   let todo = symbols.slice();
 
   for (let round = 0; round <= maxRounds && todo.length > 0; round++) {
@@ -1600,8 +1603,8 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
       const batchStart = Date.now();
       const batchResults = await Promise.allSettled(batch.map(sym => fetchFn(sym)));
       const batchLatency = Date.now() - batchStart;
-      // EWMA: 40% weight on latest batch, 60% on smoothed history — faster adaptation
-      smoothedLatency = 0.4 * batchLatency + 0.6 * smoothedLatency;
+      // EWMA: 50% weight on latest batch, 50% on smoothed history — fastest adaptation
+      smoothedLatency = 0.5 * batchLatency + 0.5 * smoothedLatency;
       cursor += batch.length; // advance by ACTUAL count — every symbol processed exactly once
 
       batchResults.forEach((res, idx) => {
@@ -1645,10 +1648,11 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
       }
 
       // NO DELAY between batches -- fire all requests in parallel; worker handles pacing
-      // Adaptive pacing: wait based on actual batch latency (EWMA), floored at 50ms safety,
-      // capped at delayMs (original cap). If API is fast (~30-40ms), wait ~50-60ms instead of 150ms.
+      // Adaptive pacing: wait based on actual batch latency (EWMA), floored at 30ms safety,
+      // capped at delayMs (original cap). If API is fast (~20-30ms), wait ~30-45ms instead of 150ms.
+      // HIGH-CONCURRENCY: 50 symbols/batch → 50+ rows per progress increment.
       if (delayMs > 0 && cursor < roundTotal && !cancelRequested) {
-        const waitTime = Math.max(50, Math.min(delayMs, Math.round(smoothedLatency * 1.5)));
+        const waitTime = Math.max(30, Math.min(delayMs, Math.round(smoothedLatency * 1.5)));
         if (waitTime > 0) { await new Promise(r => setTimeout(r, waitTime)); }
       }
     }
@@ -2101,7 +2105,7 @@ async function loadBasicQuotes() {
       return [];
     },
     {
-      concurrency: 10,
+      concurrency: 50,
       delayMs: 150,
       label: 'Current Quote (Basic)',
       logEvery: 50,
@@ -2278,7 +2282,7 @@ async function loadChart() {
       return [];
     },
     {
-      concurrency: 10,
+      concurrency: 50,
       delayMs: 150,
       label: 'Chart Data',
       logEvery: 50,
