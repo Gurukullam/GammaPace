@@ -1574,7 +1574,7 @@ function getActiveModeForAPI(apiId) {
 // on a 403/429/503 rate-limit block it halves concurrency (min 2) and doubles
 // the gap to ride out the throttle, then re-ramps after 40 clean symbols.
 async function parallelFetchAll(symbols, fetchFn, options = {}) {
-  const { concurrency = 32, delayMs = 0, label = 'Fetch', onBatch, onProgress, maxRounds = 2, logEvery = 20 } = options;
+  const { concurrency = 6, delayMs = 150, label = 'Fetch', onBatch, onProgress, maxRounds = 2, logEvery = 20 } = options;
   const results = [];
   let successCount = 0;
   let failCount = 0;
@@ -1583,6 +1583,7 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
   let curCon = Math.max(2, concurrency);
   let cleanSeen = 0;
   let warned = 0;
+  let smoothedLatency = delayMs * 0.4; // EWMA estimate of batch latency (ms)
   let todo = symbols.slice();
 
   for (let round = 0; round <= maxRounds && todo.length > 0; round++) {
@@ -1596,7 +1597,11 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
       if (cancelRequested) { log(`${label}: Cancelled by user at ${cursor}/${roundTotal} (round ${round + 1})`, 'warn'); break; }
       const size = Math.min(curCon, roundTotal - cursor);
       const batch = batchSymbols.slice(cursor, cursor + size);
+      const batchStart = Date.now();
       const batchResults = await Promise.allSettled(batch.map(sym => fetchFn(sym)));
+      const batchLatency = Date.now() - batchStart;
+      // EWMA: 25% weight on latest batch, 75% on smoothed history
+      smoothedLatency = 0.25 * batchLatency + 0.75 * smoothedLatency;
       cursor += batch.length; // advance by ACTUAL count — every symbol processed exactly once
 
       batchResults.forEach((res, idx) => {
@@ -1640,8 +1645,11 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
       }
 
       // NO DELAY between batches -- fire all requests in parallel; worker handles pacing
+      // Adaptive pacing: wait based on actual batch latency (EWMA), floored at 80ms safety,
+      // capped at delayMs (original cap). If API is fast (~40ms), wait ~80-90ms instead of 150ms.
       if (delayMs > 0 && cursor < roundTotal && !cancelRequested) {
-        await new Promise(r => setTimeout(r, delayMs));
+        const waitTime = Math.max(80, Math.min(delayMs, Math.round(smoothedLatency * 1.5)));
+        if (waitTime > 0) { await new Promise(r => setTimeout(r, waitTime)); }
       }
     }
 
@@ -2095,6 +2103,7 @@ async function loadBasicQuotes() {
     {
       concurrency: 6,
       delayMs: 150,
+      maxRounds: 1, // same adaptive pacing — fail-fast skip rate-limits, recover on next Loop
       label: 'Current Quote (Basic)',
       logEvery: 50,
       onProgress: (processed, total, ok, fail) => {
@@ -2270,8 +2279,9 @@ async function loadChart() {
       return [];
     },
     {
-      concurrency: 32,
-      delayMs: 0,
+      concurrency: 6,
+      delayMs: 150,
+      maxRounds: 1, // chart data: fail-fast skip rate-limits; retries are wasted — recover on next Loop
       label: 'Chart Data',
       logEvery: 50,
       onProgress: (processed, total, ok, fail) => {
