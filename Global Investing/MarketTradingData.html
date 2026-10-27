@@ -1583,7 +1583,7 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
   let curCon = Math.max(2, concurrency);
   let cleanSeen = 0;
   let warned = 0;
-  let smoothedLatency = delayMs * 0.4; // EWMA estimate of batch latency (ms)
+  let smoothedLatency = delayMs * 0.2; // EWMA estimate of batch latency (ms) — start optimistic
   let todo = symbols.slice();
 
   for (let round = 0; round <= maxRounds && todo.length > 0; round++) {
@@ -1600,8 +1600,8 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
       const batchStart = Date.now();
       const batchResults = await Promise.allSettled(batch.map(sym => fetchFn(sym)));
       const batchLatency = Date.now() - batchStart;
-      // EWMA: 25% weight on latest batch, 75% on smoothed history
-      smoothedLatency = 0.25 * batchLatency + 0.75 * smoothedLatency;
+      // EWMA: 40% weight on latest batch, 60% on smoothed history — faster adaptation
+      smoothedLatency = 0.4 * batchLatency + 0.6 * smoothedLatency;
       cursor += batch.length; // advance by ACTUAL count — every symbol processed exactly once
 
       batchResults.forEach((res, idx) => {
@@ -1645,10 +1645,10 @@ async function parallelFetchAll(symbols, fetchFn, options = {}) {
       }
 
       // NO DELAY between batches -- fire all requests in parallel; worker handles pacing
-      // Adaptive pacing: wait based on actual batch latency (EWMA), floored at 80ms safety,
-      // capped at delayMs (original cap). If API is fast (~40ms), wait ~80-90ms instead of 150ms.
+      // Adaptive pacing: wait based on actual batch latency (EWMA), floored at 50ms safety,
+      // capped at delayMs (original cap). If API is fast (~30-40ms), wait ~50-60ms instead of 150ms.
       if (delayMs > 0 && cursor < roundTotal && !cancelRequested) {
-        const waitTime = Math.max(80, Math.min(delayMs, Math.round(smoothedLatency * 1.5)));
+        const waitTime = Math.max(50, Math.min(delayMs, Math.round(smoothedLatency * 1.5)));
         if (waitTime > 0) { await new Promise(r => setTimeout(r, waitTime)); }
       }
     }
@@ -2101,9 +2101,8 @@ async function loadBasicQuotes() {
       return [];
     },
     {
-      concurrency: 6,
+      concurrency: 10,
       delayMs: 150,
-      maxRounds: 1, // same adaptive pacing — fail-fast skip rate-limits, recover on next Loop
       label: 'Current Quote (Basic)',
       logEvery: 50,
       onProgress: (processed, total, ok, fail) => {
@@ -2279,9 +2278,8 @@ async function loadChart() {
       return [];
     },
     {
-      concurrency: 6,
+      concurrency: 10,
       delayMs: 150,
-      maxRounds: 1, // chart data: fail-fast skip rate-limits; retries are wasted — recover on next Loop
       label: 'Chart Data',
       logEvery: 50,
       onProgress: (processed, total, ok, fail) => {
